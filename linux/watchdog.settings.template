@@ -1,0 +1,29 @@
+# $Id: watchdog.settings.template,v 1.1 2015/03/17 01:23:19 cmayer Exp $
+#
+# watchdog.settings
+
+# 
+# These are the default timeouts, in seconds, before the watchdog will
+# initiate a failover.  If they are set to low, they can cause unexpected
+# failover events and controller downtime.  The following defaults are very
+# conservative and should be overridden with site-specific settings by
+# copying this file to $APPD_ROOT/HA/watchdog.settings and editing
+# it appropriately.
+
+# Controller app server not reachable via HTTP(S):  5 Minutes
+DOWNLIMIT=300
+
+# Controller app server shutting down: 5 Minutes
+FALLINGLIMIT=300
+
+# Controller app server starting up: 60 Minutes
+RISINGLIMIT=3600
+
+# The primary database is not responding: 5 Minutes
+DBDOWNLIMIT=300
+
+# The active controller host is not responding to ICMP echo, (ping),
+# requests: 5 Minutes
+PINGLIMIT=300
+
+
