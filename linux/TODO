@@ -1,0 +1,18 @@
+install-init.sh
+	require curl
+
+replicate.sh:
+	check for bc and vim-tiny/minimal. warn if not installed, and exit
+	add update logic
+	
+
+make it that assassin auto-kills if replicate is run.
+make a make-keys script
+make a check-prerequisites script
+make a system-check script
+	deadline (or controller running on ZFS)
+	swap space
+	nofile ( moot point.  handled by init script)
+	swappiness
+	sizing (heap, buffer cache) ram total
+iptables rule for 3388
