@@ -59,7 +59,7 @@ function stop_appdynamics_services()
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		$ssh $secondary $sudo service $s stop || ((errors++))
+		$ssh $secondary $sudo /sbin/service $s stop || ((errors++))
 	done
 	return $errors;
 }
@@ -89,8 +89,8 @@ function verify_sudo_service_cmds(){
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		$ssh $secondary sudo -l service $s start > /dev/null 2>&1 || ((errors++))
-		$ssh $secondary sudo -l service $s stop > /dev/null 2>&1 || ((errors++))
+		$ssh $secondary sudo -l /sbin/service $s start > /dev/null 2>&1 || ((errors++))
+		$ssh $secondary sudo -l /sbin/service $s stop > /dev/null 2>&1 || ((errors++))
 	done
 	return $errors;
 }
@@ -643,7 +643,7 @@ fi
 echo "  -- starting primary database" | tee -a $repl_log
 # Do not proceed unless the primary starts cleanly or we could end up with
 #  unexpected failovers.
-if ! $sudo service appdcontroller-db start >> $repl_log 2>&1 ; then
+if ! $sudo /sbin/service appdcontroller-db start >> $repl_log 2>&1 ; then
 	echo "-- failed to start primary database.  Exiting..." | tee -a $repl_log
 	exit 1
 fi
@@ -740,7 +740,7 @@ ssh $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE >> $repl_log 2>&1
 # start the secondary database
 #
 echo "  -- start secondary database" | tee -a $repl_log
-ssh -t $secondary $sudo service appdcontroller-db start >> $repl_log 2>&1
+ssh -t $secondary $sudo /sbin/service appdcontroller-db start >> $repl_log 2>&1
 
 #
 # ugly hack here - there seems to be a small timing problem
@@ -864,11 +864,11 @@ ssh $secondary rm -f $APPD_ROOT/HA/APPSERVER_DISABLE >> $repl_log 2>&1
 #
 if [ $start_appserver = "true" ] ; then
 	echo "  -- start primary appserver" | tee -a $repl_log
-	$sudo service appdcontroller start >> $repl_log 2>&1
+	$sudo /sbin/service appdcontroller start >> $repl_log 2>&1
 	echo "  -- secondary service start" | tee -a $repl_log
 	# issues with the command actually starting the watchdog on the secondary.
 	# further troubleshooting needed
-	ssh -t $secondary $sudo service appdcontroller start >> $repl_log 2>&1
+	ssh -t $secondary $sudo /sbin/service appdcontroller start >> $repl_log 2>&1
 #	ssh $secondary $sudo service appdcontroller start >> $repl_log 2>&1
 	echo "  -- HA setup complete." | tee -a $repl_log
 fi
