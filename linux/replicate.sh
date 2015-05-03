@@ -160,7 +160,7 @@ while getopts :s:e:i:c:dfhjut:nwzFHW flag; do
 			usage
 		fi
 		# fall through - only valid in bash 4.0+
-		;&
+		;;
 	t)
 		if echo $OPTARG | grep -q '^-' ; then
 			((OPTIND--))
