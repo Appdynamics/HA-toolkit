@@ -153,13 +153,12 @@ while getopts :s:e:i:c:dfhjut:nwzFHW flag; do
 		exit 8
 		;;
 	:)
-		echo yarg $OPTARG
+		# optional arguments are handled here
 		if [ $OPTARG = 't' ] ; then
-			OPTARG=0
+			rsync_throttle=""
 		else
 			usage
 		fi
-		# fall through - only valid in bash 4.0+
 		;;
 	t)
 		if echo $OPTARG | grep -q '^-' ; then
