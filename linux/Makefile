@@ -9,7 +9,8 @@ SOURCES= README Makefile \
 	assassin.sh failover.sh watchdog.sh \
 	install-init.sh uninstall-init.sh \
 	watchdog.settings.template \
-	replicate.sh install-init.sh uninstall-init.sh
+	replicate.sh install-init.sh uninstall-init.sh \
+	appdservice.c
 
 all: HA.shar
 
@@ -24,3 +25,10 @@ install:
 HA.shar: $(SOURCES)
 	date +"# HA package built %c" > HA.shar
 	shar $(SOURCES) | sed -e 's/^exit/chmod ugo+rx . .. *.sh; exit/' >> HA.shar
+
+#
+# not used normally, as the install-init.sh compiles it in an installation
+# here for development purposes.
+#
+appdservice: appdservice.c
+	cc -DAPPDUSER=`id -u` -o appdservice appdservice.c
