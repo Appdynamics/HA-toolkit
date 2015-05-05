@@ -22,6 +22,10 @@ if echo $VENDOR | grep -iq ubuntu ; then
 	APPDYNAMICS_SERVICE_STOP=( 90 89 )
 fi
 
+use_sudo=true
+use_appdservice=false
+APPDSERVICE=/sbin/appdservice
+
 cd $(dirname $0)
 APPD_ROOT=`cd .. ; pwd`
 if ! [ -d $APPD_ROOT/bin ] ; then
@@ -93,6 +97,8 @@ fi
 # this is not a security hole, it is a controlled privilege escalation, really.
 #
 if [[ `id -u $RUNUSER` != "0" ]] ; then
+
+	if [ $use_sudo == true ] ; then
 	require sudo sudo sudo || exit 1
 	[ -d /etc/sudoers.d ] || mkdir /etc/sudoers.d && chmod 0750 /etc/sudoers.d
 	grep -Eq "^#includedir[\t ]+/etc/sudoers.d[\t ]*$" /etc/sudoers || \
@@ -126,6 +132,15 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 		$RUNUSER ALL=(root) NOPASSWD: APPD
 	SUDOERS
 	chmod 0440 /etc/sudoers.d/appdynamics
+	fi
+
+	if [ $use_appdservice == true ] ; then
+		# compile wrapper, chown and chmod with setuid
+		cc -DAPPDUSER=`id -u $RUNUSER` -o $APPDSERVICE appdservice.c
+		chown root:root $APPDSERVICE
+		chmod 4755 $APPDSERVICE
+	fi
+
 	if ! require setcap libcap libcap2-bin && \
 		[[ `echo "cat //*[@port<1024]" | xmllint --shell $DOMAIN_XML | wc -l` -gt 1 ]] ; then
 		echo "\

@@ -159,6 +159,10 @@ main(int argc, char**argv)
 		exit(3);
 	}
 	
+	/* definitively become root */
+	setreuid(0, 0);
+	setregid(0, 0);
+
 	/* iterate through handlers until null */
 	for (hand = 0; prog = actions[act].handlers[hand].prog; hand++) {
 
