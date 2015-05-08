@@ -22,13 +22,18 @@
 #include <unistd.h>
 #include <fcntl.h>
 
+/*
+ * these names are intentionally not the same pointer, even though they have
+ * the same value.
+ * we never copy anything from the arguments to the exec arguments.
+ */
 struct service {
 	char *name;
 	char *service_name;
 } services[] = {
-	{ "controller",	"appdcontroller" },
-	{ "db",			"appdcontroller-db" },
-	{ "machine_agent", "appdmachine-agent" }
+	{ "appdcontroller",		"appdcontroller" },
+	{ "appdcontroller-db",	"appdcontroller-db" },
+	{ "appdmachine_agent", 	"appdmachine-agent" }
 };
 #define NSRV (sizeof(services)/sizeof(services[0]))
 
@@ -42,6 +47,11 @@ struct action {
 		char *verb;
 	} handlers[NHAND];
 } actions[] = {
+	{ "status", {
+		{ "service", "status" },
+		{ 0, 0 },
+		{ 0, 0 }}
+	},
 	{ "start", {
 		{ "service", "start" },
 		{ 0, 0 },

@@ -14,8 +14,6 @@ APPD_ROOT=$( cd $(dirname "$0"); cd .. ; pwd)
 dbpasswd=`cat $APPD_ROOT/db/.rootpw`
 dbport=`grep ^DB_PORT $APPD_ROOT/bin/controller.sh | cut -d = -f 2`
 WATCHDOG=$APPD_ROOT/HA/appd_watchdog.pid
-running_as_root=$( [[ $(id -u) == 0 ]] && echo "true" || echo "false" )
-sudo=$( [ "$running_as_root" == "false" ] && echo "sudo" )
 
 #
 # these are derived, but should not need editing
@@ -46,6 +44,29 @@ function slave_status {
 		/Seconds_Behind_Master:/ {print "seconds_behind=",$2}
 		/Master_Host:/ {print "primary=",$2}
 	'`
+}
+
+# abstract out the privilege escalation
+if [ `uid -u` == 0 ] ; then
+	function remservice {
+		ssh $1 $2 $3 $4
+	}	
+else
+	if [ -x /sbin/appdservice ] ; then
+		function service {
+			/sbin/appdservice $2 $3
+		}
+		function remservice {
+			ssh $1 $2 /sbin/appdservice $3 $4
+		}	
+	else
+		function service {
+			sudo service $2 $3
+		}
+		function remservice {
+			ssh $1 $2 sudo service $3 $4
+		}	
+	fi
 }
 
 #
@@ -151,7 +172,7 @@ done
 # kill the local appserver if it's running
 #
 echo "  -- Kill Local Appserver" | tee -a $fo_log
-$sudo service appdcontroller stop >> $fo_log 2>&1
+service appdcontroller stop >> $fo_log 2>&1
 
 #
 # persistently break replication if the primary is down, 
@@ -184,7 +205,7 @@ fi
 #
 if [ "$primary_up" = "true" ] ; then
 	echo "  -- Stop primary appserver" | tee -a $fo_log
-	ssh -tq $primary $sudo service appdcontroller stop >> $fo_log 2>&1
+	remservice -tq $primary appdcontroller stop >> $fo_log 2>&1
 	echo "  -- Mark primary passive + secondary" | tee -a $fo_log
 	sql $primary "update global_configuration_local set value='passive' where name = 'appserver.mode';"
 	sql $primary "update global_configuration_local set value='secondary' where name = 'ha.controller.type';"
@@ -194,7 +215,7 @@ if [ "$primary_up" = "true" ] ; then
 	if [ "$break_replication" == true ] ; then
 		primary_up=false
 		echo "  -- Stop secondary database" | tee -a $fo_log
-		ssh -tq $primary $sudo service appdcontroller-db stop >> $fo_log 2>&1
+		remservice -tq $primary appdcontroller-db stop >> $fo_log 2>&1
 		ssh -tq $primary ed -s $DBCNF <<- 'DISABLEP'
 g/^skip-slave-start/d
 $a
@@ -222,14 +243,14 @@ fi
 echo "  -- Mark local active" | tee -a $fo_log
 echo "  -- Starting local Controller" | tee -a $fo_log
 sql localhost "update global_configuration_local set value='active' where name = 'appserver.mode';"
-$sudo service appdcontroller start >> $fo_log 2>&1
+service appdcontroller start >> $fo_log 2>&1
 
 #
 # if the other side was ok, then we can start the service in passive mode
 #
 if [ "$primary_up" = "true" ] ; then
 	echo "  -- start passive secondary" | tee -a $fo_log
-	ssh -nqf $primary sudo service appdcontroller start | tee -a $fo_log 2>&1 &
+	remservice -nqf $primary appdcontroller start | tee -a $fo_log 2>&1 &
 fi
 
 echo "  -- Failover complete" | tee -a $fo_log
