@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.8 2015-03-30 17:50:50 cmayer Exp $
+# $Id: replicate.sh 2.9 2015-05-08 02:00:16 cmayer Exp $
 #
 # install HA to a controller pair
 #
@@ -24,7 +24,6 @@ datadir=
 upgrade=
 final=false
 running_as_root=$( [[ $(id -u) -eq 0 ]] && echo "true" || echo "false" )
-sudo=$( [ "$running_as_root" == "false" ] && echo "sudo" )
 #
 # the services in this list must appear in the order in which they should be
 # stopped
@@ -41,6 +40,34 @@ watchdog_enable=false
 rsync_compression=""
 wildcard=
 
+# execute remote service operation
+# args:  flags machine service verb
+function remservice {
+	if [ `id -u` == 0 ] ; then
+		ssh $1 $2 /sbin/service $3 $4
+	else
+		if ssh $2 test -x /sbin/appdservice ; then
+			ssh $1 $2 /sbin/appdservice $3 $4
+		else
+			ssh $1 $2 sudo -n /sbin/appdservice $3 $4
+		fi
+	fi
+}
+
+# execute service operation
+# args: service verb
+function service {
+	if [ `id -u` == 0 ] ; then
+		/sbin/service $1 $2
+	else
+		if [ -x /sbin/appdservice ] ; then
+			/sbin/appdservice $1 $2
+		else
+			sudo -n /sbin/service $1 $2
+		fi
+	fi
+}
+
 function help()
 {
 	if [ -f README ] ; then
@@ -55,11 +82,14 @@ function help()
 function stop_appdynamics_services()
 {
 	local secondary=$1
-	local ssh=`[ -n "$secondary" ] && echo "ssh -tq"`
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		$ssh $secondary $sudo /sbin/service $s stop || ((errors++))
+		if [ -z "$secondary" ] ; then
+			service $s stop || ((errors++))
+		else
+			remservice -tq $secondary $s stop || ((errors++))
+		fi
 	done
 	return $errors;
 }
@@ -80,18 +110,43 @@ function verify_init_scripts()
 			((errors++))
 		fi
 	done
+	if [ $errors -gt 0 ] ; then
+		if [ -z $secondary ] ; then
+			echo "\
+One or more AppDynamics init scripts are not installed or are out of date.
+Please run $APPD_ROOT/HA/install-init.sh as root before proceeding."
+		else
+			echo "\
+One or more AppDynamics init scripts are not installed or are out of date on
+$secondary.  Please run $APPD_ROOT/HA/install-init.sh as root on $secondary
+before proceeding."
+		fi
+	fi
 	return $errors;
 }
 
-function verify_sudo_service_cmds(){
+function verify_privilege_escalation(){
 	local secondary=$1
 	local ssh=`[ -n "$secondary" ] && echo "ssh -tq"`
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		$ssh $secondary sudo -l /sbin/service $s start > /dev/null 2>&1 || ((errors++))
-		$ssh $secondary sudo -l /sbin/service $s stop > /dev/null 2>&1 || ((errors++))
+		if ! $ssh $secondary /bin/test -x /sbin/appdservice ; then
+			$ssh $secondary sudo -nl /sbin/service $s start > /dev/null 2>&1 || ((errors++))
+			$ssh $secondary sudo -nl /sbin/service $s stop > /dev/null 2>&1 || ((errors++))
+		fi
 	done
+	if [ $errors -gt 0 ] ; then
+		if [ -z $secondary ] ; then
+			echo "\
+$RUNUSER is unable to start and stop appdynamics services
+Please ensure that $APPD_ROOT/HA/install-init.sh has been run."
+		else
+			echo "\
+$RUNUSER is unable to start and stop appdynamics services on $secondary.
+Please ensure that $APPD_ROOT/HA/install-init.sh has been run on $secondary."
+		fi
+	fi
 	return $errors;
 }
 
@@ -338,6 +393,35 @@ fi
 # if final, make sure the latest init scripts are installed and stop the primary database
 #
 if [ $final == 'true' ] ; then
+
+	# make sure the latest init scripts are installed on both hosts
+	if [ "$running_as_root" == "false" ] ; then
+		if ! verify_init_scripts; then
+			missing_init="true" 
+		fi
+		if ! verify_init_scripts $secondary ; then
+			missing_init="true"
+		fi
+		if [ "$missing_init" = "true" ] ; then
+			echo "Cannot proceed"
+			exit 7
+		fi
+		# verify that we can cause service state changes
+		if ! verify_privilege_escalation ; then
+			bad_sudo="true"
+		fi
+		if ! verify_privilege_escalation $secondary ; then
+			bad_sudo="true"
+		fi
+		if [ "$bad_sudo" = "true" ] ; then
+			echo "Cannot proceed"
+			exit 9
+		fi
+	else
+		$APPD_ROOT/HA/install-init.sh
+		ssh $secondary $APPD_ROOT/HA/install-init.sh
+	fi
+
 	echo "  -- stopping primary" | tee -a $repl_log
 	rsync_opts=$final_rsync_opts
 	rsync_throttle=""
@@ -470,44 +554,8 @@ else
 fi
 
 if [ "$final" == "true" ] ; then
-	# make sure the latest init scripts are installed on both hosts
-	if [ "$running_as_root" == "false" ] ; then
-		if ! verify_init_scripts; then
-			echo "\
-One or more AppDynamics init scripts are not installed or are out of date.
-Please run $APPD_ROOT/HA/install-init.sh as root before proceeding."
-			missing_init="true" 
-		fi
-		if ! verify_init_scripts $secondary ; then
-			echo "\
-One or more AppDynamics init scripts are not installed or are out of date on
-$secondary.  Please run $APPD_ROOT/HA/install-init.sh as root on $secondary
-before proceeding."
-			missing_init="true"
-		fi
-		if [ "$missing_init" = "true" ] ; then
-			exit 7
-		fi
-		# verify that the "sudo service commands work"
-		if ! verify_sudo_service_cmds ; then
-			echo"\
-$RUNUSER is unable to start and stop appdynamics services with sudo.  Please
-verify that sudo is configured to include the contents of
-/etc/sudoers.d/appdynamics"
-			bad_sudo="true"
-		fi
-		if ! verify_sudo_service_cmds $secondary ; then
-			echo"\
-$RUNUSER unable to start and stop appdynamics services with sudo on $secondary.
-Please verify that sudo is configured on $secondary to include the contents of
-/etc/sudoers.d/appdynamics"
-			bad_sudo="true"
-		fi
-		if [ "$bad_sudo" = "true" ] ; then
-			exit 9
-		fi
-	else
-		$APPD_ROOT/HA/install-init.sh
+
+	if [ "$running_as_root" == "true" ] ; then
 		ssh $secondary $APPD_ROOT/HA/install-init.sh
 	fi
 
@@ -541,7 +589,7 @@ CHANGEID
 # edit the secondary to change the server id
 #
 echo "  -- changing secondary server id" | tee -a $repl_log
-cat $tmpdir/ha.changeid | ssh  $secondary ex -s $APPD_ROOT/db/db.cnf >> $repl_log 2>&1
+cat $tmpdir/ha.changeid | ssh $secondary ex -s $APPD_ROOT/db/db.cnf >> $repl_log 2>&1
 
 #
 # if we're only do incremental, then no need to stop primary
@@ -552,36 +600,13 @@ if [ $final == 'false' ] ; then
 	# and warn user if they need to be updated before final
 	#
 	if [ "$running_as_root" == 'false' ] ; then
-		if ! verify_init_scripts; then
-			echo "\
-WARNING: One or more AppDynamics init scripts are not installed or are out of
-date. Please run $APPD_ROOT/HA/install-init.sh
-as root before running replicate.sh with the -f flag.
-"
-		elif ! verify_sudo_service_cmds ; then
-			echo"\
-WARNING: $RUNUSER is unable to start and stop appdynamics services with sudo.
-Please verify that sudo is configured to include the contents of
-/etc/sudoers.d/appdynamics before running replicate.sh with the -f flag.
-"
-		fi
-		if ! verify_init_scripts $secondary ; then
-			echo "\
-WARNING: One or more AppDynamics init scripts are not installed or are out of
-date on $secondary. Please run $APPD_ROOT/HA/install-init.sh
-as root on $secondary before running replicate.sh with the -f flag.
-"
-		elif ! verify_sudo_service_cmds $secondary ; then
-			echo "\
-WARNING: $RUNUSER unable to start and stop appdynamics services with sudo on
-$secondary. Please verify that sudo is configured on $secondary to include the
-contents of /etc/sudoers.d/appdynamics before running replicate.sh with the -f
-flag.
-"
-		fi
+		verify_init_scripts
+		verify_init_scripts $secondary
+		verify_privilege_escalation
+		verify_privilege_escalation $secondary
 	fi
 	echo "  -- incremental sync done" | tee -a $repl_log
-	exit 0;
+	exit 0
 fi
 
 #
@@ -642,7 +667,7 @@ fi
 echo "  -- starting primary database" | tee -a $repl_log
 # Do not proceed unless the primary starts cleanly or we could end up with
 #  unexpected failovers.
-if ! $sudo /sbin/service appdcontroller-db start >> $repl_log 2>&1 ; then
+if ! service appdcontroller-db start >> $repl_log 2>&1 ; then
 	echo "-- failed to start primary database.  Exiting..." | tee -a $repl_log
 	exit 1
 fi
@@ -656,7 +681,7 @@ if [ -z $wildcard ] ; then
 		/ERROR 1045/ { gsub("^.*@",""); print $1;}
 		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
 
-	secondary1=`ssh  $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=3388 --protocol=TCP --user=impossible 2>&1 | awk '
+	secondary1=`ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=3388 --protocol=TCP --user=impossible 2>&1 | awk '
 		/ERROR 1045/ { gsub("^.*@",""); print $1;}
 		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
 
@@ -739,7 +764,10 @@ ssh $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE >> $repl_log 2>&1
 # start the secondary database
 #
 echo "  -- start secondary database" | tee -a $repl_log
-ssh -t $secondary $sudo /sbin/service appdcontroller-db start >> $repl_log 2>&1
+if ! remservice -t $secondary appdcontroller-db start >> $repl_log 2>&1 ; then
+	echo "could not start secondary database"
+	exit 10
+fi
 
 #
 # ugly hack here - there seems to be a small timing problem
@@ -754,12 +782,12 @@ done
 # make all the changes on the secondary
 #
 echo "  -- setting up secondary slave" | tee -a $repl_log
-cat $tmpdir/ha.secondary | ssh  $secondary $APPD_ROOT/bin/controller.sh login-db >> $repl_log 2>&1
+cat $tmpdir/ha.secondary | ssh $secondary $APPD_ROOT/bin/controller.sh login-db >> $repl_log 2>&1
 
 echo "  -- removing skip-slave-start from primary" | tee -a $repl_log
 cat $tmpdir/ha.enable | ex -s $APPD_ROOT/db/db.cnf
 echo "  -- removing skip-slave-start from secondary" | tee -a $repl_log
-cat $tmpdir/ha.enable | ssh  $secondary ex -s $APPD_ROOT/db/db.cnf
+cat $tmpdir/ha.enable | ssh $secondary ex -s $APPD_ROOT/db/db.cnf
 
 #
 # start the replication slaves
@@ -768,7 +796,7 @@ echo "  -- start primary slave" | tee -a $repl_log
 echo "START SLAVE;" | $APPD_ROOT/bin/controller.sh login-db >> $repl_log 2>&1
 
 echo "  -- start secondary slave" | tee -a $repl_log
-echo "START SLAVE;" | ssh  $secondary $APPD_ROOT/bin/controller.sh login-db >> $repl_log 2>&1
+echo "START SLAVE;" | ssh $secondary $APPD_ROOT/bin/controller.sh login-db >> $repl_log 2>&1
 
 #
 # slave status on both ends
@@ -783,7 +811,7 @@ echo "SHOW SLAVE STATUS\G" | \
 	tee -a $repl_log 2>&1
 echo "  -- secondary slave status " | tee -a $repl_log
 echo "SHOW SLAVE STATUS\G" | \
-	ssh  $secondary $APPD_ROOT/bin/controller.sh login-db | \
+	ssh $secondary $APPD_ROOT/bin/controller.sh login-db | \
 	awk '/Slave_IO_State/ {print}
 	/Seconds_Behind_Master/ {print} 
 	/Master_Server_Id/ {print}
@@ -863,12 +891,18 @@ ssh $secondary rm -f $APPD_ROOT/HA/APPSERVER_DISABLE >> $repl_log 2>&1
 #
 if [ $start_appserver = "true" ] ; then
 	echo "  -- start primary appserver" | tee -a $repl_log
-	$sudo /sbin/service appdcontroller start >> $repl_log 2>&1
+	if ! service appdcontroller start >> $repl_log 2>&1 ; then
+		echo "could not start primary appdcontroller service"
+		exit 12
+	fi
+
 	echo "  -- secondary service start" | tee -a $repl_log
 	# issues with the command actually starting the watchdog on the secondary.
 	# further troubleshooting needed
-	ssh -t $secondary $sudo /sbin/service appdcontroller start >> $repl_log 2>&1
-#	ssh $secondary $sudo service appdcontroller start >> $repl_log 2>&1
+	if ! remservice -t $secondary appdcontroller start >> $repl_log 2>&1; then
+		echo "could not start secondary appdcontroller service"
+		exit 11
+	fi
 	echo "  -- HA setup complete." | tee -a $repl_log
 fi
 

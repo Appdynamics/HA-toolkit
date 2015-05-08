@@ -23,7 +23,7 @@ if echo $VENDOR | grep -iq ubuntu ; then
 fi
 
 use_sudo=true
-use_appdservice=false
+use_appdservice=true
 APPDSERVICE=/sbin/appdservice
 
 cd $(dirname $0)
