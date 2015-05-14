@@ -46,10 +46,10 @@ function remservice {
 	if [ `id -u` == 0 ] ; then
 		ssh $1 $2 /sbin/service $3 $4
 	else
-		if ssh $2 test -x /sbin/appdservice ; then
+		if ssh $2 [ -x /sbin/appdservice ] ; then
 			ssh $1 $2 /sbin/appdservice $3 $4
 		else
-			ssh $1 $2 sudo -n /sbin/appdservice $3 $4
+			ssh $1 $2 sudo -n /sbin/service $3 $4
 		fi
 	fi
 }
@@ -131,7 +131,7 @@ function verify_privilege_escalation(){
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		if ! $ssh $secondary /bin/test -x /sbin/appdservice ; then
+		if ! $ssh $secondary [ -x /sbin/appdservice ] ; then
 			$ssh $secondary sudo -nl /sbin/service $s start > /dev/null 2>&1 || ((errors++))
 			$ssh $secondary sudo -nl /sbin/service $s stop > /dev/null 2>&1 || ((errors++))
 		fi

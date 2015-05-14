@@ -47,27 +47,27 @@ function slave_status {
 }
 
 # abstract out the privilege escalation
-if [ `uid -u` == 0 ] ; then
+if [[ `id -u` == 0 ]] ; then
 	function remservice {
 		ssh $1 $2 $3 $4
 	}	
 else
 	if [ -x /sbin/appdservice ] ; then
 		function service {
-			/sbin/appdservice $2 $3
+			/sbin/appdservice $1 $2
 		}
 		function remservice {
 			ssh $1 $2 /sbin/appdservice $3 $4
 		}	
 	else
 		function service {
-			sudo service $2 $3
+			sudo service $1 $2
 		}
 		function remservice {
 			ssh $1 $2 sudo service $3 $4
 		}	
 	fi
-}
+fi
 
 #
 # parse arguments
