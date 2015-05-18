@@ -192,6 +192,10 @@ function serverstatus {
 	0)
 		echo good
 		;;
+	7)
+		echo "down"
+		echo "curl error 7" >> $wd_log
+		;;
 	22)
 		eval `awk '/(22)/ {printf("http_code=%d\n", $8);}' < $wd_tmp`
 		echo "curl error 22: $http_code" >> $wd_log
@@ -211,17 +215,16 @@ function serverstatus {
 			;;
 		esac
 		;;
-	52)
-		echo "no data"
-		echo "curl error 52" >> $wd_log
-		;;
-	7)
+	28)
 		echo "down"
-		echo "curl error 7" >> $wd_log
-		;;
+		echo "curl error 28: operation timed out"
 	35)
 		echo "down"
 		echo "curl error 35" >> $wd_log
+		;;
+	52)
+		echo "no data"
+		echo "curl error 52" >> $wd_log
 		;;
 	*)
 		echo "other"
