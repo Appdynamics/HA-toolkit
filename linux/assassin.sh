@@ -27,6 +27,20 @@ ASSASSIN=$APPD_ROOT/HA/appd_assassin.pid
 
 as_log=$APPD_ROOT/logs/assassin.log
 
+# execute remote service operation
+# args:  flags machine service verb
+function remservice {
+	if [ `id -u` == 0 ] ; then
+		ssh $1 $2 /sbin/service $3 $4
+	else
+		if ssh $2 [ -x /sbin/appdservice ] ; then
+			ssh $1 $2 /sbin/appdservice $3 $4
+		else
+			ssh $1 $2 sudo -n /sbin/service $3 $4
+		fi
+	fi
+}
+
 function sql {
 	echo "$2 | $MYSQL --host=$1 $CONNECT controller" >> $as_log
 	echo "$2" | $MYSQL --host=$1 $CONNECT controller | tee -a $as_log 2>> $as_log
@@ -120,7 +134,7 @@ DISABLE
     sql $primary "update global_configuration_local set value='passive' where name = 'appserver.mode';" >/dev/null 2>&1
 	sql $primary "update global_configuration_local set value='secondary' where name = 'ha.controller.type';" >/dev/null 2>&1
 	echo "  -- disable slave autostart on $primary" >> $as_log
-	ssh $primary $APPD_ROOT/bin/controller.sh stop >> $as_log 2>&1
+	remservice -tq $primary appdcontroller-db stop >> $as_log 2>&1
 	if ssh $primary grep -q ^skip-slave-start=true $APPD_ROOT/db/db.cnf >/dev/null 2>&1 ; then
 		sql localhost "update global_configuration_local set value='primary' where name = 'ha.controller.type';"
 		echo "assassin exiting - old primary killed" >> $as_log
