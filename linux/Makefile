@@ -22,8 +22,10 @@ install:
 	cp README *.sh $(APPD_ROOT)/HA
 	sudo $(APPD_ROOT)/HA/install-init.sh
 
-HA.shar: $(SOURCES)
+HA.shar: $(SOURCES) Makefile
 	date +"# HA package built %c" > HA.shar
+	echo "if echo '" >> HA.shar
+	echo "' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true" >> HA.shar
 	shar $(SOURCES) | sed -e 's/^exit/chmod ugo+rx . .. *.sh; exit/' >> HA.shar
 
 #
