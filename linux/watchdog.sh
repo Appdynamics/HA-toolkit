@@ -88,6 +88,16 @@ PINGLIMIT=300
 LOOPTIME=10
 
 #
+# Time to wait for a ping response
+#
+PINGTIME=2
+
+#
+# Time for curl to wait for a complete response from the controller
+#
+CURL_MAXTIME=2
+
+#
 # remove the watchdog pid and temporary curl output file when we exit
 #
 function cleanup () {
@@ -186,7 +196,7 @@ function serverstatus {
 	local app_proto=$1
 	local app_port=$2
 	STATUS="$app_proto://$primary:$app_port/controller/rest/serverstatus"
-	curl -fsS $CERT_VALIDATION_MODE $STATUS > $wd_tmp 2>&1
+	curl -m $CURL_MAXTIME -fsS $CERT_VALIDATION_MODE $STATUS > $wd_tmp 2>&1
 	curlstat=$?
 	case "$curlstat" in
 	0)
@@ -217,7 +227,8 @@ function serverstatus {
 		;;
 	28)
 		echo "down"
-		echo "curl error 28: operation timed out"
+		echo "curl error 28: operation timed out" >> $wd_log
+		;;
 	35)
 		echo "down"
 		echo "curl error 35" >> $wd_log
@@ -278,7 +289,34 @@ function poll {
 		fi
 		
 		#
-		# first, how does the appserver respond to a serverstatus REST?
+		# first, ping the primary
+		#
+		if ping -c 1 -W $PINGTIME -q $primary >/dev/null 2>&1 ; then
+			pingfail=0
+		else
+			if expired pingfail $PINGLIMIT ; then
+				echo `date` pingfail expired >> $wd_log
+				return 2
+			fi
+			# we can't even ping.  Sleep for $((LOOPTIME-PINGTIME)) then try again
+			sleep $((LOOPTIME-PINGTIME))
+			continue
+		fi
+		
+		#
+		# then, is the database up
+		#
+		if $MYSQLADMIN $CONNECT ping >/dev/null 2>&1 ; then
+			dbfail=0
+		else
+			if expired dbfail $DBLIMIT ; then
+				echo `date` dbfail expired >> $wd_log
+				return 2
+			fi
+		fi
+		
+		#
+		# how does the appserver respond to a serverstatus REST?
 		# if down, try every port before calling expired()
 		#
 		status=`serverstatus ${APP_PROTO[$i]} ${APP_PORT[$i]}`
@@ -316,31 +354,6 @@ function poll {
 			;;
 		esac
 		
-		#
-		# ping the primary
-		#
-		if ping -c 1 -w $PINGTIME -q $primary >/dev/null 2>&1 ; then
-			pingfail=0
-		else
-			if expired pingfail $PINGLIMIT ; then
-				echo `date` pingfail expired >> $wd_log
-				return 2
-			fi
-		fi
-		#
-		# then, is the database up
-		#
-		if $MYSQLADMIN $CONNECT ping >/dev/null 2>&1 ; then
-			dbfail=0
-		else
-			if expired dbfail $DBLIMIT ; then
-				echo `date` dbfail expired >> $wd_log
-				return 2
-			fi
-		fi
-
-
-
 		sleep $LOOPTIME
 	done
 }

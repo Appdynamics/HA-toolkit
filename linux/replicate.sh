@@ -381,7 +381,8 @@ if [ "$appserver_only_sync" != "true" ] ; then
 	# this inhibits starting an incomplete controller
 	#
 	echo "  -- inhibit running of secondary and delete mysql/innodb logfiles" | tee -a $repl_log
-	ssh $secondary "rm -f $APPD_ROOT/bin/controller.sh $APPD_ROOT/db/data/*log*" >> $repl_log 2>&1
+	ssh $secondary "rm -f $APPD_ROOT/bin/controller.sh $datadir/*log*" \
+		$datadir/ibdata1 >> $repl_log 2>&1
 	
 	#
 	# disable automatic start of replication slave
