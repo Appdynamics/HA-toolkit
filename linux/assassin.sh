@@ -27,16 +27,21 @@ ASSASSIN=$APPD_ROOT/HA/appd_assassin.pid
 
 as_log=$APPD_ROOT/logs/assassin.log
 
+if ! service_bin=$(export PATH=/sbin:/usr/sbin ; which service 2>/dev/null) ; then
+	echo service not found in /sbin or /usr/sbin - exiting
+	exit 1
+fi
+
 # execute remote service operation
 # args:  flags machine service verb
 function remservice {
 	if [ `id -u` == 0 ] ; then
-		ssh $1 $2 /sbin/service $3 $4
+		ssh $1 $2 $service_bin $3 $4
 	else
 		if ssh $2 [ -x /sbin/appdservice ] ; then
 			ssh $1 $2 /sbin/appdservice $3 $4
 		else
-			ssh $1 $2 sudo -n /sbin/service $3 $4
+			ssh $1 $2 sudo -n $service_bin $3 $4
 		fi
 	fi
 }
