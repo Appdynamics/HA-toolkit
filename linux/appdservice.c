@@ -110,7 +110,6 @@ executable_at(char *dir, char *prog)
 	int dirfd;
 	int ret;
 
-	fprintf(stderr, "check dir %s prog %s\n", dir, prog);
 	dirfd = open(dir, O_RDONLY | O_DIRECTORY);
 	ret = faccessat(dirfd, prog, AT_EACCESS, X_OK);
 	close(dirfd);
