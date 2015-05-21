@@ -40,16 +40,21 @@ watchdog_enable=false
 rsync_compression=""
 wildcard=
 
+if ! service_bin=$(export PATH=/sbin:/usr/sbin ; which service 2>/dev/null) ; then
+    echo service not found in /sbin or /usr/sbin - exiting
+    exit 13
+fi
+
 # execute remote service operation
 # args:  flags machine service verb
 function remservice {
 	if [ `id -u` == 0 ] ; then
-		ssh $1 $2 /sbin/service $3 $4
+		ssh $1 $2 $service_bin $3 $4
 	else
 		if ssh $2 [ -x /sbin/appdservice ] ; then
 			ssh $1 $2 /sbin/appdservice $3 $4
 		else
-			ssh $1 $2 sudo -n /sbin/service $3 $4
+			ssh $1 $2 sudo -n $service_bin $3 $4
 		fi
 	fi
 }
@@ -58,12 +63,12 @@ function remservice {
 # args: service verb
 function service {
 	if [ `id -u` == 0 ] ; then
-		/sbin/service $1 $2
+		$service_bin $1 $2
 	else
 		if [ -x /sbin/appdservice ] ; then
 			/sbin/appdservice $1 $2
 		else
-			sudo -n /sbin/service $1 $2
+			sudo -n $service_bin $1 $2
 		fi
 	fi
 }
@@ -132,8 +137,8 @@ function verify_privilege_escalation(){
 	for s in ${appdynamics_service_list[@]}
 	do 
 		if ! $ssh $secondary [ -x /sbin/appdservice ] ; then
-			$ssh $secondary sudo -nl /sbin/service $s start > /dev/null 2>&1 || ((errors++))
-			$ssh $secondary sudo -nl /sbin/service $s stop > /dev/null 2>&1 || ((errors++))
+			$ssh $secondary sudo -nl $service_bin $s start > /dev/null 2>&1 || ((errors++))
+			$ssh $secondary sudo -nl $service_bin $s stop > /dev/null 2>&1 || ((errors++))
 		fi
 	done
 	if [ $errors -gt 0 ] ; then
