@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.9 2015-05-08 02:00:16 cmayer Exp $
+# $Id: replicate.sh 2.10 2015-06-02 2015-06-02 14:38:38 cmayer $
 #
 # install HA to a controller pair
 #
@@ -40,7 +40,11 @@ watchdog_enable=false
 rsync_compression=""
 wildcard=
 
-if ! service_bin=$(export PATH=/sbin:/usr/sbin ; which service 2>/dev/null) ; then
+if [ -f /sbin/service ] ; then
+	service_bin=/sbin/service
+elif [ -f /usr/sbin/service ] ; then
+	service_bin=/usr/sbin/service
+else 
     echo service not found in /sbin or /usr/sbin - exiting
     exit 13
 fi
@@ -315,6 +319,7 @@ fi
 #
 echo "  -- replication log (script included)" `date` > $repl_log
 cat $0 >> $repl_log
+echo "$@" >> $repl_log
 
 if [ ! -d "$APPD_ROOT" ] ; then
 	echo controller root $APPD_ROOT is not a directory | tee -a $repl_log
@@ -338,6 +343,8 @@ if [ `id -un` != "$RUNUSER" ] ; then
 	echo replicate script must be run as $RUNUSER | tee -a $repl_log
 	exit 1
 fi
+
+echo "  -- appdynamics run user: $RUNUSER" | tee -a $repl_log
 
 #
 # verify no-password ssh is set up
@@ -505,7 +512,7 @@ ssh $secondary date >> $repl_log 2>&1
 rmdate=`ssh $secondary date +%s`
 lodate=`date +%s`
 skew=`echo "sqrt(($rmdate-$lodate)^2)" | bc`
-if [ $skew -gt 10 ] ; then
+if [ $skew -gt 60 ] ; then
 	echo unacceptable clock skew: $rmdate $lodate $skew
 	exit 6
 fi

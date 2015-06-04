@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh,v 1.3 2015/03/17 03:05:10 cmayer Exp $
+# $Id: appdcontroller-db.sh 1.4 2015/03/17 2015-06-02 14:39:55 cmayer $
 # 
 # HA Aware Init file for AppDynamics Controller 
 # 
@@ -639,7 +639,7 @@ controllerversion=`echo "select value from global_configuration_cluster where na
 	if [ ! -z $controllerversion ] ; then
 		echo version: $controllerversion
 	fi
-		echo -n "db running - "
+		echo -n "db running as $RUNUSER - "
 		if active ; then
 			echo "active"
 		else
@@ -648,7 +648,6 @@ controllerversion=`echo "select value from global_configuration_cluster where na
 				echo replication disabled
 			fi
 		fi
-
 		case `echo "select value from global_configuration_local where name='ha.controller.type'" | runuser $APPD_BIN/controller.sh login-db | tail -1` in
 		primary) 
 			echo primary

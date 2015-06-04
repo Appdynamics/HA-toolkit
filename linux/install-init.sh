@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh,v 2.4 2015/03/17 03:04:17 cmayer Exp $
+# $Id: install-init.sh 2.5 2015/03/17 2015-06-02 14:45:41 cmayer $
 #
 # install init script
 #
@@ -62,6 +62,7 @@ function require() {
 }
 
 function install_init() {
+	echo "installing /etc/init.d/$1"
 	sed <./$1.sh >/etc/init.d/$1 \
 		-e "/^APPD_ROOT=/s,=.*,=$APPD_ROOT," \
 		-e "/^RUNUSER=/s,=.*,=$RUNUSER,"
@@ -132,13 +133,19 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 		$RUNUSER ALL=(root) NOPASSWD: APPD
 	SUDOERS
 	chmod 0440 /etc/sudoers.d/appdynamics
+	echo "installed /etc/sudoers.d/appdynamics"
 	fi
 
 	if [ $use_appdservice == true ] ; then
 		# compile wrapper, chown and chmod with setuid
 		cc -DAPPDUSER=`id -u $RUNUSER` -o $APPDSERVICE appdservice.c
-		chown root:root $APPDSERVICE
-		chmod 4755 $APPDSERVICE
+		if [ -x $APPDSERVICE ] ; then
+			chown root:root $APPDSERVICE
+			chmod 4755 $APPDSERVICE
+			echo "installed $APPDSERVICE"
+		else
+			echo "installation of $APPDSERVICE failed"
+		fi
 	fi
 
 	if ! require setcap libcap libcap2-bin && \
