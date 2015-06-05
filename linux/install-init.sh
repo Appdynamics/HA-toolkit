@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 2.5 2015/03/17 2015-06-02 14:45:41 cmayer $
+# $Id: install-init.sh 2.6 2015/03/17 2015-06-05 16:18:43 cmayer $
 #
 # install init script
 #
@@ -67,7 +67,7 @@ function install_init() {
 		-e "/^APPD_ROOT=/s,=.*,=$APPD_ROOT," \
 		-e "/^RUNUSER=/s,=.*,=$RUNUSER,"
 
-	chmod +x /etc/init.d/$1
+	chmod 0744 /etc/init.d/$1
 
 	if [ -x "$CHKCONFIG" ] ; then
 		chkconfig --add $1
