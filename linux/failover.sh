@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh,v 2.5 2015/03/17 01:23:45 cmayer Exp $
+# $Id: failover.sh 2.6 2015/03/17 2015-06-05 16:18:42 cmayer $
 #
 # failover.sh
 # run on the passive node, activate this HA node.
@@ -21,6 +21,15 @@ WATCHDOG=$APPD_ROOT/HA/appd_watchdog.pid
 MYSQL="$APPD_ROOT/db/bin/mysql"
 DBCNF="$APPD_ROOT/db/db.cnf"
 CONNECT="--protocol=TCP --user=$dbuser --password=$dbpasswd --port=$dbport"
+
+if [ -f /sbin/service ] ; then
+    service_bin=/sbin/service
+elif [ -f /usr/sbin/service ] ; then
+    service_bin=/usr/sbin/service
+else
+    echo service not found in /sbin or /usr/sbin - exiting
+    exit 13
+fi
 
 fo_log=$APPD_ROOT/logs/failover.log
 
@@ -61,10 +70,10 @@ else
 		}	
 	else
 		function service {
-			sudo service $1 $2
+			sudo $service_bin $1 $2
 		}
 		function remservice {
-			ssh $1 $2 sudo service $3 $4
+			ssh $1 $2 sudo $service_bin $3 $4
 		}	
 	fi
 fi

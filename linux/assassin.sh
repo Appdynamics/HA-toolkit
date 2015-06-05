@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh,v 2.1 2015/01/27 02:07:57 cmayer Exp $
+# $Id: assassin.sh 2.2 2015/01/27 2015-06-05 16:18:42 cmayer $
 #
 # assassin.sh
 # run on the active node after a failover, 
@@ -27,9 +27,13 @@ ASSASSIN=$APPD_ROOT/HA/appd_assassin.pid
 
 as_log=$APPD_ROOT/logs/assassin.log
 
-if ! service_bin=$(export PATH=/sbin:/usr/sbin ; which service 2>/dev/null) ; then
-	echo service not found in /sbin or /usr/sbin - exiting
-	exit 1
+if [ -f /sbin/service ] ; then
+    service_bin=/sbin/service
+elif [ -f /usr/sbin/service ] ; then
+    service_bin=/usr/sbin/service
+else
+    echo service not found in /sbin or /usr/sbin - exiting
+    exit 1
 fi
 
 # execute remote service operation
