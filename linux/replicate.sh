@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.10 2015-06-02 2015-06-02 14:38:38 cmayer $
+# $Id: replicate.sh 2.11 2015-06-02 2015-06-05 16:18:43 cmayer $
 #
 # install HA to a controller pair
 #
@@ -14,9 +14,7 @@
 #
 primary=`hostname`
 internal_vip=
-internal_vip_port=8090
 external_vip=
-external_vip_port=8090
 secondary=
 def_APPD_ROOT=$(cd $(dirname "$0"); cd .. ; pwd)
 APPD_ROOT=$def_APPD_ROOT
@@ -165,8 +163,8 @@ function usage()
 	echo "    -s <secondary hostname>"
 	echo "    [ -j ] Synchronize controller app server configurations and related binaries"
 	echo "           if secondary database is running, leave it running."
-	echo "    [ -e <external vip>[:port] ]"
-	echo "    [ -i <internal vip>[:port] ]"
+	echo "    [ -e [protocol://]<external vip>[:port]"
+	echo "    [ -i [protocol://]<internal vip>[:port]"
 	echo "    [ -c <controller root directory> ]"
 	echo "       default: $def_APPD_ROOT"
 	echo "    [ -f ]       do final install and activation"
@@ -180,6 +178,29 @@ function usage()
 	exit 1
 }
 
+function parse_vip()
+{
+	vip_name=$1
+	vip_def=$2
+
+	echo $vip_def | awk -F: -v vip_name=$vip_name '
+		BEGIN { 
+			host=""; 
+			protocol="http";
+			port="8090"; 
+		}
+		/http[s]*:/ {protocol=$1; host=$2; port=$3;next}
+		/:/ {host=$1; port=$2;next}
+		{host=$1}
+		END {
+			gsub("^//","",host);
+			printf("%s_host=%s\n", vip_name, host);
+			printf("%s_port=%s\n", vip_name, port);
+			printf("%s_protocol=%s\n", vip_name, protocol);
+		}
+	'
+}
+
 while getopts :s:e:i:c:dfhjut:nwzFHW flag; do
 	case $flag in
 	d)
@@ -190,17 +211,9 @@ while getopts :s:e:i:c:dfhjut:nwzFHW flag; do
 		;;
 	e)
 		external_vip=$OPTARG
-		if echo $external_vip | grep -q : ; then
-			external_vip_port=`echo $external_vip | awk -F: '{print $2}'`
-			external_vip=`echo $external_vip | awk -F: '{print $1}'`
-		fi
 		;;
 	i)
 		internal_vip=$OPTARG
-		if echo $internal_vip | grep -q : ; then
-			internal_vip_port=`echo $internal_vip | awk -F: '{print $2}'`
-			internal_vip=`echo $internal_vip | awk -F: '{print $1}'`
-		fi
 		;;
 	j)
 		appserver_only_sync=true
@@ -270,7 +283,15 @@ done
 
 if [ -z "$internal_vip" ] ; then
 	internal_vip=$external_vip
-	internal_vip_port=$external_vip_port
+fi
+
+eval `parse_vip external_vip $external_vip`
+eval `parse_vip internal_vip $internal_vip`
+
+# sanity check - verify that the appd_user and the directory owner are the same
+if [ `ls -ld .. | awk '{print $3}'` != `id -un` ] ; then
+	echo "Controller root directory not owned by current user"
+	exit 1
 fi
 
 if [ "$appserver_only_sync" == "true" ] && [ "$final" == "true" ] ; then
@@ -537,6 +558,19 @@ else
 	ssh $secondary rm -f '$datadir/bin-log*' '$datadir/relay-log*' | tee -a $repl_log 2>&1
 
 	#
+	# maximum paranoia:  build space ID maps of each of the innodb data files and prune differences
+	# caution: gnarly quoting
+	#
+	echo "  -- Building innodb file maps" | tee -a $repl_log
+	rm -f $tmpdir/ibdlist.local $tmpdir/ibdlist.remote
+	find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \; > $tmpdir/ibdlist.local
+	ssh $secondary "find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \;" > $tmpdir/ibdlist.remote
+	for obsolete in `diff $tmpdir/ibdlist.local $tmpdir/ibdlist.remote | awk '/^>/ {print $2}'` ; do
+		echo "  --   pruning $obsolete"
+		ssh $secondary rm -f $obsolete
+	done
+	
+	#
 	# copy the controller + data to the secondary
 	#
 	echo "  -- Rsync'ing Controller: $APPD_ROOT" | tee -a $repl_log
@@ -581,7 +615,7 @@ if [ "$final" == "true" ] ; then
 		if [ -f $APPD_ROOT/MachineAgent/conf/controller-info.xml ] ; then
 			if [ -f "$mif" ] ; then
 				ex -s $mif <<- SETMACHINE
-					%s/\(<controller-host>\)[^<]*/\1$internal_vip/
+					%s/\(<controller-host>\)[^<]*/\1$internal_vip_host/
 					%s/\(<controller-port>\)[^<]*/\1$internal_vip_port/
 					wq
 				SETMACHINE
@@ -623,16 +657,29 @@ if [ $final == 'false' ] ; then
 fi
 
 #
-# plug the external hostname and port into the domain.xml
+# plug the external hostname, protocol and port into the domain.xml
 #
 if [ -n "$external_vip" ] ; then
 	echo "  -- edit domain.xml to point at external host" | tee -a $repl_log
+	if [ "$internal_vip_protocol" == "https" ] ; then
+		if grep -q appdynamics.controller.ssl.enabled $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml ; then
+			ex -s $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml <<- SETHTTPS
+				%s/\(-Dappdynamics.controller.ssl.enabled=\)[^<]*/\1true/
+			SETHTTPS
+		else
+			ex -s $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml <<- ADDHTTPS
+				/-Dappdynamics.controller.hostName/a
+				<jvm-options>-Dappdynamics.controller.ssl.enabled=true</jvm-options>
+				.
+			ADDHTTPS
+		fi
+	fi
 	ex -s $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml <<- SETHOST
-		%s/\(-Dappdynamics.controller.hostName=\)[^<]*/\1$internal_vip/
+		%s/\(-Dappdynamics.controller.hostName=\)[^<]*/\1$internal_vip_host/
 		%s/\(-Dappdynamics.controller.port=\)[^<]*/\1$internal_vip_port/
-		%s/\(-Dappdynamics.controller.services.hostName=\)[^<]*/\1$internal_vip/
+		%s/\(-Dappdynamics.controller.services.hostName=\)[^<]*/\1$internal_vip_host/
 		%s/\(-Dappdynamics.controller.services.port=\)[^<]*/\1$internal_vip_port/
-		%s,\(-Dappdynamics.controller.ui.deeplink.url=http[s]*:/\)[^/]*,\1$external_vip:$external_vip_port,
+		%s,\(-Dappdynamics.controller.ui.deeplink.url=\)[^<]*,\1$external_vip_protocol://$external_vip_host:$external_vip_port,
 		wq
 	SETHOST
 fi
