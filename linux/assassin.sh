@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 2.2 2015/01/27 2015-06-05 16:18:42 cmayer $
+# $Id: assassin.sh 2.3 2015/01/27 2015-06-09 13:38:19 cmayer $
 #
 # assassin.sh
 # run on the active node after a failover, 
@@ -130,27 +130,54 @@ fi
 # so it stays down.
 #
 
+echo "assassin committed" | tee -a $as_log
+
 echo $$ >$ASSASSIN
+
+loops=0
 while true ; do
-cat <<- 'DISABLE' | ssh $primary ed -s $DBCNF >/dev/null 2>&1
-g/^skip-slave-start/d
-$a
-skip-slave-start=true
-.
-wq
-DISABLE
-    sql $primary "stop slave;" >/dev/null 2>&1
-    sql $primary "update global_configuration_local set value='passive' where name = 'appserver.mode';" >/dev/null 2>&1
-	sql $primary "update global_configuration_local set value='secondary' where name = 'ha.controller.type';" >/dev/null 2>&1
+	if [ $loops -gt 0 ] ; then
+		sleep 60;
+	fi
+	(( loops ++ ))
+
+	# if we can't get through, no point doing real work
+	if ! ssh $primary date >/dev/null 2>&1 ; then
+		continue;
+	fi
+
+	# make sure skip-slave-start is in db.cnf
+	cat <<- 'DISABLE' | ssh $primary ed -s $DBCNF >/dev/null 2>&1
+		g/^skip-slave-start/d
+		$a
+		skip-slave-start=true
+		.
+		wq
+	DISABLE
+	if ! ssh $primary grep -q skip-slave-start $DBCNF ; then
+		echo "skip-slave-start insert failed" | tee -a $as_log
+		continue;
+	fi
+
+	# update the remote database
+	sql $primary "stop slave;" >/dev/null
+	sql $primary "update global_configuration_local set value='passive' where name = 'appserver.mode';" >/dev/null
+	sql $primary "update global_configuration_local set value='secondary' where name = 'ha.controller.type';" >/dev/null
+
+	# check if this happened
+	if ! sql $primary "select value from global_configuration_local where name = 'appserver.mode';" | grep -q passive ; then
+		echo "set passive failed" | tee -a $as_log
+		continue;
+	fi
+
 	echo "  -- disable slave autostart on $primary" >> $as_log
 	remservice -tq $primary appdcontroller-db stop >> $as_log 2>&1
-	if ssh $primary grep -q ^skip-slave-start=true $APPD_ROOT/db/db.cnf >/dev/null 2>&1 ; then
-		sql localhost "update global_configuration_local set value='primary' where name = 'ha.controller.type';"
-		echo "assassin exiting - old primary killed" >> $as_log
-		rm -f $ASSASSIN
-		exit 0
-	fi
-	sleep 60
+
+	sql localhost "update global_configuration_local set value='primary' where name = 'ha.controller.type';"
+	echo "assassin exiting - old primary killed" >> $as_log
+	rm -f $ASSASSIN
+	exit 0
+
 done
 
 #
