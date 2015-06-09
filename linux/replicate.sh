@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.11 2015-06-02 2015-06-05 16:18:43 cmayer $
+# $Id: replicate.sh 2.12 2015-06-02 2015-06-08 19:54:19 cmayer $
 #
 # install HA to a controller pair
 #
@@ -563,8 +563,9 @@ else
 	#
 	echo "  -- Building innodb file maps" | tee -a $repl_log
 	rm -f $tmpdir/ibdlist.local $tmpdir/ibdlist.remote
-	find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \; > $tmpdir/ibdlist.local
-	ssh $secondary "find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \;" > $tmpdir/ibdlist.remote
+	find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \; | sort > $tmpdir/ibdlist.local
+	ssh $secondary "find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \;" | sort > $tmpdir/ibdlist.remote
+	printf "  --   found %d discrepancies\n" `diff $tmpdir/ibdlist.* | grep "^>" | wc -l`
 	for obsolete in `diff $tmpdir/ibdlist.local $tmpdir/ibdlist.remote | awk '/^>/ {print $2}'` ; do
 		echo "  --   pruning $obsolete"
 		ssh $secondary rm -f $obsolete
