@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 2.6 2015/03/17 2015-06-05 16:18:42 cmayer $
+# $Id: failover.sh 2.7 2015/03/17 2015-06-08 19:54:19 cmayer $
 #
 # failover.sh
 # run on the passive node, activate this HA node.
@@ -44,6 +44,9 @@ function bounce_slave {
 
 function slave_status {
 	bounce_slave
+
+	# this is to allow the slave connect to stabilize
+	sleep 120
 
 	eval `sql localhost "show slave status\G" | awk '
 		BEGIN { OFS="" }
