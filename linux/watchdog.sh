@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh,v 2.6 2015/03/17 01:24:29 cmayer Exp $
+# $Id: watchdog.sh 2.7 2015/03/17 2015-06-09 13:43:43 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -257,7 +257,7 @@ function expired () {
 	limit=$((${!1} + $2))
 	left=$(($limit - $now))
 	echo `date` "expired $1 ${!1} $limit $left $2" >> $wd_log
-	echo "expired $limit $left $2" > $WATCHDOG_STATUS
+	echo "   timer $1 start $limit left $left limit $2" > $WATCHDOG_STATUS
 	if [ `date +%s` -gt $((${!1} + $2)) ] ; then
 		return 0
 	else
@@ -272,11 +272,13 @@ function expired () {
 # for long enough
 function poll {
 	local i=0
+
 	downtime=0
 	risingtime=0
 	fallingtime=0
 	pingfail=0
 	dbfail=0
+
 	rm -f $WATCHDOG_STATUS
 
 	while true ; do
@@ -309,6 +311,10 @@ function poll {
 		if $MYSQLADMIN $CONNECT ping >/dev/null 2>&1 ; then
 			dbfail=0
 		else
+			downtime=0
+			risingtime=0
+			fallingtime=0
+			pingfail=0
 			if expired dbfail $DBLIMIT ; then
 				echo `date` dbfail expired >> $wd_log
 				return 2
@@ -328,18 +334,32 @@ function poll {
 			else
 				i=0
 			fi
+			risingtime=0
+			fallingtime=0
+			pingfail=0
+			dbfail=0
 			if expired downtime $DOWNLIMIT ; then
 				echo `date` downtime expired >> $wd_log
 				return 2
 			fi
 			;;
 		rising)
+			# reset the other timers
+			downtime=0
+			fallingtime=0
+			pingfail=0
+			dbfail=0
+
 			if expired risingtime $RISINGLIMIT ; then
 				echo `date` risingtime expired >> $wd_log
 				return 2
 			fi
 			;;
 		falling)
+			downtime=0
+			risingtime=0
+			pingfail=0
+			dbfail=0
 			if expired fallingtime $FALLINGLIMIT ; then
 				echo `date` fallingtime expired >> $wd_log
 				return 2
