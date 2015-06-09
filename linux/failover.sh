@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 2.7 2015/03/17 2015-06-08 19:54:19 cmayer $
+# $Id: failover.sh 2.8 2015/03/17 2015-06-09 13:43:43 cmayer $
 #
 # failover.sh
 # run on the passive node, activate this HA node.
@@ -45,17 +45,29 @@ function bounce_slave {
 function slave_status {
 	bounce_slave
 
-	# this is to allow the slave connect to stabilize
-	sleep 120
+	# wait for the slave to settle
+	connect_count=0
 
-	eval `sql localhost "show slave status\G" | awk '
-		BEGIN { OFS="" }
-		/Slave_IO_Running:/ {print "slave_io=",$2}
-		/Slave_IO_Running:/ {print "slave_io=",$2}
-		/Slave_SQL_Running:/ {print "slave_sql=",$2}
-		/Seconds_Behind_Master:/ {print "seconds_behind=",$2}
-		/Master_Host:/ {print "primary=",$2}
-	'`
+	while [ $connect_count -lt 3 ] ; do
+		eval `sql localhost "show slave status\G" | awk '
+			BEGIN { OFS="" }
+			/Slave_IO_Running:/ {print "slave_io=",$2}
+			/Slave_SQL_Running:/ {print "slave_sql=",$2}
+			/Seconds_Behind_Master:/ {print "seconds_behind=",$2}
+			/Master_Host:/ {print "primary=",$2}
+		'`
+		case "$slave_io" in
+		Connecting) 
+			(( connect_count++ ))
+			sleep 10
+			continue;
+			;;
+		Yes) break
+			;;
+		No) break
+			;;
+		esac
+	done
 }
 
 # abstract out the privilege escalation
