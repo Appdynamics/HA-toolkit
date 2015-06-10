@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.12 2015-06-02 2015-06-08 19:54:19 cmayer $
+# $Id: replicate.sh 2.13 2015-06-02 2015-06-09 19:42:39 cmayer $
 #
 # install HA to a controller pair
 #
@@ -30,6 +30,7 @@ appdynamics_service_list=( appdcontroller appdcontroller-db )
 
 tmpdir=/tmp/ha.$$
 
+rsync_crypto='--rsh=ssh -c aes128-ctr'
 rsync_opts="-PavpW --del --inplace --exclude=ibdata1 --exclude=ib_logfile*"
 final_rsync_opts="-PavpW --del --inplace"
 rsync_throttle="--bwlimit=20000"
@@ -540,7 +541,7 @@ fi
 
 if [ "$appserver_only_sync" == "true" ] ; then
 	echo "  -- Rsync'ing controller app server only: $APPD_ROOT" | tee -a $repl_log
-	rsync $rsync_opts $rsync_throttle $rsync_compression               \
+	rsync $rsync_opts "$rsync_crypto" $rsync_throttle $rsync_compression               \
 	    --exclude=app_agent_operation_logs/\*                          \
 		--exclude=db/\*                                                \
 		--exclude=logs/\*                                              \
@@ -565,17 +566,17 @@ else
 	rm -f $tmpdir/ibdlist.local $tmpdir/ibdlist.remote
 	find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \; | sort > $tmpdir/ibdlist.local
 	ssh $secondary "find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \;" | sort > $tmpdir/ibdlist.remote
-	printf "  --   found %d discrepancies\n" `diff $tmpdir/ibdlist.* | grep "^>" | wc -l`
+	printf "  --   found %d discrepancies\n" `diff $tmpdir/ibdlist.* | grep "^>" | wc -l` | tee -a $repl_log
 	for obsolete in `diff $tmpdir/ibdlist.local $tmpdir/ibdlist.remote | awk '/^>/ {print $2}'` ; do
-		echo "  --   pruning $obsolete"
+		echo "  --   pruning $obsolete" | tee -a $repl_log
 		ssh $secondary rm -f $obsolete
 	done
-	
+
 	#
 	# copy the controller + data to the secondary
 	#
 	echo "  -- Rsync'ing Controller: $APPD_ROOT" | tee -a $repl_log
-	rsync $rsync_opts $rsync_throttle $rsync_compression                \
+	rsync $rsync_opts "$rsync_crypto" $rsync_throttle $rsync_compression                \
 	    --exclude=bin/controller.sh					                    \
 	    --exclude=license.lic						                    \
 		--exclude=logs/\*							                    \
@@ -586,7 +587,7 @@ else
 		--exclude=tmp/\*                                                \
 		$APPD_ROOT/ $secondary:$APPD_ROOT >> $repl_log
 	echo "  -- Rsync'ing Data: $datadir" | tee -a $repl_log
-	rsync $rsync_opts $rsync_throttle $rsync_compression                \
+	rsync $rsync_opts "$rsync_crypto" $rsync_throttle $rsync_compression                \
 	    --exclude=bin-log\*						                        \
 	    --exclude=relay-log\*					                        \
 	    --exclude=\*.log						                        \
@@ -595,7 +596,7 @@ else
 	    $datadir/ $secondary:$datadir >> $repl_log
 	if [ "$final" == "true" ] ; then
 		echo "  -- Rsync'ing Partmax Data files: $datadir" | tee -a $repl_log
-		rsync $rsync_opts -c $rsync_compression                         \
+		rsync $rsync_opts "$rsync_crypto" -c $rsync_compression                         \
 		$datadir/controller/*PARTMAX* $secondary:$datadir/controller >> $repl_log
 	fi
 	echo "  -- Rsyncs complete" | tee -a $repl_log
