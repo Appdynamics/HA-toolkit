@@ -1,0 +1,105 @@
+The HA environment can be in several states, and it is desireable to place 
+the systems into the fully replicated state as soon as possible. here are
+the possible states, how to identify the state, and the corresponding 
+procedure to repair the condition.
+
+-----------
+NOT PRESENT:
+	the HA package has not been installed on the primary machine.
+
+diagnosis:
+	the HA directory is absent from the controller directory.
+
+to fix:
+	cd <controller root> ; mkdir HA ; cd HA ; bash <path>/HA.shar
+	then follow the steps for UNINSTALLED
+
+-----------
+UNINSTALLED:
+	the package is present in the controller HA directory, but the
+	services have not been installed.
+
+diagnosis:
+	service appdcontroller status shows appdcontroller service not found
+
+to fix:
+	cd <controller root>/HA
+	become root
+	./install-init.sh
+
+------------
+NO HOSTS:
+	the secondary machine does not have a resolvable host name
+
+diagnosis:
+	ping <secondary> returns unknown host
+
+to fix:
+	add the primary and secondary host name into both machines /etc/hosts files
+	
+------------
+NO SSH:
+	the appdynamics user does not have no-password ssh access between
+	machines.
+
+diagnosis:
+	ssh <secondary> date prompts for a password
+
+to fix:
+	in the below, you will be prompted for passwords and confirmations
+	ssh-keygen -P "" -f ~/.ssh/id_rsa -t rsa
+	ssh <secondary> ssh-keygen -P "''" -f ~/.ssh/id_rsa -t rsa
+	scp ~/.ssh/id_rsa.pub <secondary>:.ssh/authorized_keys
+	scp <secondary>:.ssh/id_rsa.pub ~/.ssh/authorized_keys
+
+------------
+UNREPLICATED: the HA package has been installed on the primary controller,
+but the package has not been activated.
+
+diagnosis:
+	service appdcontroller-db status shows "HA not installed" 
+
+to fix:
+	cd <controller root>/HA
+	./replicate -s <secondary>
+	<become root on secondary>
+		cd <controller root>/HA
+		./install-init
+		exit
+	<back on primary>
+	./replicate -s <secondary> -e <vip>	-f
+		confirm
+
+----------
+DISCONNECTED:
+Replication communication is being blocked, HA has been installed and activated,
+but a firewall is preventing access to replication communications.
+
+diagnosis:
+	service appdcontroller-db status shows 
+		"Slave_IO_State: Connecting to master"
+		"Seconds_Behind_Master: NULL"
+
+to fix:
+	disable the firewall for port 3388
+	brute force as root:  iptables -F
+
+----------
+REPLICATED: 
+the HA package is running fully replicated, and the primary node is serving
+agents with metric storage, and the UI is responsive.  the secondary is
+monitoring the primary appserver with a watchdog process.
+
+diagnosis:
+	service appdcontroller status on the primary reports:
+	db running as <user> - active
+	primary
+		Slave_IO_State: Waiting for master to send event
+
+	service appdcontroller status on the secondary reports:
+	db running as <user> - passive
+	secondary
+		Slave_IO_State: Waiting for master to send event
+
+
+
