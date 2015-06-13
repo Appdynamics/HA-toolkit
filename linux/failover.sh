@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 2.8 2015/03/17 2015-06-09 13:43:43 cmayer $
+# $Id: failover.sh 2.10 2015-06-12 12:22:17 cmayer $
 #
 # failover.sh
 # run on the passive node, activate this HA node.

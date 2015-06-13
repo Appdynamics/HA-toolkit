@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 2.7 2015/03/17 2015-06-09 13:43:43 cmayer $
+# $Id: watchdog.sh 2.9 2015-06-12 12:22:17 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick

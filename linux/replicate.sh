@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.13 2015-06-02 2015-06-09 19:42:39 cmayer $
+# $Id: replicate.sh 2.16 2015-06-12 12:22:17 cmayer $
 #
 # install HA to a controller pair
 #
@@ -30,7 +30,6 @@ appdynamics_service_list=( appdcontroller appdcontroller-db )
 
 tmpdir=/tmp/ha.$$
 
-rsync_crypto='--rsh=ssh -c aes128-ctr'
 rsync_opts="-PavpW --del --inplace --exclude=ibdata1 --exclude=ib_logfile*"
 final_rsync_opts="-PavpW --del --inplace"
 rsync_throttle="--bwlimit=20000"
@@ -336,12 +335,14 @@ if [ -e $repl_log ] ; then
 	echo "  -- replication log renamed" `date` | tee -a $repl_log
 	mv $repl_log $repl_log.`date +%F.%T`
 fi
+
 #
 # send the script to the log
 #
-echo "  -- replication log (script included)" `date` > $repl_log
-cat $0 >> $repl_log
-echo "$@" >> $repl_log
+echo "  -- replication log " `date` > $repl_log
+echo -n "version: " >> $repl_log 
+grep '$Id' $0 | head -1 >> $repl_log
+echo "command line options: " "$@" >> $repl_log
 
 if [ ! -d "$APPD_ROOT" ] ; then
 	echo controller root $APPD_ROOT is not a directory | tee -a $repl_log
@@ -377,6 +378,33 @@ if ! ssh -o PasswordAuthentication=no $secondary true ; then
 	exit 4
 fi
 
+#
+# find a compatible cipher - important for speed
+#
+for ssh_crypto in aes128-gcm@openssh.com aes128-ctr aes128-cbc arcfour128 3des-cbc lose ; do
+	if ssh -c $ssh_crypto $secondary true >/dev/null 2>&1 ; then
+		break;
+	fi
+done
+if [ "$ssh_crypto" = "lose" ] ; then
+	echo "  -- default crypto" | tee -a $repl_log
+	rsync_crypto=
+else
+	echo "  -- using $ssh_crypto crypto" | tee -a $repl_log
+	rsync_crypto="--rsh=ssh -c $ssh_crypto"
+fi
+
+#
+# make sure we aren't replicating to ourselves!
+#
+myhostname=`hostname`
+themhostname=`ssh $secondary hostname 2>/dev/null`
+
+if [ "$myhostname" = "$themhostname" ] ; then
+	echo "  -- self-replication meaningless"
+	exit 14
+fi
+
 datadir=`grep ^datadir $APPD_ROOT/db/db.cnf | cut -d = -f 2`
 
 if [ "$appserver_only_sync" != "true" ] ; then
@@ -404,6 +432,12 @@ if [ "$appserver_only_sync" != "true" ] ; then
 	fi
 	
 	#
+	# force the ha.controller.type to primary, 
+	# this should kill the assassin if it running.
+	#
+	echo "  -- force primary" | tee -a $repl_log
+	echo "update global_configuration_local set value='primary' where name = 'ha.controller.type';" | $APPD_ROOT/bin/controller.sh login-db >> $repl_log
+
 	# stop the secondary database (and anything else)
 	# this may fail totally
 	#
