@@ -5,8 +5,10 @@ replicate.sh:
 	check for bc and vim-tiny/minimal. warn if not installed, and exit
 	add update logic
 	
+break out common functions into hafunctions.sh
 
-make it that assassin auto-kills if replicate is run.
+upgrade support
+
 make a make-keys script
 make a check-prerequisites script
 make a system-check script
