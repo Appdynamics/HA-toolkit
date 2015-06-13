@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 2.6 2015/03/17 2015-06-05 16:18:43 cmayer $
+# $Id: install-init.sh 2.8 2015-06-12 12:22:17 cmayer $
 #
 # install init script
 #
