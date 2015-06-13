@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: uninstall-init.sh,v 1.2 2015/03/13 21:10:25 cmayer Exp $
+# $Id: uninstall-init.sh 1.4 2015-06-12 12:22:17 cmayer $
 #
 # uninstall init script
 #

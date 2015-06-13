@@ -1,4 +1,6 @@
 /*
+ * $Id: appdservice.c 1.1 2015-06-12 12:22:17 cmayer $
+ *
  * this program is a trampoline for the Appdynamics user to invoke
  * a controlled escalation of privilege to cause changes in the
  * installed appdynamics services via the system's service wrapper,

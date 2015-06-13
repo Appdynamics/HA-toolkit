@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 1.4 2015/03/17 2015-06-02 14:39:55 cmayer $
+# $Id: appdcontroller-db.sh 1.6 2015-06-12 12:22:17 cmayer $
 # 
 # HA Aware Init file for AppDynamics Controller 
 # 

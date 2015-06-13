@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 2.3 2015/01/27 2015-06-09 13:38:19 cmayer $
+# $Id: assassin.sh 2.5 2015-06-12 12:22:17 cmayer $
 #
 # assassin.sh
 # run on the active node after a failover, 
@@ -140,6 +140,16 @@ while true ; do
 		sleep 60;
 	fi
 	(( loops ++ ))
+
+	#
+	# if the database becomes primary, we don't need to run anymore.
+	#
+	type=`sql localhost \
+		 "select * from global_configuration_local where name = 'ha.controller.type'\G" | awk '/value:/ { print $2}'`
+	if [ "$type" == "primary" ] ; then
+		echo "assassin disabled" | tee -a $as_log
+		exit 1
+	fi
 
 	# if we can't get through, no point doing real work
 	if ! ssh $primary date >/dev/null 2>&1 ; then

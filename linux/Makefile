@@ -1,6 +1,6 @@
 #
 # makefile for HA script distro
-# $Id: Makefile,v 2.4 2015/02/11 20:19:23 cmayer Exp cmayer $
+# $Id: Makefile 2.6 2015-06-12 12:22:17 cmayer $
 #
 APPD_ROOT=/opt/AppDynamics/Controller
 
@@ -10,7 +10,7 @@ SOURCES= README Makefile \
 	install-init.sh uninstall-init.sh \
 	watchdog.settings.template \
 	replicate.sh install-init.sh uninstall-init.sh \
-	appdservice.c
+	appdservice.c hafunctions.sh
 
 all: HA.shar
 
