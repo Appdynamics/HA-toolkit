@@ -85,7 +85,7 @@ to fix:
 	brute force as root:  iptables -F
 
 ----------
-REPLICATED: 
+REPLICATED, WATCHDOG RUNNING: 
 the HA package is running fully replicated, and the primary node is serving
 agents with metric storage, and the UI is responsive.  the secondary is
 monitoring the primary appserver with a watchdog process.
@@ -95,11 +95,99 @@ diagnosis:
 	db running as <user> - active
 	primary
 		Slave_IO_State: Waiting for master to send event
+	controller running
 
 	service appdcontroller status on the secondary reports:
 	db running as <user> - passive
 	secondary
 		Slave_IO_State: Waiting for master to send event
+	watchdog running
 
+to fix:
+	nothing to fix
 
+----------
+REPLICATED, WATCHDOG NOT RUNNING: 
+the HA package is running fully replicated, and the primary node is serving
+agents with metric storage, and the UI is responsive.  the secondary is
+monitoring the primary appserver with a watchdog process.
+
+diagnosis:
+	service appdcontroller status on the primary reports:
+	db running as <user> - active
+	primary
+		Slave_IO_State: Waiting for master to send event
+	controller running
+
+	service appdcontroller status on the secondary reports:
+	db running as <user> - passive
+	secondary
+		Slave_IO_State: Waiting for master to send event
+	watchdog not running
+
+to fix:
+	on the secondary
+	cd <controller root>/HA
+	touch WATCHDOG_ENABLE
+	/sbin/appdservice appdcontroller start
+
+---------
+FAILED OVER, old primary broken
+The current active node has become active because of a failover.  the prior
+active node's database is inaccessible.  the assassin is running on the new
+active node to mark the old active node passive once it comes up.
+
+diagnosis:
+	service appdcontroller status on the primary reports:
+	db running as <user> - active
+	secondary
+		Slave_IO_State:
+		Seconds_Behind_Master: NULL
+	assassin running
+
+to fix:
+	replicate from the new active node to the old active node using
+	the formula for UNREPLICATED
+
+------------
+FAILED OVER, watchdog running
+The current active node has become active because of a failover.  the prior
+active node database is still intact, and replication is valid. the new
+secondary node has a watchdog running.  this is identical to the REPLICATED,
+WATCHDOG_RUNNING state.
+
+diagnosis:
+	service appdcontroller status on the original primary reports:
+	db running as <user> - passive
+		Slave_IO_State: Waiting for master to send event
+	secondary
+	watchdog running
+
+	service appdcontroller status on the original secondary reports:
+	db running as <user> - active
+	primary
+		Slave_IO_State: Waiting for master to send event
+	controller running
+
+to-fix:
+	no need to fix anything.  should it be desired to make the original node
+	the active node:
+
+	on the original primary,
+	cd <controller root>/HA
+	./failover.sh
+
+-------------
+PASSIVE DOWN
+this is a state deliberately caused to perform a consistent backup of the
+database.   it is initiated on the passive node by running:
+/sbin/appdservice appdcontroller-db stop
+
+diagnosis:
+	/sbin/appdservice appdcontroller-db status on the passive node reports:
+	db not running
+
+to-fix:
+	on the passive controller,
+	/sbin/appdservice appdcontroller start
 
