@@ -590,7 +590,7 @@ else
 	#
 	echo "  -- Removing old replication logs" | tee -a $repl_log
 	rm -f $datadir/bin-log* $datadir/relay-log* | tee -a $repl_log 2>&1
-	ssh $secondary rm -f '$datadir/bin-log*' '$datadir/relay-log*' | tee -a $repl_log 2>&1
+	ssh $secondary rm -f "$datadir/bin-log\*" "$datadir/relay-log\*" | tee -a $repl_log 2>&1
 
 	#
 	# maximum paranoia:  build space ID maps of each of the innodb data files and prune differences
