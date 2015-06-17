@@ -35,7 +35,7 @@ fi
 DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 
 ROOTOWNER=`ls -ld $APPD_ROOT | awk '{print $3}'`
-RUNUSER=`su -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
+RUNUSER=`su -s /bin/bash -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
 
 CHKCONFIG=`which chkconfig 2>/dev/null`
 UPDATE_RC_D=`which update-rc.d 2>/dev/null`

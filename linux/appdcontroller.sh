@@ -61,10 +61,10 @@ if [ `id -un` == $RUNUSER ] ; then
         }
 else
         function bg_runuser {
-                su -c "exec nohup $* >/dev/null 2>&1 &" $RUNUSER
+                su -s /bin/bash -c "exec nohup $* >/dev/null 2>&1 &" $RUNUSER
         }
         function runuser {
-                su -c "$*" $RUNUSER
+                su -s /bin/bash -c "$*" $RUNUSER
         }
 fi
 
@@ -96,7 +96,7 @@ function set_open_fd_limits() {
 	if [ "$RUNUSER" == "root" ] && [[ `ulimit -S -n` -lt $OPEN_FD_LIMIT ]]
 		then
 		ulimit -n $OPEN_FD_LIMIT
-	elif [[ `su -c "ulimit -S -n" $RUNUSER` -lt "$OPEN_FD_LIMIT" ]]
+	elif [[ `su -s /bin/bash -c "ulimit -S -n" $RUNUSER` -lt "$OPEN_FD_LIMIT" ]]
 		then
 		echo "$RUNUSER  soft  nofile $OPEN_FD_LIMIT" > /etc/security/limits.d/appdynamics.conf
 		echo "$RUNUSER  hard  nofile $OPEN_FD_LIMIT" >> /etc/security/limits.d/appdynamics.conf
@@ -110,7 +110,7 @@ set_unlimited_memlock() {
 			then
 			ulimit -l unlimited
 		else
-			if [[ $(su -c "ulimit -l" $RUNUSER) != "unlimited" ]]
+			if [[ $(su -s /bin/bash -c "ulimit -l" $RUNUSER) != "unlimited" ]]
 				then
 				echo "$RUNUSER  soft  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
 				echo "$RUNUSER  hard  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
