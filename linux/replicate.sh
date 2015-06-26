@@ -18,6 +18,7 @@ external_vip=
 secondary=
 def_APPD_ROOT=$(cd $(dirname "$0"); cd .. ; pwd)
 APPD_ROOT=$def_APPD_ROOT
+dbport=`grep ^port= $APPD_ROOT/db/db.cnf | cut -d = -f 2`
 datadir=
 upgrade=
 final=false
@@ -773,11 +774,11 @@ if [ -z $wildcard ] ; then
 	# let's probe the canonical hostnames from the local database
 	#
 	echo "  -- canonicalize hostnames" | tee -a $repl_log
-	primary1=`$APPD_ROOT/db/bin/mysql --host=$primary --port=3388 --protocol=TCP --user=impossible 2>&1 | awk '
+	primary1=`$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
 		/ERROR 1045/ { gsub("^.*@",""); print $1;}
 		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
 
-	secondary1=`ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=3388 --protocol=TCP --user=impossible 2>&1 | awk '
+	secondary1=`ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
 		/ERROR 1045/ { gsub("^.*@",""); print $1;}
 		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
 
@@ -789,8 +790,8 @@ if [ -z $wildcard ] ; then
 		echo "check firewall rules" | tee -a $repl_log
 		echo "primary: $primary1" | tee -a $repl_log
 		echo "secondary: $secondary1" | tee -a $repl_log
-		$APPD_ROOT/db/bin/mysql --host=$primary --port=3388 --protocol=TCP --user=impossible 2>&1 | tee -a $repl_log
-		ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=3388 --protocol=TCP --user=impossible 2>&1 | tee -a $repl_log
+		$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | tee -a $repl_log
+		ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | tee -a $repl_log
 		exit 5
 	fi
 
@@ -816,7 +817,7 @@ RESET SLAVE;
 RESET MASTER;
 GRANT ALL ON *.* TO 'controller_repl'@'$grant_secondary' IDENTIFIED BY 'controller_repl';
 FLUSH HOSTS;
-CHANGE MASTER TO MASTER_HOST='$secondary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=3388;
+CHANGE MASTER TO MASTER_HOST='$secondary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=$dbport;
 update global_configuration_local set value = 'active' where name = 'appserver.mode';
 update global_configuration_local set value = 'primary' where name = 'ha.controller.type';
 truncate ejb__timer__tbl;
@@ -827,7 +828,7 @@ STOP SLAVE;
 RESET SLAVE;
 RESET MASTER;
 GRANT ALL ON *.* TO 'controller_repl'@'$grant_primary' IDENTIFIED BY 'controller_repl'; FLUSH HOSTS;
-CHANGE MASTER TO MASTER_HOST='$primary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=3388;
+CHANGE MASTER TO MASTER_HOST='$primary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=$dbport;
 update global_configuration_local set value = 'passive' where name = 'appserver.mode';
 update global_configuration_local set value = 'secondary' where name = 'ha.controller.type';
 truncate ejb__timer__tbl;
