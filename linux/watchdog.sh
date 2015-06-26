@@ -17,7 +17,7 @@ APPD_ROOT=$( cd $(dirname "$0"); cd .. ; pwd)
 DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 
 dbpasswd=`cat $APPD_ROOT/db/.rootpw`
-dbport=`grep ^DB_PORT $APPD_ROOT/bin/controller.sh | cut -d = -f 2`
+dbport=`grep ^port= $APPD_ROOT/db/db.cnf | cut -d = -f 2`
 
 # get all of the ports the controller listens on and determine the accompanying
 # protocols
@@ -319,6 +319,8 @@ function poll {
 				echo `date` dbfail expired >> $wd_log
 				return 2
 			fi
+			sleep $LOOPTIME
+			continue
 		fi
 		
 		#
