@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 2.8 2015-06-12 12:22:17 cmayer $
+# $Id: install-init.sh 2.10 2015-06-30 14:56:01 cmayer $
 #
 # install init script
 #
@@ -87,7 +87,9 @@ missing_dependencies=0
 require xmllint libxml2 libxml2-utils || ((missing_dependencies++))
 require bc bc bc || ((missing_dependecies++))
 require ex vim-minimal vim-tiny || ((missing_dependecies++))
-require ping iputils iputils-ping force || ((missing_dependencies++))
+if ! ping -q -W 1 -c 1 localhost >/dev/null ; then
+	require ping iputils iputils-ping force || ((missing_dependencies++))
+fi
 if [ "$missing_dependencies" -gt 0 ] ; then
 	exit 1
 fi

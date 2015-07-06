@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.16 2015-06-12 12:22:17 cmayer $
+# $Id: replicate.sh 2.18 2015-06-30 14:55:34 cmayer $
 #
 # install HA to a controller pair
 #
@@ -341,9 +341,11 @@ fi
 # send the script to the log
 #
 echo "  -- replication log " `date` > $repl_log
-echo -n "version: " >> $repl_log 
+echo -n "  -- version: " >> $repl_log 
 grep '$Id' $0 | head -1 >> $repl_log
-echo "command line options: " "$@" >> $repl_log
+echo "  -- command line options: " "$@" >> $repl_log
+echo "  -- hostname: " `hostname` >> $repl_log
+echo "  -- appd root: $APPD_ROOT" >> $repl_log
 
 if [ ! -d "$APPD_ROOT" ] ; then
 	echo controller root $APPD_ROOT is not a directory | tee -a $repl_log
@@ -421,7 +423,7 @@ if [ "$appserver_only_sync" != "true" ] ; then
 	# make sure replication has stopped
 	#
 	echo "  -- stopping replication" | tee -a $repl_log
-	echo "STOP SLAVE;RESET SLAVE;RESET MASTER;" | $APPD_ROOT/bin/controller.sh login-db >> $repl_log 2>&1
+	echo "STOP SLAVE;RESET SLAVE ALL;RESET MASTER;" | $APPD_ROOT/bin/controller.sh login-db >> $repl_log 2>&1
 
 	#
 	# sanity check: make sure we are not the passive side. replicating the
@@ -502,10 +504,11 @@ fi
 # make sure the db.cnf is HA-enabled.  if the string ^server-id is not there,
 # then the primary has not been installed as an HA.
 #
+echo "  -- checking HA installation" | tee -a $repl_log
 if grep -q ^server-id $APPD_ROOT/db/db.cnf ; then
-	echo server-id present
+	echo "  --   server-id present" | tee -a $repl_log
 else
-	echo server-id not present
+	echo "  --   server-id not present" | tee -a $repl_log
 	cat <<- 'ADDITIONS' >> $APPD_ROOT/db/db.cnf
 	# Replication -- MASTER MASTER (for HA installs) -- Should be appended 
 	# to the end of the db.cnf file for the PRIMARY controller.
@@ -573,6 +576,7 @@ if [ $skew -gt 60 ] ; then
 	echo unacceptable clock skew: $rmdate $lodate $skew
 	exit 6
 fi
+echo "  --   clock skew: $skew" | tee -a $repl_log
 
 if [ "$appserver_only_sync" == "true" ] ; then
 	echo "  -- Rsync'ing controller app server only: $APPD_ROOT" | tee -a $repl_log
@@ -590,8 +594,10 @@ else
 	# clean out the old relay and bin-logs
 	#
 	echo "  -- Removing old replication logs" | tee -a $repl_log
-	rm -f $datadir/bin-log* $datadir/relay-log* | tee -a $repl_log 2>&1
-	ssh $secondary rm -f "$datadir/bin-log\*" "$datadir/relay-log\*" | tee -a $repl_log 2>&1
+	rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info | tee -a $repl_log 2>&1
+	ssh $secondary "find $datadir -print | grep bin-log | xargs rm  -f" | tee -a $repl_log 2>&1
+	ssh $secondary "find $datadir -print | grep relay-log | xargs rm  -f" | tee -a $repl_log 2>&1
+	ssh $secondary rm -f $datadir/master.info | tee -a $repl_log 2>&1
 
 	#
 	# maximum paranoia:  build space ID maps of each of the innodb data files and prune differences
@@ -626,6 +632,7 @@ else
 	    --exclude=bin-log\*						                        \
 	    --exclude=relay-log\*					                        \
 	    --exclude=\*.log						                        \
+	    --exclude=master.info                                           \
 	    --exclude=\*.pid                                                \
 	    --exclude=ib_logfile\*                                          \
 	    $datadir/ $secondary:$datadir >> $repl_log
@@ -813,7 +820,7 @@ echo "  -- secondary: $secondary" | tee -a $repl_log
 
 cat >$tmpdir/ha.primary <<- PRIMARY
 STOP SLAVE;
-RESET SLAVE;
+RESET SLAVE ALL;
 RESET MASTER;
 GRANT ALL ON *.* TO 'controller_repl'@'$grant_secondary' IDENTIFIED BY 'controller_repl';
 FLUSH HOSTS;
@@ -825,7 +832,7 @@ PRIMARY
 
 cat > $tmpdir/ha.secondary <<- SECONDARY
 STOP SLAVE;
-RESET SLAVE;
+RESET SLAVE ALL;
 RESET MASTER;
 GRANT ALL ON *.* TO 'controller_repl'@'$grant_primary' IDENTIFIED BY 'controller_repl'; FLUSH HOSTS;
 CHANGE MASTER TO MASTER_HOST='$primary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=$dbport;
@@ -856,6 +863,13 @@ scp -p $APPD_ROOT/bin/controller.sh $secondary:$APPD_ROOT/bin >> $repl_log 2>&1
 #
 echo "  -- disable secondary appserver" | tee -a $repl_log
 ssh $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE >> $repl_log 2>&1
+
+#
+# make sure the master.info is not going to start replication yet, since it will be
+# a stale log position
+#
+echo "  -- remove master.info" | tee -a $repl_log
+ssh $secondary rm $datadir/master.info >> $repl_log 2>&1
 
 #
 # start the secondary database
