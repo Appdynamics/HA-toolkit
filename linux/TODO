@@ -19,4 +19,3 @@ make a system-check script
 	sizing (heap, buffer cache) ram total
 iptables rule for 3388
 
-pruning using xargs

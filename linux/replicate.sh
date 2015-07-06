@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.18 2015-06-30 14:55:34 cmayer $
+# $Id: replicate.sh 2.19 2015-07-06 14:36:23 cmayer $
 #
 # install HA to a controller pair
 #
@@ -338,7 +338,7 @@ if [ -e $repl_log ] ; then
 fi
 
 #
-# send the script to the log
+# log versions and arguments
 #
 echo "  -- replication log " `date` > $repl_log
 echo -n "  -- version: " >> $repl_log 
@@ -605,13 +605,22 @@ else
 	#
 	echo "  -- Building innodb file maps" | tee -a $repl_log
 	rm -f $tmpdir/ibdlist.local $tmpdir/ibdlist.remote
-	find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \; | sort > $tmpdir/ibdlist.local
+	find $datadir/controller \
+		-name \*.ibd \
+		-exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \; | \
+		sort > $tmpdir/ibdlist.local
+
 	ssh $secondary "find $datadir/controller -name \*.ibd -exec sh -c 'echo -n {} ; od -j 40 -N 4 -t d4 -A none {}' \;" | sort > $tmpdir/ibdlist.remote
-	printf "  --   found %d discrepancies\n" `diff $tmpdir/ibdlist.* | grep "^>" | wc -l` | tee -a $repl_log
-	for obsolete in `diff $tmpdir/ibdlist.local $tmpdir/ibdlist.remote | awk '/^>/ {print $2}'` ; do
-		echo "  --   pruning $obsolete" | tee -a $repl_log
-		ssh $secondary rm -f $obsolete
-	done
+
+	diff $tmpdir/ibdlist.local $tmpdir/ibdlist.remote | awk '/^>/ {print $2}' > $tmpdir/worklist
+	
+	discrepancies=`wc -w $tmpdir/worklist | awk '{print $1}'`
+	if [ $discrepancies -gt 0 ] ; then
+		printf "  --   found %d discrepancies\n" $discrepancies | tee -a $repl_log
+		cat $tmpdir/worklist | tee -a $repl_log
+		scp $tmpdir/worklist $secondary:/tmp/replicate-prune-worklist
+		ssh $secondary "cat /tmp/replicate-prune-worklist | xargs rm"
+	fi
 
 	#
 	# copy the controller + data to the secondary
@@ -869,7 +878,7 @@ ssh $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE >> $repl_log 2>&1
 # a stale log position
 #
 echo "  -- remove master.info" | tee -a $repl_log
-ssh $secondary rm $datadir/master.info >> $repl_log 2>&1
+ssh $secondary rm -f $datadir/master.info >> $repl_log 2>&1
 
 #
 # start the secondary database
