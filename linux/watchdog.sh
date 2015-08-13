@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 2.9 2015-06-12 12:22:17 cmayer $
+# $Id: watchdog.sh 2.10 2015-08-13 11:54:05 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -291,20 +291,25 @@ function poll {
 		fi
 		
 		#
-		# first, ping the primary
+		# first, ping the primary.  
+		# occasionally, ICMP is disabled, so PING can be disabled
 		#
-		if ping -c 1 -W $PINGTIME -q $primary >/dev/null 2>&1 ; then
+		if [ "$PINGLIMIT" = "0" ] ; then
 			pingfail=0
 		else
-			if expired pingfail $PINGLIMIT ; then
-				echo `date` pingfail expired >> $wd_log
-				return 2
+			if ping -c 1 -W $PINGTIME -q $primary >/dev/null 2>&1 ; then
+				pingfail=0
+			else
+				if expired pingfail $PINGLIMIT ; then
+					echo `date` pingfail expired >> $wd_log
+					return 2
+				fi
+				# we can't even ping.  Sleep for $((LOOPTIME-PINGTIME)) then try again
+				sleep $((LOOPTIME-PINGTIME))
+				continue
 			fi
-			# we can't even ping.  Sleep for $((LOOPTIME-PINGTIME)) then try again
-			sleep $((LOOPTIME-PINGTIME))
-			continue
 		fi
-		
+	
 		#
 		# then, is the database up
 		#
