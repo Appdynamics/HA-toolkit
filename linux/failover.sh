@@ -1,4 +1,4 @@
-#!/bin/bash
+/!/bin/bash
 #
 # $Id: failover.sh 2.10 2015-06-12 12:22:17 cmayer $
 #
@@ -72,8 +72,12 @@ function slave_status {
 
 # abstract out the privilege escalation
 if [[ `id -u` == 0 ]] ; then
+	function service {
+		$service_bin $1 $2
+	}
+
 	function remservice {
-		ssh $1 $2 $3 $4
+		ssh $1 $2 $service_bin $3 $4
 	}	
 else
 	if [ -x /sbin/appdservice ] ; then
