@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 2.12 2015-06-30 14:56:01 cmayer $
+# $Id: appdcontroller.sh 2.13 2015-08-24 14:37:53 cmayer $
 # 
 # HA Aware Init file for AppDynamics Controller 
 # 
@@ -355,7 +355,6 @@ status)
 		echo "reporting service not running"
 		;;
 	esac
-    exit 1  
 ;;
 
 *)  

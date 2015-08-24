@@ -19,3 +19,4 @@ make a system-check script
 	sizing (heap, buffer cache) ram total
 iptables rule for 3388
 
+certs for secure mysql replication
