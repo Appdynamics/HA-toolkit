@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.19 2015-07-06 14:36:23 cmayer $
+# $Id: replicate.sh 2.20 2015-08-24 14:38:56 cmayer $
 #
 # install HA to a controller pair
 #
@@ -376,7 +376,7 @@ echo "  -- appdynamics run user: $RUNUSER" | tee -a $repl_log
 # verify no-password ssh is set up
 #
 echo "  -- assert no password ssh" | tee -a $repl_log
-if ! ssh -o PasswordAuthentication=no $secondary true ; then
+if ! ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no $secondary true ; then
 	echo "no-password ssh not set up" | tee -a $repl_log
 	exit 4
 fi
@@ -1005,6 +1005,15 @@ scp $APPD_ROOT/license.lic.$primary $secondary:$APPD_ROOT
 #
 echo " -- enable secondary appserver" | tee -a $repl_log
 ssh $secondary rm -f $APPD_ROOT/HA/APPSERVER_DISABLE >> $repl_log 2>&1
+
+#
+# make sure host keys are properly set to prevent ssh from hanging
+#
+eval `echo "show slave status\G" | $APPD_ROOT/bin/controller.sh login-db |
+	awk 'BEGIN {OFS=""} /Master_Host/ {print "sechost=",$2}'`
+eval `echo "show slave status\G" | ssh $secondary $APPD_ROOT/bin/controller.sh login-db |
+	awk 'BEGIN {OFS=""} /Master_Host/ {print "prihost=",$2}'`
+ssh -o StrictHostKeyChecking=no $sechost ssh -o StrictHostKeyChecking=no $prihost /bin/true
 
 #
 # restart the appserver

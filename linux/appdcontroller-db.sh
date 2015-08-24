@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 1.8 2015-06-30 14:56:01 cmayer $
+# $Id: appdcontroller-db.sh 1.9 2015-08-24 14:37:53 cmayer $
 # 
 # HA Aware Init file for AppDynamics Controller 
 # 
@@ -672,7 +672,6 @@ controllerversion=`echo "select value from global_configuration_cluster where na
 	else
 		echo "db not running"
 	fi
-        exit 1  
 ;;
 
 *)  
