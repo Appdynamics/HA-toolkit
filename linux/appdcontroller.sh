@@ -302,6 +302,9 @@ stop)
 		echo "truncate ejb__timer__tbl;" | runuser $APPD_BIN/controller.sh login-db
 	fi
 
+	if [ -e $APPD_ROOT/logs/server.log.lck ] ; then
+		runuser rm -f $APPD_ROOT/logs/server.log.lck
+	fi
 	rm -f $lockfile
 ;;  
 
