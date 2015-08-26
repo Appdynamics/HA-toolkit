@@ -299,7 +299,7 @@ stop)
 	if [ $? -lt 2 ] ; then
 		echo "forcibly killing appserver"
 		pkill -9 -f "$APPD_ROOT/jre/bin/java -cp $APPD_ROOT/lib/tools.jar"
-		echo truncate ejb__timer__tbl\; | $APPD_BIN/controller.sh login-db
+		echo "truncate ejb__timer__tbl;" | runuser $APPD_BIN/controller.sh login-db
 	fi
 
 	rm -f $lockfile
