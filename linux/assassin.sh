@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 2.5 2015-06-12 12:22:17 cmayer $
+# $Id: assassin.sh 2.6 2015-09-02 15:36:05 cmayer $
 #
 # assassin.sh
 # run on the active node after a failover, 
@@ -24,6 +24,11 @@ MYSQL="$APPD_ROOT/db/bin/mysql"
 DBCNF="$APPD_ROOT/db/db.cnf"
 CONNECT="--protocol=TCP --user=$dbuser --password=$dbpasswd --port=$dbport"
 ASSASSIN=$APPD_ROOT/HA/appd_assassin.pid
+
+#
+# hack to supppress password
+#
+PWBLOCK='sed -e s/\(--password=\)[^-]*/\1=XXX/'
 
 as_log=$APPD_ROOT/logs/assassin.log
 
@@ -51,7 +56,7 @@ function remservice {
 }
 
 function sql {
-	echo "$2 | $MYSQL --host=$1 $CONNECT controller" >> $as_log
+	echo "$2 | $MYSQL --host=$1 $CONNECT controller" | $PWBLOCK >> $as_log
 	echo "$2" | $MYSQL --host=$1 $CONNECT controller | tee -a $as_log 2>> $as_log
 }
 

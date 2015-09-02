@@ -1,6 +1,6 @@
-/!/bin/bash
+#!/bin/bash
 #
-# $Id: failover.sh 2.10 2015-06-12 12:22:17 cmayer $
+# $Id: failover.sh 2.11 2015-09-02 15:36:05 cmayer $
 #
 # failover.sh
 # run on the passive node, activate this HA node.
@@ -21,6 +21,10 @@ WATCHDOG=$APPD_ROOT/HA/appd_watchdog.pid
 MYSQL="$APPD_ROOT/db/bin/mysql"
 DBCNF="$APPD_ROOT/db/db.cnf"
 CONNECT="--protocol=TCP --user=$dbuser --password=$dbpasswd --port=$dbport"
+#
+# hack to supppress password
+#
+PWBLOCK='sed -e s/\(--password=\)[^-]*/\1=XXX/'
 
 if [ -f /sbin/service ] ; then
     service_bin=/sbin/service
@@ -34,7 +38,7 @@ fi
 fo_log=$APPD_ROOT/logs/failover.log
 
 function sql {
-	echo "$2 | $MYSQL --host=$1 $CONNECT controller" >> $fo_log
+	echo "$2 | $MYSQL --host=$1 $CONNECT controller" | $PWBLOCK >> $fo_log
 	echo "$2" | $MYSQL --host=$1 $CONNECT controller | tee -a $fo_log
 }
 
