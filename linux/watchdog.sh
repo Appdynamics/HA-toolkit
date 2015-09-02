@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 2.10 2015-08-13 11:54:05 cmayer $
+# $Id: watchdog.sh 2.11 2015-09-02 15:36:05 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -54,6 +54,10 @@ CONNECT="--protocol=TCP --user=root --password=$dbpasswd --port=$dbport"
 WATCHDOG_ENABLE=$APPD_ROOT/HA/WATCHDOG_ENABLE
 WATCHDOG_SETTINGS=$APPD_ROOT/HA/watchdog.settings
 WATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status
+#
+# hack to supppress password
+#
+PWBLOCK='sed -e s/\(--password=\)[^-]*/\1=XXX/'
 
 fo_log=$APPD_ROOT/logs/failover.log
 wd_log=$APPD_ROOT/logs/watchdog.log
@@ -109,7 +113,7 @@ function cleanup () {
 # logging local/remote sql wrapper
 #
 function sql {
-	# echo "$2 | $MYSQL --host=$1 $CONNECT controller" >> $wd_log
+	echo "$2 | $MYSQL --host=$1 $CONNECT controller" | $PWBLOCK >> $wd_log
 	echo "$2" | $MYSQL --host=$1 $CONNECT controller
 }
 
