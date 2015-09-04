@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 2.13 2015-08-24 14:37:53 cmayer $
+# $Id: appdcontroller.sh 2.14 2015-09-03 20:50:49 cmayer $
 # 
 # HA Aware Init file for AppDynamics Controller 
 # 
@@ -314,6 +314,7 @@ restart)
 ;;  
   
 status)  
+	retcode=0
 	service appdcontroller-db status
 	if watchdog_running ; then
 		echo watchdog running
@@ -335,9 +336,11 @@ status)
 		;;
 	1)
 		echo "controller started - not up"
+		retcode=1
 		;;
 	*)
 		echo "controller not running"
+		retcode=1
 		;;
 	esac
 	events_running
@@ -358,6 +361,7 @@ status)
 		echo "reporting service not running"
 		;;
 	esac
+	exit $retcode
 ;;
 
 *)  
