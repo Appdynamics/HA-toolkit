@@ -162,15 +162,15 @@ function usage()
 {
 	echo "usage: $0 <options>"
 	echo "    -s <secondary hostname>"
-	echo "    [ -j ] Synchronize controller app server configurations and related binaries"
-	echo "           if secondary database is running, leave it running."
+#	echo "    [ -j ] Synchronize controller app server configurations and related binaries"
+#	echo "           if secondary database is running, leave it running."
 	echo "    [ -e [protocol://]<external vip>[:port]"
 	echo "    [ -i [protocol://]<internal vip>[:port]"
 	echo "    [ -c <controller root directory> ]"
 	echo "       default: $def_APPD_ROOT"
 	echo "    [ -f ]       do final install and activation"
 	echo "    [ -t [rsync speed limit]]" if unspecified or 0, unlimited
-	echo "    [ -u ] upgrade fixup"
+#	echo "    [ -u ] upgrade fixup"
 	echo "    [ -n ] no appserver start"
 	echo "    [ -w ] enable watchdog on secondary"
 	echo "    [ -z ] enable rsync compression"
