@@ -20,6 +20,7 @@ def_APPD_ROOT=$(cd $(dirname "$0"); cd .. ; pwd)
 APPD_ROOT=$def_APPD_ROOT
 dbport=`grep ^port= $APPD_ROOT/db/db.cnf | cut -d = -f 2`
 datadir=
+innodb_logdir=
 upgrade=
 final=false
 running_as_root=$( [[ $(id -u) -eq 0 ]] && echo "true" || echo "false" )
@@ -409,6 +410,10 @@ if [ "$myhostname" = "$themhostname" ] ; then
 fi
 
 datadir=`grep ^datadir $APPD_ROOT/db/db.cnf | cut -d = -f 2`
+innodb_logdir=`grep ^innodb_log_group_home_dir $APPD_ROOT/db/db.cnf | cut -d = -f 2`
+if [ -z "$innodb_logdir" ] ; then
+	innodb_logdir="$datadir"
+fi
 
 if [ "$appserver_only_sync" != "true" ] ; then
 	#
@@ -452,7 +457,9 @@ if [ "$appserver_only_sync" != "true" ] ; then
 	# this inhibits starting an incomplete controller
 	#
 	echo "  -- inhibit running of secondary and delete mysql/innodb logfiles" | tee -a $repl_log
-	ssh $secondary "rm -f $APPD_ROOT/bin/controller.sh $datadir/*log*" \
+	ssh $secondary rm -f $APPD_ROOT/bin/controller.sh \
+		"$innodb_logdir/ib_logfile*"
+		"$datadir/*log*" \
 		$datadir/ibdata1 >> $repl_log 2>&1
 	
 	#
