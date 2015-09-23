@@ -542,7 +542,6 @@ fi
 #
 # force server id - for failback
 #
-#ed -s $APPD_ROOT/db/db.cnf <<- SETID
 ex -s $APPD_ROOT/db/db.cnf <<- SETID
 /^server-id=/s,=.*,=666,
 wq
