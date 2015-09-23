@@ -218,7 +218,7 @@ if [ "$break_replication" == true -o "$primary_up" == false ] ; then
 	# edit the db.cnf to remove any redundant entries for skip-slave-start
 	# this is to ensure that replication does not get turned on by a reboot
 	#
-	ed -s $DBCNF <<- 'DISABLE'
+	ex -s $DBCNF <<- 'DISABLE'
 g/^skip-slave-start/d
 $a
 skip-slave-start=true
@@ -234,6 +234,7 @@ fi
 
 #
 # if the primary is up, mark it passive, and stop the appserver
+# also, if the old primary is not reachable, ha.controller.type will be changed by the assassin when it finally makes contact.
 #
 if [ "$primary_up" = "true" ] ; then
 	echo "  -- Stop primary appserver" | tee -a $fo_log
@@ -248,7 +249,7 @@ if [ "$primary_up" = "true" ] ; then
 		primary_up=false
 		echo "  -- Stop secondary database" | tee -a $fo_log
 		remservice -tq $primary appdcontroller-db stop >> $fo_log 2>&1
-		ssh -tq $primary ed -s $DBCNF <<- 'DISABLEP'
+		ssh -tq $primary ex -s $DBCNF <<- 'DISABLEP'
 g/^skip-slave-start/d
 $a
 skip-slave-start=true
@@ -256,16 +257,6 @@ skip-slave-start=true
 wq
 DISABLEP
 	fi
-
-else
-
-	#
-	# if we didn't detect the primary up, we start the assassin process
-	# to kill it when it shows up.
-	# the ha.controller.type == secondary on the local marks this need
-	#
-	echo "  -- start assassin" | tee -a $fo_log
-	$APPD_ROOT/HA/assassin.sh &
 fi
 
 #
@@ -275,6 +266,8 @@ fi
 echo "  -- Mark local active" | tee -a $fo_log
 echo "  -- Starting local Controller" | tee -a $fo_log
 sql localhost "update global_configuration_local set value='active' where name = 'appserver.mode';"
+#
+# this will start the assassin if needed.
 service appdcontroller start >> $fo_log 2>&1
 
 #

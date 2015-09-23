@@ -36,7 +36,7 @@ if [ -f /etc/sudoers.d/appdynamics ] ; then
 
 	if grep -Eq "^#include[\t ]+/etc/sudoers.d/appdynamics[\t ]*$" /etc/sudoers ; then
 		echo removing sudoers additions
-		ed -s /etc/sudoers <<- RMAPPD
+		ex -s /etc/sudoers <<- RMAPPD
 			g/^#include[\t ][\t ]*\/etc\/sudoers.d\/appdynamics/d
 			wq
 		RMAPPD
