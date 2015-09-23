@@ -165,7 +165,7 @@ while true ; do
 	fi
 
 	# make sure skip-slave-start is in db.cnf
-	cat <<- 'DISABLE' | ssh $primary ed -s $DBCNF >/dev/null 2>&1
+	cat <<- 'DISABLE' | ssh $primary ex -s $DBCNF >/dev/null 2>&1
 		g/^skip-slave-start/d
 		$a
 		skip-slave-start=true
