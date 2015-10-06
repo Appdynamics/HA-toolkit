@@ -10,7 +10,7 @@ SOURCES= README Makefile \
 	install-init.sh uninstall-init.sh \
 	watchdog.settings.template \
 	replicate.sh install-init.sh uninstall-init.sh \
-	appdservice.c hafunctions.sh RUNBOOK
+	appdservice.c appdservice.sh hafunctions.sh RUNBOOK
 
 all: HA.shar
 
