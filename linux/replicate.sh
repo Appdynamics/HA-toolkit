@@ -625,7 +625,7 @@ else
 		printf "  --   found %d discrepancies\n" $discrepancies | tee -a $repl_log
 		cat $tmpdir/worklist | tee -a $repl_log
 		scp $tmpdir/worklist $secondary:/tmp/replicate-prune-worklist
-		ssh $secondary "cat /tmp/replicate-prune-worklist | xargs rm"
+		ssh $secondary "cat /tmp/replicate-prune-worklist | xargs rm -f"
 	fi
 
 	#
