@@ -4,6 +4,47 @@
 #
 # install init script
 #
+PBRUN=/usr/local/bin/pbrun
+
+function usage {
+	echo "$0 -[options] where:"
+	echo "   -c  use setuid c wrapper"
+	echo "   -s  use sudo"
+	echo "   -p  use pbrun wrapper"
+	exit 1
+}
+
+use_pbrun=0
+use_cwrapper=0
+use_sudo=0
+
+while getopts csp flag; do
+	case $flag in
+	c)
+		use_cwrapper=1
+		;;
+	s)
+		use_sudo=1
+		;;
+	p)
+		if [ -x $PBRUN ] ; then
+			use_pbrun=1
+		else
+			echo $PBRUN not found
+			exit 1
+		fi
+		;;
+	*)
+		usage
+		;;
+	esac
+done
+
+if [ `id -u` != 0 ] ; then
+	echo $0 must be run as root
+	exit 0
+fi
+
 SCRIPTNAME=$(basename $(readlink -e $0))
 
 export PATH=/sbin:/usr/sbin:$PATH
@@ -22,8 +63,6 @@ if echo $VENDOR | grep -iq ubuntu ; then
 	APPDYNAMICS_SERVICE_STOP=( 90 89 )
 fi
 
-use_sudo=true
-use_appdservice=true
 APPDSERVICE=/sbin/appdservice
 
 cd $(dirname $0)
@@ -36,6 +75,16 @@ DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 
 ROOTOWNER=`ls -ld $APPD_ROOT | awk '{print $3}'`
 RUNUSER=`su -s /bin/bash -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
+if [[ `id -u $RUNUSER` != "0" ]] ; then
+	if [ `expr $use_cwrapper + $use_sudo + $use_pbrun` == 0 ] ; then
+		echo non-root usage requires at least one privilege escalation method
+		usage
+	fi
+	if [ `expr $use_cwrapper + $use_pbrun` == 2 ] ; then
+		echo cwrapper and pbrun are mutually exclusive
+		usage
+	fi
+fi
 
 CHKCONFIG=`which chkconfig 2>/dev/null`
 UPDATE_RC_D=`which update-rc.d 2>/dev/null`
@@ -101,7 +150,7 @@ fi
 #
 if [[ `id -u $RUNUSER` != "0" ]] ; then
 
-	if [ $use_sudo == true ] ; then
+	if [ $use_sudo == 1 ] ; then
 	require sudo sudo sudo || exit 1
 	[ -d /etc/sudoers.d ] || mkdir /etc/sudoers.d && chmod 0750 /etc/sudoers.d
 	grep -Eq "^#includedir[\t ]+/etc/sudoers.d[\t ]*$" /etc/sudoers || \
@@ -138,16 +187,22 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 	echo "installed /etc/sudoers.d/appdynamics"
 	fi
 
-	if [ $use_appdservice == true ] ; then
+	if [ $use_cwrapper == 1 ] ; then
 		# compile wrapper, chown and chmod with setuid
 		cc -DAPPDUSER=`id -u $RUNUSER` -o $APPDSERVICE appdservice.c
 		if [ -x $APPDSERVICE ] ; then
 			chown root:root $APPDSERVICE
 			chmod 4755 $APPDSERVICE
-			echo "installed $APPDSERVICE"
+			echo "installed setuid root wrapper as $APPDSERVICE"
 		else
 			echo "installation of $APPDSERVICE failed"
 		fi
+	fi
+
+	if [ $use_pbrun == 1 ] ; then
+		cp appdservice.sh $APPDSERVICE
+		chmod 755 $APPDSERVICE
+		echo "installed pbrun wrapper as $APPDSERVICE"
 	fi
 
 	if ! require setcap libcap libcap2-bin && \
