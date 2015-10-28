@@ -325,6 +325,18 @@ trap cleanup EXIT
 cleanup
 mkdir -p $tmpdir
 
+function handle_interrupt(){
+	echo "Caught interrupt."
+	if [[ -n `jobs -p` ]] ; then
+		echo "Killing child processes."
+		kill $(jobs -p) 2>/dev/null
+	fi
+	echo "Exiting"
+	exit
+}
+
+trap handle_interrupt INT
+
 #
 # set any variables dependent on command options
 #
@@ -651,11 +663,6 @@ else
 	    --exclude=\*.pid                                                \
 	    --exclude=ib_logfile\*                                          \
 	    $datadir/ $secondary:$datadir >> $repl_log
-	if [ "$final" == "true" ] ; then
-		echo "  -- Rsync'ing Partmax Data files: $datadir" | tee -a $repl_log
-		rsync $rsync_opts "$rsync_crypto" -c $rsync_compression                         \
-		$datadir/controller/*PARTMAX* $secondary:$datadir/controller >> $repl_log
-	fi
 	echo "  -- Rsyncs complete" | tee -a $repl_log
 fi
 

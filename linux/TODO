@@ -1,3 +1,8 @@
+replicate bug: https:// vip with no port does not set -Dappdynamics.controller.port= jvm-option and did not set <controller-ssl-enabled>true</... in controller agent controller-info.xml files
+
+Make sure install-init was run the same way on each host. Replicate needs to complain if not
+Auto-start machine agent.
+
 install-init.sh
 	require curl
 
