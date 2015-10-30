@@ -91,16 +91,28 @@ UPDATE_RC_D=`which update-rc.d 2>/dev/null`
 SERVICE=`which service 2>/dev/null`
 
 function require() {
-	# args: executable "redhat package" "debian package" [ force ]
+	# args: executable "redhat package" "debian package" [ force|advise ] ["<reason package is required>"]
 	local errors=0
 	if ! [[  -x `which $1 2>/dev/null` ]] || [ "$4" == "force" ] ; then
 		if [[ -x `which apt-get 2>/dev/null` ]] ; then
-			if ! apt-get -qq -y install $3 && [ "$4" == "force" ] ; then
-				errors=1
+			if [ "$4" == "advise" ] ; then
+				echo "Package $3 not installed."
+				echo "$3 is required $5"
+				return 1
+			else
+				if ! apt-get -qq -y install $3 && [ "$4" == "force" ] ; then
+					errors=1
+				fi
 			fi
 		elif [[ -x `which yum 2>/dev/null` ]] ; then
-			if ! yum --quiet -y install $2 >/dev/null && [ "$4" == "force" ] ; then
-				errors=1
+			if [ "$4" == "advise" ] ; then
+				echo "Package $2 not installed."
+				echo "$2 is required $5"
+				return 1
+			else
+				if ! yum --quiet -y install $2 >/dev/null && [ "$4" == "force" ] ; then
+					errors=1
+				fi
 			fi
 		fi
 		if ! [[  -x `which $1 2>/dev/null` ]] || [ "$errors" -gt 0 ] ; then
@@ -136,6 +148,7 @@ missing_dependencies=0
 require xmllint libxml2 libxml2-utils || ((missing_dependencies++))
 require bc bc bc || ((missing_dependecies++))
 require ex vim-minimal vim-tiny || ((missing_dependecies++))
+require curl curl curl || ((missing_dependencies++))
 if ! ping -q -W 1 -c 1 localhost >/dev/null ; then
 	require ping iputils iputils-ping force || ((missing_dependencies++))
 fi
@@ -151,55 +164,67 @@ fi
 if [[ `id -u $RUNUSER` != "0" ]] ; then
 
 	if [ $use_sudo == 1 ] ; then
-	require sudo sudo sudo || exit 1
-	[ -d /etc/sudoers.d ] || mkdir /etc/sudoers.d && chmod 0750 /etc/sudoers.d
-	grep -Eq "^#includedir[\t ]+/etc/sudoers.d[\t ]*$" /etc/sudoers || \
-	grep -Eq "^#include[\t ]+/etc/sudoers.d/appdynamics[\t ]*$" /etc/sudoers || \
-	echo "#include /etc/sudoers.d/appdynamics" >> /etc/sudoers
-	if [ -x "$CHKCONFIG" ] ; then
-		COMMA=
-		for s in ${APPDYNAMICS_SERVICE_LIST[@]} ; do
-			CMND_ALIAS_LIST="$CMND_ALIAS_LIST $COMMA \\
-			$SERVICE $s *, \\
-			$CHKCONFIG $s on, \\
-			$CHKCONFIG $s off"
-			COMMA=","
-		done
-	elif [ -x "$UPDATE_RC_D" ] ; then
-		COMMA=
-		for s in ${APPDYNAMICS_SERVICE_LIST[@]} ; do
-			CMND_ALIAS_LIST="$CMND_ALIAS_LIST$COMMA \\
-			$SERVICE $s *, \\
-			$UPDATE_RC_D $s enable, \\
-			$UPDATE_RC_D $s disable"
-			COMMA=","
-		done
-	fi
-	cat > /etc/sudoers.d/appdynamics <<- SUDOERS
-	# allow appdynamics user to:
-	#    start, stop, and query status of appdynamics via init scripts
-	#    to enable and disable those init scripts
-	Defaults:$RUNUSER !requiretty
-	Cmnd_Alias APPD = $CMND_ALIAS_LIST
-		$RUNUSER ALL=(root) NOPASSWD: APPD
-	SUDOERS
-	chmod 0440 /etc/sudoers.d/appdynamics
-	echo "installed /etc/sudoers.d/appdynamics"
+		# Clean up C / pbrun wrappers if they were previously installed
+		rm -f $APPDSERVICE 2>/dev/null
+		require sudo sudo sudo || exit 1
+		[ -d /etc/sudoers.d ] || mkdir /etc/sudoers.d && chmod 0750 /etc/sudoers.d
+		grep -Eq "^#includedir[\t ]+/etc/sudoers.d[\t ]*$" /etc/sudoers || \
+		grep -Eq "^#include[\t ]+/etc/sudoers.d/appdynamics[\t ]*$" /etc/sudoers || \
+		echo "#include /etc/sudoers.d/appdynamics" >> /etc/sudoers
+		if [ -x "$CHKCONFIG" ] ; then
+			COMMA=
+			for s in ${APPDYNAMICS_SERVICE_LIST[@]} ; do
+				CMND_ALIAS_LIST="$CMND_ALIAS_LIST $COMMA \\
+				$SERVICE $s *, \\
+				$CHKCONFIG $s on, \\
+				$CHKCONFIG $s off"
+				COMMA=","
+			done
+		elif [ -x "$UPDATE_RC_D" ] ; then
+			COMMA=
+			for s in ${APPDYNAMICS_SERVICE_LIST[@]} ; do
+				CMND_ALIAS_LIST="$CMND_ALIAS_LIST$COMMA \\
+				$SERVICE $s *, \\
+				$UPDATE_RC_D $s enable, \\
+				$UPDATE_RC_D $s disable"
+				COMMA=","
+			done
+		fi
+		cat > /etc/sudoers.d/appdynamics <<- SUDOERS
+		# allow appdynamics user to:
+		#    start, stop, and query status of appdynamics via init scripts
+		#    to enable and disable those init scripts
+		Defaults:$RUNUSER !requiretty
+		Cmnd_Alias APPD = $CMND_ALIAS_LIST
+			$RUNUSER ALL=(root) NOPASSWD: APPD
+		SUDOERS
+		chmod 0440 /etc/sudoers.d/appdynamics
+		echo "installed /etc/sudoers.d/appdynamics"
 	fi
 
 	if [ $use_cwrapper == 1 ] ; then
-		# compile wrapper, chown and chmod with setuid
-		cc -DAPPDUSER=`id -u $RUNUSER` -o $APPDSERVICE appdservice.c
-		if [ -x $APPDSERVICE ] ; then
-			chown root:root $APPDSERVICE
-			chmod 4755 $APPDSERVICE
-			echo "installed setuid root wrapper as $APPDSERVICE"
+		if require cc gcc gcc advise "to build $APPDSERVICE privilege escalation wrapper" ; then
+			# Clean up sudo privilege escalation if it was previously installed
+			rm -f /etc/sudoers.d/appdynamics 2>/dev/null
+			# compile wrapper, chown and chmod with setuid
+			cc -DAPPDUSER=`id -u $RUNUSER` -o $APPDSERVICE appdservice.c
+			if [ -x $APPDSERVICE ] ; then
+				chown root:root $APPDSERVICE
+				chmod 4755 $APPDSERVICE
+				echo "installed setuid root wrapper as $APPDSERVICE"
+			else
+				echo "installation of $APPDSERVICE failed"
+			fi
 		else
-			echo "installation of $APPDSERVICE failed"
+			echo "Exiting..."
+			exit 1
 		fi
 	fi
 
 	if [ $use_pbrun == 1 ] ; then
+		# Clean up sudo privilege escalation if it was previously installed
+		rm -f /etc/sudoers.d/appdynamics 2>/dev/null
+		# Install the pbrun privilege escalation wrapper
 		cp appdservice.sh $APPDSERVICE
 		chmod 755 $APPDSERVICE
 		echo "installed pbrun wrapper as $APPDSERVICE"
