@@ -49,6 +49,24 @@ else
     exit 13
 fi
 
+# verify that a required executable / package is installed
+# complain and return 1 if not
+function require() {
+	# args: executable "redhat package" "debian package" 
+	if ! [[  -x `which $1 2>/dev/null` ]] ; then
+		echo "Unable to find $1 in $PATH"
+		echo "Please install with:"
+		if [[ -x `which apt-get 2>/dev/null` ]] ; then
+			echo "apt-get update && apt-get install $3"
+		elif [[ -x `which yum 2>/dev/null` ]] ; then
+			echo "yum install $2"
+		fi
+		return 1
+	fi
+	return 0
+}
+
+
 # execute remote service operation
 # args:  flags machine service verb
 function remservice {
@@ -134,29 +152,68 @@ before proceeding."
 	return $errors;
 }
 
-function verify_privilege_escalation(){
+function get_privilege_escalation(){
 	local secondary=$1
 	local ssh=`[ -n "$secondary" ] && echo "ssh -tq"`
+	local escalation_type=
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		if ! $ssh $secondary [ -x /sbin/appdservice ] ; then
+		if $ssh $secondary [ -x /sbin/appdservice ] ; then
+			if dd if=/sbin/appdservice bs=11 count=1 2>/dev/null \
+				| grep -q '^#!/bin/bash' ; then
+				escalation_type="pbrun"
+			else
+				escalation_type="setuid"
+			fi
+		else
 			$ssh $secondary sudo -nl $service_bin $s start > /dev/null 2>&1 || ((errors++))
 			$ssh $secondary sudo -nl $service_bin $s stop > /dev/null 2>&1 || ((errors++))
+			if  [ $errors -lt 1 ] ; then
+				escalation_type="sudo"
+			else
+				escalation_type="unknown"
+			fi
 		fi
 	done
-	if [ $errors -gt 0 ] ; then
-		if [ -z $secondary ] ; then
-			echo "\
-$RUNUSER is unable to start and stop appdynamics services
+	echo $escalation_type
+	return $errors
+}
+
+function verify_privilege_escalation(){
+	local secondary=$1
+	local errors=0
+	local local_priv_escalation=
+	local remote_priv_escalation=
+
+	local_priv_escalation=$(get_privilege_escalation)
+	if [ $? -gt 0 ] ; then
+		echo "\
+User $RUNUSER is unable to start and stop appdynamics services
 Please ensure that $APPD_ROOT/HA/install-init.sh has been run."
-		else
-			echo "\
-$RUNUSER is unable to start and stop appdynamics services on $secondary.
-Please ensure that $APPD_ROOT/HA/install-init.sh has been run on $secondary."
-		fi
+		((errors++))
 	fi
-	return $errors;
+
+	remote_priv_escalation=$(get_privilege_escalation $secondary)
+	if [ $? -gt 0 ] ; then
+		echo "\
+User $RUNUSER is unable to start and stop appdynamics services on $secondary.
+Please ensure that $APPD_ROOT/HA/install-init.sh has been run on $secondary."
+		((errors++))
+	fi
+	
+	if [ $errors -lt 1 ] && [ "$local_priv_escalation" != "$remote_priv_escalation" ] ; then
+		echo "\
+The primary and secondary hosts are not using the same privilege escalation
+wrapper.
+
+Primary:   $local_priv_escalation
+Secondary: $remote_priv_escalation
+
+Please re-run install-init.sh on one or both hosts with the same options."
+		((errors++))
+	fi
+	return $errors
 }
 
 function usage()
@@ -302,6 +359,8 @@ App-server-only and final sync modes are mutually exclusive.  Please run with
 -j or -f, not both."
 	exit 1
 fi
+
+require "ex" "vim-minimal" "vim-tiny" || exit 1
 
 if [ "$debug" == "true" ] ; then
 	if ! [[ -x `which parallel 2>&1` ]] ; then
@@ -498,13 +557,10 @@ if [ $final == 'true' ] ; then
 			exit 7
 		fi
 		# verify that we can cause service state changes
-		if ! verify_privilege_escalation ; then
-			bad_sudo="true"
-		fi
 		if ! verify_privilege_escalation $secondary ; then
-			bad_sudo="true"
+			bad_privilege_escalation="true"
 		fi
-		if [ "$bad_sudo" = "true" ] ; then
+		if [ "$bad_privilege_escalation" = "true" ] ; then
 			echo "Cannot proceed"
 			exit 9
 		fi
@@ -589,8 +645,8 @@ echo -n "secondary date: " >> $repl_log
 ssh $secondary date >> $repl_log 2>&1 
 rmdate=`ssh $secondary date +%s`
 lodate=`date +%s`
-skew=`echo "sqrt(($rmdate-$lodate)^2)" | bc`
-if [ $skew -gt 60 ] ; then
+skew=$((rmdate-lodate))
+if [ $skew -gt 60 ] || [ $skew -lt -60 ]; then
 	echo unacceptable clock skew: $rmdate $lodate $skew
 	exit 6
 fi
@@ -713,10 +769,12 @@ if [ $final == 'false' ] ; then
 	# and warn user if they need to be updated before final
 	#
 	if [ "$running_as_root" == 'false' ] ; then
-		verify_init_scripts
-		verify_init_scripts $secondary
-		verify_privilege_escalation
-		verify_privilege_escalation $secondary
+		errors=0
+		verify_init_scripts || ((errors++))
+		verify_init_scripts $secondary || ((errors++))
+		if [ $errors -lt 1 ] ; then
+			verify_privilege_escalation $secondary
+		fi
 	fi
 	echo "  -- incremental sync done" | tee -a $repl_log
 	exit 0
