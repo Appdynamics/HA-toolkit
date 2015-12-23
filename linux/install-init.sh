@@ -1,10 +1,10 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 2.10 2015-06-30 14:56:01 cmayer $
+# $Id: install-init.sh 2.12 2015-12-23 00:36:28 cmayer $
 #
 # install init script
 #
-PBRUN=/usr/local/bin/pbrun
+PBRUN=`grep PBRUN= appdservice-pbrun.sh | awk -F= '{print $2}'`
 
 function usage {
 	echo "$0 -[options] where:"
@@ -17,8 +17,9 @@ function usage {
 use_pbrun=0
 use_cwrapper=0
 use_sudo=0
+use_root=0
 
-while getopts csp flag; do
+while getopts cspr flag; do
 	case $flag in
 	c)
 		use_cwrapper=1
@@ -84,6 +85,8 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 		echo cwrapper and pbrun are mutually exclusive
 		usage
 	fi
+else
+	use_root=1
 fi
 
 CHKCONFIG=`which chkconfig 2>/dev/null`
@@ -225,9 +228,17 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 		# Clean up sudo privilege escalation if it was previously installed
 		rm -f /etc/sudoers.d/appdynamics 2>/dev/null
 		# Install the pbrun privilege escalation wrapper
-		cp appdservice.sh $APPDSERVICE
+		cp appdservice-pbrun.sh $APPDSERVICE
 		chmod 755 $APPDSERVICE
 		echo "installed pbrun wrapper as $APPDSERVICE"
+	fi
+
+	if [ $use_root == 1 ] ; then
+		# Clean up sudo privilege escalation if it was previously installed
+		rm -f /etc/sudoers.d/appdynamics 2>/dev/null
+		cp appdservice-root.sh $APPDSERVICE
+		chmod 755 $APPDSERVICE
+		echo "installed root wrapper as $APPDSERVICE"
 	fi
 
 	if ! require setcap libcap libcap2-bin && \

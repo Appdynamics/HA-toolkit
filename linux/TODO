@@ -1,10 +1,9 @@
+# $Id: TODO 1.1 2015-12-23 00:36:28 cmayer $
+
 replicate bug: https:// vip with no port does not set -Dappdynamics.controller.port= jvm-option and did not set <controller-ssl-enabled>true</... in controller agent controller-info.xml files
 
 install-init needs to clean up old privilege escalation methods.
 Auto-start machine agent.
-
-install-init.sh
-	require curl
 
 replicate.sh:
 	add update logic
@@ -24,3 +23,12 @@ make a system-check script
 iptables rule for 3388
 
 certs for secure mysql replication
+
+enable event service marker file obeyed by init scripts.
+
+port number for https://external without port number generates bogus hostname
+
+monitoring extension:
+surface:
+	seconds behind master
+	watchdog running

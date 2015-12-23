@@ -1,16 +1,22 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 2.11 2015-09-02 15:36:05 cmayer $
+# $Id: watchdog.sh 2.12 2015-12-23 00:36:28 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
 # if we are not capable of failing over, fall over immediately
 
 #
+# this is needed to set the output of a pipe to the first failing process
+#
+set -o pipefail
+
+#
 # skip SSL certificate validation when doing health checks, ( useful for 
 # self-signed certificates, and certs issued by internal, corporate CAs )
 # leave empty to require certificate validation against the host's CA cert bundle
 #
+
 CERT_VALIDATION_MODE="-k"
 
 APPD_ROOT=$( cd $(dirname "$0"); cd .. ; pwd)
@@ -54,6 +60,7 @@ CONNECT="--protocol=TCP --user=root --password=$dbpasswd --port=$dbport"
 WATCHDOG_ENABLE=$APPD_ROOT/HA/WATCHDOG_ENABLE
 WATCHDOG_SETTINGS=$APPD_ROOT/HA/watchdog.settings
 WATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status
+
 #
 # hack to supppress password
 #
@@ -82,9 +89,16 @@ RISINGLIMIT=3600
 # The primary database is not responding: 5 Minutes
 DBDOWNLIMIT=300
 
+# The primary database cannot create a table: 2 Minutes
+DBOPLIMIT=300
+
 # The active controller host is not responding to ICMP echo, (ping),
 # requests: 5 Minutes
 PINGLIMIT=300
+
+#
+# the length of time to wait for a sql statememt to run
+DBWAIT=10
 
 #
 # polling frequency
@@ -102,19 +116,61 @@ PINGTIME=2
 CURL_MAXTIME=2
 
 #
+# Time to wait between consecutive requests to create a dummy table on remote
+#
+DB_CREATE_DELAY=10
+
+last_db_create=0
+
+#
 # remove the watchdog pid and temporary curl output file when we exit
 #
 function cleanup () {
 	echo `date` "watchdog exit" >> $wd_log
-	rm -f $WATCHDOG $wd_tmp
+	rm -f $WATCHDOG $wd_tmp $DELFILES
 }
 
 #
-# logging local/remote sql wrapper
+# worker function for sql timer
+#
+function sqltimeout {
+	if [ $sqlpid -ne 0 ] ; then
+		echo "killing sql pid $sqlpid"
+		disown $sqlpid
+		kill -9 $sqlpid
+		sqlpid=0
+		sqlkiller=0
+	fi
+}
+
+#
+# args:  hostname command [ timeout ]
+# sql wrapper - knows about timeout - returns 0 on success, nonzero otherwise
 #
 function sql {
-	echo "$2 | $MYSQL --host=$1 $CONNECT controller" | $PWBLOCK >> $wd_log
-	echo "$2" | $MYSQL --host=$1 $CONNECT controller
+	if [ $# -lt 3 ] ; then
+		echo "$2" | $MYSQL --host=$1 $CONNECT controller
+	else
+		trap sqltimeout SIGALRM
+		tmpfile=/tmp/watchdog.sql.$$
+		rm -f $tmpfile
+		DELFILES=$tmpfile
+		mypid=$$
+		(sleep $3 ; kill -SIGALRM $mypid) &
+		sqlkiller=$!
+		disown $sqlkiller
+		echo "$2" | $MYSQL --host=$1 $CONNECT controller > $tmpfile &
+		sqlpid=$!
+		wait $sqlpid
+		retval=$?
+		if [ $sqlkiller -ne 0 ] ; then
+			kill -9 $sqlkiller
+		fi
+		cat $tmpfile
+		rm -f $tmpfile
+		DELFILES=
+		return $retval
+	fi
 }
 
 #
@@ -192,7 +248,7 @@ function sanity {
 	esac
 	return 1
 }
-	
+
 #
 # code to do a rest call for status. 
 #
@@ -282,6 +338,7 @@ function poll {
 	fallingtime=0
 	pingfail=0
 	dbfail=0
+	dbopfail=0
 
 	rm -f $WATCHDOG_STATUS
 
@@ -313,25 +370,54 @@ function poll {
 				continue
 			fi
 		fi
-	
+
 		#
-		# then, is the database up
+		# then, is the database up listening
 		#
 		if $MYSQLADMIN $CONNECT ping >/dev/null 2>&1 ; then
 			dbfail=0
 		else
+			dbopfail=0
 			downtime=0
 			risingtime=0
 			fallingtime=0
 			pingfail=0
-			if expired dbfail $DBLIMIT ; then
+			if expired dbfail $DBDOWNLIMIT ; then
 				echo `date` dbfail expired >> $wd_log
 				return 2
 			fi
 			sleep $LOOPTIME
 			continue
 		fi
-		
+
+		#
+		# then, is the database capable of doing some real work for us
+		# only do this every DB_CREATE_DELAY
+		#
+		if [ $(($last_db_create+$DB_CREATE_DELAY)) -le `date +%s` ] ; then
+			last_db_create=`date +%s`
+			if 
+sql $primary "drop table if exists watchdog_test_table;" $DBWAIT &&
+sql $primary "create table watchdog_test_table (i int);" $DBWAIT &&
+sql $primary "insert into watchdog_test_table values (1);" $DBWAIT &&
+sql $primary "select count(*) from watchdog_test_table;" $DBWAIT &&
+sql $primary "drop table watchdog_test_table;" $DBWAIT ; then
+				dbopfail=0
+			else
+				dbfail=0
+				downtime=0
+				risingtime=0
+				fallingtime=0
+				pingfail=0
+				if expired dbopfail $DBOPLIMIT ; then
+					echo `date` dbopfail expired >> $wd_log
+					return 2
+				fi
+				sleep $LOOPTIME
+				continue
+			fi
+		fi
+
 		#
 		# how does the appserver respond to a serverstatus REST?
 		# if down, try every port before calling expired()
@@ -349,6 +435,7 @@ function poll {
 			fallingtime=0
 			pingfail=0
 			dbfail=0
+			dbopfail=0
 			if expired downtime $DOWNLIMIT ; then
 				echo `date` downtime expired >> $wd_log
 				return 2
@@ -360,6 +447,7 @@ function poll {
 			fallingtime=0
 			pingfail=0
 			dbfail=0
+			dbopfail=0
 
 			if expired risingtime $RISINGLIMIT ; then
 				echo `date` risingtime expired >> $wd_log
@@ -371,6 +459,7 @@ function poll {
 			risingtime=0
 			pingfail=0
 			dbfail=0
+			dbopfail=0
 			if expired fallingtime $FALLINGLIMIT ; then
 				echo `date` fallingtime expired >> $wd_log
 				return 2
@@ -425,10 +514,19 @@ if [ -f $WATCHDOG_SETTINGS ] ; then
 fi
 
 #
+# force first report
+#
+laststatus=1
+
+#
 # our main loop.  every time the controller is noted up, we start from scratch.
 #
 while true ; do
-	echo "  -- watchdog log " `date` > $wd_log
+	if [ ! -f $wd_log ] ; then
+		echo "  -- watchdog log " `date` > $wd_log
+		echo "  -- settings: down:$DOWNLIMIT falling:$FALLINGLIMIT \
+ rising:$RISINGLIMIT dbdown:$DBDOWNLIMIT ping:$PINGLIMIT loop:$LOOPTIME" >> $wd_log
+	fi
 	if sanity ; then
 		if [ -f $WATCHDOG_ENABLE ] ; then
 			echo "failover not possible" | tee -a $wd_log
@@ -437,27 +535,30 @@ while true ; do
 		exit 1
 	fi
 
-	echo "  -- settings: down:$DOWNLIMIT falling:$FALLINGLIMIT \
-rising:$RISINGLIMIT dbdown:$DBDOWNLIMIT ping:$PINGLIMIT loop:$LOOPTIME" >> $wd_log
-
 	poll
 	pollstatus=$?
-	date >> $wd_log
 	case $pollstatus in
 	0)
-		echo "watchdog good" >> $wd_log
+		# don't report consecutive good to minimize noise
+		if [ $laststatus != '0' ] ; then
+			date >> $wd_log
+			echo "watchdog good" >> $wd_log
+		fi
 		;;
 	2)
+		date >> $wd_log
 		echo "failover invoked" >> $wd_log
-		$APPD_ROOT/HA/failover.sh >> $fo_log 2>&1 &
+		#$APPD_ROOT/HA/failover.sh >> $fo_log 2>&1 &
 		exit 0
 		;;
 	1|*)
+		date >> $wd_log
 		echo "watchdog abort poll status = $pollstatus" >> $wd_log
 		exit 1
 		;;
 	esac
 	sleep $LOOPTIME
+	laststatus=$pollstatus
 done
 
 #

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 2.20 2015-08-24 14:38:56 cmayer $
+# $Id: replicate.sh 2.22 2015-12-23 00:36:28 cmayer $
 #
 # install HA to a controller pair
 #
@@ -487,6 +487,16 @@ if [ -z "$innodb_logdir" ] ; then
 fi
 
 if [ "$appserver_only_sync" != "true" ] ; then
+
+	#
+	# sanity check: make sure we don't have the controller.sh interlock active.
+	# if there's no controller.sh file, we are the target of an incremental!
+	echo "  -- assert non-incremental" | tee -a $repl_log
+	if ! [ -f $APPD_ROOT/bin/controller.sh ] ; then
+		echo "copying from disabled controller - BOGUS!" | tee -a $repl_log
+		exit 15
+	fi
+
 	#
 	# make sure that the primary database is up.  if not, start it
 	#
