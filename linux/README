@@ -1,11 +1,17 @@
 Contents:
 
 	README: this file
+	RUNBOOK:  a list of state descriptions, validations, and remedial actions
+
 
 	replicate.sh:  the all-singing, all-dancing HA (re)activator
 	this installs and sets up the HA function for a controller pair.
 
-	appdcontroller.sh: a file intended to be placed into /etc/init.d
+	appdcontroller.sh: a file intended to be placed into /etc/init.d to control
+	the controller, watchdog, and assassin
+
+	appdcontroller-db.sh: a file intended to be placed into /etc/init.d to control
+	the mysql database
 
 	assassin.sh:  a script run on a failed-over primary to kill the old primary
 
@@ -19,6 +25,12 @@ Contents:
 
 	watchdog.settings.template:  copy this to watchdog.settings to override defaults
 
+	appdservice-root.sh:  a null privilege escalation wrapper
+
+	appdservice-pbrun.sh:  a privilege escalation wrapper around pbrun
+
+	appdservice.c:  a privilege escalation c program
+	
 Installation notes:
 This software is intended to connect the appdynamics controller into linux's
 service machinery.  This optionally includes a watchdog process running on the
@@ -28,7 +40,7 @@ the primary controller or database.
 Permissions: 
 	If the controller is to be run as a non-root user, part of the 
 installation cannot be directly automated, as it involves installing of a 
-system service into /etc/init.d and ancillary directories.
+system service into /etc/init.d and ancillary directories using install-init.sh
 
 Prerequisites:
 --------------
@@ -113,6 +125,12 @@ the -f option would approach a perfect copy over a period of days.  the final
 activation with -f during a maintenance window would only copy those data filesi
 that differ from the last copy.
 
+Privilege Escalation:
+---------------------
+the install-init.sh script is used to install the init scripts, and to set
+up a controlled privilege escalation.  this can take the form of sudo settings,
+or one of 3 flavors of /sbin/appdservice. run install-init.sh for usage.
+
 Service Control:
 ----------------
 After activation, the controller service and HA facility can be controlled 
@@ -122,6 +140,9 @@ the system is halted, and automatically start it at boot time.
 
 	service appdcontroller start
 	service appdcontroller stop
+
+an additional service, appdcontroller-db, is used to manage the database.
+a sensible dependency between the two services is implemented
 
 Status:
 -------
@@ -189,5 +210,5 @@ is the place to add code.
 
 Version:
 --------
-$Id: README 1.8 2015/03/17 01:48:21 cmayer Exp $
+$Id: README 1.9 2015-12-23 00:36:28 cmayer Exp $
 

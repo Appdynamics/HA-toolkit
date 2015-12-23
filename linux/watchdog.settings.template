@@ -1,4 +1,4 @@
-# $Id: watchdog.settings.template 1.4 2015-08-13 11:54:05 cmayer $
+# $Id: watchdog.settings.template 1.5 2015-12-23 00:36:28 cmayer $
 #
 # watchdog.settings
 
@@ -26,5 +26,12 @@ DBDOWNLIMIT=300
 # requests: 5 Minutes
 # if ICMP is disabled, PING can be disabled by setting PINGLIMIT to 0
 PINGLIMIT=300
+
+# The primary database cannot create a table: 2 Minutes
+DBOPLIMIT=300
+
+#
+# the length of time to wait for a sql statememt to run
+DBWAIT=10
 
 

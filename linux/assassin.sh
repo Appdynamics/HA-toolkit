@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 2.6 2015-09-02 15:36:05 cmayer $
+# $Id: assassin.sh 2.7 2015-12-23 00:36:28 cmayer $
 #
 # assassin.sh
 # run on the active node after a failover, 

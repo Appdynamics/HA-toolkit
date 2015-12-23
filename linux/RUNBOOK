@@ -110,7 +110,7 @@ to fix:
 REPLICATED, WATCHDOG NOT RUNNING: 
 the HA package is running fully replicated, and the primary node is serving
 agents with metric storage, and the UI is responsive.  the secondary is
-monitoring the primary appserver with a watchdog process.
+not monitoring the primary appserver with a watchdog process.
 
 diagnosis:
 	service appdcontroller status on the primary reports:
@@ -190,4 +190,8 @@ diagnosis:
 to-fix:
 	on the passive controller,
 	/sbin/appdservice appdcontroller start
+
+Version:
+--------
+$Id: RUNBOOK 1.2 2015-12-23 00:36:28 cmayer Exp $
 

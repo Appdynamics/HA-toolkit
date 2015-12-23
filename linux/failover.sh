@@ -1,11 +1,11 @@
 #!/bin/bash
 #
-# $Id: failover.sh 2.11 2015-09-02 15:36:05 cmayer $
+# $Id: failover.sh 2.12 2015-12-23 00:36:28 cmayer $
 #
 # failover.sh
 # run on the passive node, activate this HA node.
 # 
-# if run with the -f option, force replication break
+# if run with the -f option, force failover
 #
 # this may need editing to conform with your controller install
 #
@@ -37,9 +37,48 @@ fi
 
 fo_log=$APPD_ROOT/logs/failover.log
 
+#
+# worker function for sql timer
+#
+function sqltimeout {
+        if [ $sqlpid -ne 0 ] ; then
+                echo "killing sql pid $sqlpid"
+                disown $sqlpid
+                kill -9 $sqlpid
+                sqlpid=0
+                sqlkiller=0
+        fi
+}
+
+#
+# args:  hostname command [ timeout ]
+# sql wrapper - knows about timeout - returns 0 on success, nonzero otherwise
+#
 function sql {
-	echo "$2 | $MYSQL --host=$1 $CONNECT controller" | $PWBLOCK >> $fo_log
-	echo "$2" | $MYSQL --host=$1 $CONNECT controller | tee -a $fo_log
+		echo sql $1 "$2" $3 >> $fo_log
+        if [ $# -lt 3 ] ; then
+                echo "$2" | $MYSQL --host=$1 $CONNECT controller
+        else
+                trap sqltimeout SIGALRM
+                tmpfile=/tmp/failover.sql.$$
+                rm -f $tmpfile
+                DELFILES=$tmpfile
+                mypid=$$
+                (sleep $3 ; kill -SIGALRM $mypid) &
+                sqlkiller=$!
+                disown $sqlkiller
+                echo "$2" | $MYSQL --host=$1 $CONNECT controller > $tmpfile &
+                sqlpid=$!
+                wait $sqlpid
+                retval=$?
+                if [ $sqlkiller -ne 0 ] ; then
+                        kill -9 $sqlkiller
+                fi
+                cat $tmpfile
+                rm -f $tmpfile
+                DELFILES=
+                return $retval
+        fi
 }
 
 function bounce_slave {
@@ -104,12 +143,12 @@ fi
 #
 # parse arguments
 #
-break_replication=false
+force=false
 
 while getopts f flag; do
 	case $flag in
 	f)
-		break_replication=true
+		force=true
 		;;
 	*)
 		echo "usage: $0 <options>"
@@ -157,7 +196,12 @@ echo "  -- Verify replication state" | tee -a $fo_log
 slave=`sql localhost \ "show slave status\G" | wc -l`
 if [ "$slave" = 0 ] ; then
 	echo "replication is not running" | tee -a $fo_log
-	exit 1
+	if [ $force != "true" ] ; then
+		exit 1
+	else
+		echo "  -- Force Failover even with no slave" | tee -a $fo_log
+		primary_up=false
+	fi
 fi
 
 #
@@ -166,7 +210,12 @@ fi
 slave_status
 if [ "$slave_sql" != "Yes" ] ; then
 	echo slave SQL not running - replication error | tee -a $fo_log
-	exit 1
+	if [ $force != "true" ] ; then
+		exit 1
+	else
+		echo "  -- Force Failover - stopped slave" | tee -a $fo_log
+		primary_up=false
+	fi
 fi
 case "$slave_io" in 
 	"Yes")
@@ -178,7 +227,12 @@ case "$slave_io" in
 		;;
 	*)
 		echo "Unrecognized state for slave IO: $slave_io" | tee -a $fo_log
-		exit 1
+		if [ "$force" != true ] ; then
+			exit 1
+		else
+			echo "  -- Force Failover - unknown slave state" | tee -a $fo_log
+			primary_up=false
+		fi
 		;;
 esac
 
@@ -210,7 +264,7 @@ service appdcontroller stop >> $fo_log 2>&1
 # persistently break replication if the primary is down, 
 # or we want to force a replication break
 #
-if [ "$break_replication" == true -o "$primary_up" == false ] ; then
+if [ "$force" == true -o "$primary_up" == false ] ; then
 	echo "  -- Disable local slave autostart" | tee -a $fo_log
 
 	#
@@ -240,11 +294,14 @@ if [ "$primary_up" = "true" ] ; then
 	echo "  -- Stop primary appserver" | tee -a $fo_log
 	remservice -tq $primary appdcontroller stop >> $fo_log 2>&1
 	echo "  -- Mark primary passive + secondary" | tee -a $fo_log
-	sql $primary "update global_configuration_local set value='passive' where name = 'appserver.mode';"
-	sql $primary "update global_configuration_local set value='secondary' where name = 'ha.controller.type';"
-	echo "  -- Mark local primary" | tee -a $fo_log
-	sql localhost "update global_configuration_local set value='primary' where name = 'ha.controller.type';"
-
+	if sql $primary "update global_configuration_local set value='passive' where name = 'appserver.mode';" 10 &&
+sql $primary "update global_configuration_local set value='secondary' where name = 'ha.controller.type';" 10 ; then
+		echo "  -- Mark local primary" | tee -a $fo_log
+		sql localhost "update global_configuration_local set value='primary' where name = 'ha.controller.type';"
+	else
+		echo "  -- Primary DB timeout" | tee -a $fo_log
+		break_replication=true
+	fi
 	if [ "$break_replication" == true ] ; then
 		primary_up=false
 		echo "  -- Stop secondary database" | tee -a $fo_log
