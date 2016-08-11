@@ -13,30 +13,31 @@ Git Flow automates [a number of excellent conventions for managing branches, mer
 * Easily installed on Mac OS X via homebrew 
 * Documentation: http://datasift.github.io/gitflow/
 
-The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `master`.  `develop` contains every merged feature and bug fix.  `master` only contains released, production-ready code.  Bug fixes or features are branched from develop and then merged back in.
+The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `master`:
 
-***Please note that only Curt Mayer, the project architect, has push privileges to the `develop` and `master` branches in this repository.***  To get your features and fixes merged into `develop` and released into `master`, please follow the procedures below.
+* `develop` contains every merged feature and bug fix.
+* `master` only contains released, production-ready code.  Bug fixes or features are branched from develop and then merged back in.
 
-#### Getting started with HA toolkit development
+***Please note that only Curt Mayer, the project architect, has push privileges to the*** `develop` ***and*** `master` ***branches in this repository.***  To get your features and fixes merged into `develop` and released into `master`, please follow the procedures below.
 
-##### AppDynamics GitHub organization members:
+### Getting started with HA toolkit development
+
+**AppDynamics GitHub organization members:**
 
 * Install hubflow \(`brew install hubflow` on Macs with [Homebrew](http://brew.sh) installed, follow the instructions [here](https://github.com/datasift/gitflow) for other platforms.\)
 * Clone this repo from GitHub with SSH
 * Change directories into your clone of the HA-toolkit repo and run `git hf init`
+* Please see [Datasift's excellent tutorial on HubFlow](http://datasift.github.io/gitflow/GitFlowForGitHub.html)
 
-##### Others:
+**Others:**
 
 * Fork this repository on GitHub
 * Clone your forked repository to your development machine.
+* Use your preferred version control workflow, push back to your forked repo, and open a pull request on GitHub.  We will evaluate your contributions as we have the bandwidth to do so.
 
-#### Common operations
+### Common HubFlow operations
 
-Please see [Datasift's excellent tutorial on HubFlow](http://datasift.github.io/gitflow/GitFlowForGitHub.html)
-
-##### Fixing bugs or writing new features
-
-**Starting a new feature branch**
+**Starting a new feature (or bugfix) branch**
 
 `git hf feature start <feature-name>`
 
@@ -67,7 +68,7 @@ Please see [Datasift's excellent tutorial on HubFlow](http://datasift.github.io/
 * `git hf feature checkout <feature-name>`
 * `git merge develop` (and resolve any merge conflicts)
 * `git hf push`
-* Open a [pull request](https://help.github.com/articles/using-pull-requests/) to pull changes from your feature branch to `develop` and assign to Curt Mayer \(cmayer68\)
+* Open a [pull request](https://help.github.com/articles/using-pull-requests/) to pull changes from your feature branch to `develop` and assign to Curt Mayer (cmayer68)
 * If any changes are required before your pull request gets merged, commit them to your feature request branch and `git hf push` them to github.  They will be added automatically to your pull request.
 * Once your pull request has been merged, run `git hf feature finish` to close your feature branch.
 
