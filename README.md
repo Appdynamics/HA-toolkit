@@ -24,7 +24,7 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 
 **AppDynamics GitHub organization members:**
 
-* Install hubflow \(`brew install hubflow` on Macs with [Homebrew](http://brew.sh) installed, follow the instructions [here](https://github.com/datasift/gitflow) for other platforms.\)
+* Install hubflow (`brew install hubflow` on Macs with [Homebrew](http://brew.sh) installed, follow the instructions [here](https://github.com/datasift/gitflow) for other platforms.)
 * Clone this repo from GitHub with SSH
 * Change directories into your clone of the HA-toolkit repo and run `git hf init`
 * Please see [Datasift's excellent tutorial on HubFlow](http://datasift.github.io/gitflow/GitFlowForGitHub.html)
@@ -72,7 +72,7 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 * If any changes are required before your pull request gets merged, commit them to your feature request branch and `git hf push` them to github.  They will be added automatically to your pull request.
 * Once your pull request has been merged, run `git hf feature finish` to close your feature branch.
 
-##### Handling pull requests
+**Handling pull requests**
 
-##### Publishing a new release
+**Publishing a new release**
 
