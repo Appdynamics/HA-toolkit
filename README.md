@@ -35,7 +35,7 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 * Clone your forked repository to your development machine.
 * Use your preferred version control workflow, push back to your forked repo, and open a pull request on GitHub.  We will evaluate your contributions as we have the bandwidth to do so.
 
-### Common HubFlow operations
+### Common HubFlow / GitHub operations
 
 **Starting a new feature (or bugfix) branch**
 
@@ -74,5 +74,15 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 
 **Handling pull requests**
 
+* Review the "Conversation," "Commits," and "Files changed" tabs.
+* Make comments, as necessary, on the submitted code changes.  (Note that GitHub's comment system isn't as slick as Gerrit's where you can highligt a section of code and attach a comment it to it.  You should place your comment *below* all of the code you are commenting on to improve readability in the "Conversation" tab)
+* New commits based on your feedback will be reflected automatically in the pull request.
+* Once you are satisfied with all of the changes, scroll to the end of the conversation and click the "Merge pull request" button.
+* Enter a commit message
+* Decide whether to [preserve all of the commits in the pull request, or squash them into a single commit.](https://help.github.com/articles/about-pull-request-merge-squashing/)
+* Click the green button again to confirm your selection.
+
 **Publishing a new release**
+
+(TBW)
 
