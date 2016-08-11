@@ -70,7 +70,7 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 * `git hf push`
 * Open a [pull request](https://help.github.com/articles/using-pull-requests/) to pull changes from your feature branch to `develop` and assign to Curt Mayer (cmayer68)
 * If any changes are required before your pull request gets merged, commit them to your feature request branch and `git hf push` them to github.  They will be added automatically to your pull request.
-* Once your pull request has been merged, run `git hf feature finish` to close your feature branch.
+* Once your pull request has been merged, delete your feature branch from GitHub and run `git hf feature finish` to close your feature branch.
 
 **Handling pull requests**
 
