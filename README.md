@@ -2,7 +2,7 @@
 Appdynamics HA Controller provisioning subsystem
 
 ## Documentation
-See (README.txt) and https://docs.appdynamics.com/display/PRO42/Using+the+High+Availability+\(HA\)+Toolkit
+See (README.txt) and https://docs.appdynamics.com/display/PRO42/Using+the+High+Availability+(HA)+Toolkit
 
 ## Contributing
 
