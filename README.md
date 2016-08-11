@@ -74,9 +74,9 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 
 **Handling pull requests**
 
-* Review the "Conversation," "Commits," and "Files changed" tabs.
-* Make comments, as necessary, on the submitted code changes.  (Note that GitHub's comment system isn't as slick as Gerrit's where you can highligt a section of code and attach a comment it to it.  You should place your comment *below* all of the code you are commenting on to improve readability in the "Conversation" tab)
-* New commits based on your feedback will be reflected automatically in the pull request.
+* Open the pull request and review the "Conversation," "Commits," and "Files changed" tabs.
+* Make comments, as necessary, on the submitted code changes.  (Unfortunately, that GitHub's comment system isn't as slick as Gerrit's where you can highligt a section of code and attach a comment it to it.  You should place your comment *below* all of the code you are commenting on to improve readability in the "Conversation" tab)
+* New commits based on your feedback will be reflected automatically in the pull request, though a browser refresh may be required.
 * Once you are satisfied with all of the changes, scroll to the end of the conversation and click the "Merge pull request" button.
 * Enter a commit message
 * Decide whether to [preserve all of the commits in the pull request, or squash them into a single commit.](https://help.github.com/articles/about-pull-request-merge-squashing/)
@@ -84,5 +84,6 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 
 **Publishing a new release**
 
-(TBW)
-
+* `git hf release start <tag name>` (Note that the `<tag name>` should be your version string, i.e. '1.2.3')
+* Complete pre-release tests and bug fixes on the relese candidate branch
+* `git hf release finish <tag name>`
