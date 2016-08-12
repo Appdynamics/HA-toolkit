@@ -45,9 +45,7 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 
 `git hf feature checkout <feature-name>`
 
-**Pushing a feature to GitHub for collaborative development**
-
-`git hf push`
+This command also works for checking out a feature started by a colleague.  Note that you will need to look [here](https://github.com/Appdynamics/HA-toolkit/branches) for the correct `feature/<feature name>` branch.
 
 **Pulling a colleague's work down from GitHub to your feature branch.**
 
@@ -70,7 +68,7 @@ The Git Flow / Hubflow workflow maintains a pair of branches: `develop` and `mas
 * `git hf push`
 * Open a [pull request](https://help.github.com/articles/using-pull-requests/) to pull changes from your feature branch to `develop` and assign to Curt Mayer (cmayer68)
 * If any changes are required before your pull request gets merged, commit them to your feature request branch and `git hf push` them to github.  They will be added automatically to your pull request.
-* Once your pull request has been merged, delete your feature branch from GitHub and run `git hf feature finish` to close your feature branch.
+* Once your pull request has been merged, delete your feature branch from GitHub and run `git hf feature finish` to close your feature branch.  If this fails and you are certain that your feature has been merged, run `git hf feature finish -f <feature name>` to force the cleanup to complete.
 
 **Handling pull requests**
 
