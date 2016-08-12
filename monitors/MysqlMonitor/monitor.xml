@@ -1,0 +1,22 @@
+<monitor>
+    <name>MysqlMonitor</name>
+    <type>managed</type>
+    <enabled>true</enabled>
+    <enable-override os-type="solaris">true</enable-override>
+    <enable-override os-type="sunos">true</enable-override>
+    <description>Mysql Monitor
+    </description>
+    <monitor-configuration>
+    </monitor-configuration>
+    <monitor-run-task>
+        <execution-style>continuous</execution-style>
+        <name>Run</name>
+        <type>executable</type>
+        <task-arguments>
+        </task-arguments>
+        <executable-task>
+            <type>file</type>
+            <file os-type="linux">mysql-stat.sh</file>
+        </executable-task>
+    </monitor-run-task>
+</monitor>

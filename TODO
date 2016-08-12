@@ -1,0 +1,30 @@
+# $Id: TODO 3.0 2016-08-04 03:09:49 cmayer $
+
+replicate bug: https:// vip with no port does not set -Dappdynamics.controller.port= jvm-option and did not set <controller-ssl-enabled>true</... in controller agent controller-info.xml files
+
+replicate.sh:
+	add update logic
+	
+make a make-keys script
+make a check-prerequisites script
+make a system-check script
+	deadline (or controller running on ZFS)
+	swap space
+	nofile ( moot point.  handled by init script)
+	swappiness
+	sizing (heap, buffer cache) ram total
+iptables rule for 3388
+
+enable event service marker file obeyed by init scripts.
+
+port number for https://external without port number generates bogus hostname
+
+monitoring extension:
+
+surface:
+	watchdog running
+
+excludefiles
+numeric host names only
+
+watchdog:  only ping ports that are listening

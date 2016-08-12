@@ -1,0 +1,5 @@
+this directory contains library functions for the HA package.  they
+are shell fragments that assume a distinct order of inclusion.
+
+furthermore, the package assumes that only one of init.sh or runuser.sh
+is included

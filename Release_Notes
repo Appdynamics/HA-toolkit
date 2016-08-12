@@ -1,0 +1,98 @@
+
+ Copyright 2016 AppDynamics, Inc
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
+
+--------------------------------------------
+
+Release notes for version 3.0
+
+In addition to bug fixes, the package has been substantially enhanced and 
+re-written for enhanced portability, security, performance and maintainability.
+
+The following new functionality is present:
+
+1) replicate optionally can use of non-encrypted rsync.  in environments where 
+a VPN or a dedicated network exists between primary and secondary controllers, 
+replication can be noticably faster.  this is enabled by using the -U option.
+
+2) mysql replication can use SSL encryption.  a pair of signed certificates 
+and keys is exchanged between the 2 mysql instances.  after this negotiation,
+all communication for mysql replication is encrypted.
+
+3) mysql replication compression is enabled by default
+
+4) the secondary no longer places replicated traffic in it's bin-logs.  this
+greatly decreases disk usage on the secondary
+
+5) scripts and support files are added for NUMA segregation
+
+6) the machine agent is can run as non-root, and automatically is configured
+with additional monitors to surface custom mysql and disk metrics. also,
+the machine agent is automatically detected if it is in the controller root
+directory or it's parent.  we use the controller JVM, so there is no need
+to install anything other than the Java-less zip file of the machine agent.
+
+7) configuration of an external monitoring host is simplified
+
+8) support for controller versions greater than 4.2.0, which removed the
+plaintext password file for mysql root.  we have 2 distinct solutions to
+this:  recreate the db/.rootpw file, or run the save_mysql_passwd.sh script
+which obfuscates the password and save that, unscrambling it whenever it is
+needed
+
+9) more extensive logging of the replicate process
+
+10) init script configuration is now done via sysconfig files installed in
+/etc/sysconfig (for redhat) or /etc/default (for debian).
+
+11) greater compatibility with systemd.  newer linux distributions have a
+different implementation of boot time init script handling, which does not
+support the clean execution of the service status verb.  this is deprecated
+on these systems, and a new script,  HA/appdstatus.sh, is supplied to replace 
+this functionality.
+
+Significant bug fixes in this release:
+
+1) files of size less than 1M are checksummed to prevent rsync missing them
+if changes to the file did not cause it to grow
+
+2) the database health check now recovers if one of the steps timed out.
+
+3) failover can not longer oscillate between two machines
+
+4) the secondary controller now waits until the relay logs have been executed
+before starting the new appserver on failover.   although this can take quite
+some time, it prevents database inconsistencies.
+
+------------------------------------
+Release notes for version 3.0.1
+
+this is a minor bugfix and enhancement release.
+
+1) added support for fairly ugly root mysql passwords.  whitespace characters
+are not supported, but punctuation is ok, plus $*()...
+
+2) failover is a bit smarter about breaking replication.   all things being
+otherwise ok, if the old primary has been up at least 1 hour, we don't break
+replication
+
+3) in the case of a persistent replication break, if we KNOW that the database
+is not damaged on each end, we can run replicate -E to restore the slave to
+operation.
+
+4) the machine agent is started with nodename set
+
+5) install_init.sh changes ownership of the machine agent to RUNUSER
+
+6) Documentation on machine agent startup additions
