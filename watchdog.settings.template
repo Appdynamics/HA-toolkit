@@ -1,0 +1,50 @@
+# $Id: watchdog.settings.template 3.0 2015-12-23 00:36:28 cmayer $
+#
+# watchdog.settings
+#
+# Copyright 2016 AppDynamics, Inc
+#
+#   Licensed under the Apache License, Version 2.0 (the "License");
+#   you may not use this file except in compliance with the License.
+#   You may obtain a copy of the License at
+#
+#       http://www.apache.org/licenses/LICENSE-2.0
+#
+#   Unless required by applicable law or agreed to in writing, software
+#   distributed under the License is distributed on an "AS IS" BASIS,
+#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+#   See the License for the specific language governing permissions and
+#   limitations under the License.
+# 
+# These are the default timeouts, in seconds, before the watchdog will
+# initiate a failover.  If they are set to low, they can cause unexpected
+# failover events and controller downtime.  The following defaults are very
+# conservative and should be overridden with site-specific settings by
+# copying this file to $APPD_ROOT/HA/watchdog.settings and editing
+# it appropriately.
+
+# Controller app server not reachable via HTTP(S):  5 Minutes
+DOWNLIMIT=300
+
+# Controller app server shutting down: 5 Minutes
+FALLINGLIMIT=300
+
+# Controller app server starting up: 60 Minutes
+RISINGLIMIT=3600
+
+# The primary database is not responding: 5 Minutes
+DBDOWNLIMIT=300
+
+# The active controller host is not responding to ICMP echo, (ping),
+# requests: 5 Minutes
+# if ICMP is disabled, PING can be disabled by setting PINGLIMIT to 0
+PINGLIMIT=300
+
+# The primary database cannot create a table: 5 Minutes
+DBOPLIMIT=300
+
+#
+# the length of time to wait for a sql statememt to run
+DBWAIT=60
+
+

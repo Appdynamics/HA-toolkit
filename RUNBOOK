@@ -1,0 +1,223 @@
+The HA environment can be in several states, and it is desireable to place 
+the systems into the fully replicated state as soon as possible. here are
+the possible states, how to identify the state, and the corresponding 
+procedure to repair the condition.
+
+-----------
+NOT PRESENT:
+	the HA package has not been installed on the primary machine.
+
+diagnosis:
+	the HA directory is absent from the controller directory.
+
+to fix:
+	cd <controller root> ; mkdir HA ; cd HA ; bash <path>/HA.shar
+	then follow the steps for UNINSTALLED
+
+-----------
+UNINSTALLED:
+	the package is present in the controller HA directory, but the
+	services have not been installed.
+
+diagnosis:
+	service appdcontroller status shows appdcontroller service not found
+
+to fix:
+	cd <controller root>/HA
+	become root
+	./install-init.sh [-c | -s]
+
+------------
+NO HOSTS:
+	the secondary machine does not have a resolvable host name
+
+diagnosis:
+	ping <secondary> returns unknown host
+
+to fix:
+	add the primary and secondary host name into both machines /etc/hosts files
+	
+------------
+NO SSH:
+	the appdynamics user does not have no-password ssh access between
+	machines.
+
+diagnosis:
+	ssh <secondary> date prompts for a password
+
+to fix:
+	in the below, you will be prompted for passwords and confirmations
+	ssh-keygen -P "" -f ~/.ssh/id_rsa -t rsa
+	ssh <secondary> ssh-keygen -P "''" -f ~/.ssh/id_rsa -t rsa
+	scp ~/.ssh/id_rsa.pub <secondary>:.ssh/authorized_keys
+	scp <secondary>:.ssh/id_rsa.pub ~/.ssh/authorized_keys
+
+------------
+UNREPLICATED: the HA package has been installed on the primary controller,
+but the package has not been activated.
+
+diagnosis:
+	service appdcontroller-db status shows "HA not installed" 
+
+to fix:
+	cd <controller root>/HA
+	./replicate -s <secondary>
+	<become root on secondary>
+		cd <controller root>/HA
+		./install-init [-c | -s]
+		exit
+	<back on primary>
+	./replicate -s <secondary> -e <vip>	-f
+		confirm
+
+----------
+DISCONNECTED:
+Replication communication is being blocked, HA has been installed and activated,
+but a firewall is preventing access to replication communications.
+
+diagnosis:
+	service appdcontroller-db status shows 
+		"Slave_IO_State: Connecting to master"
+		"Seconds_Behind_Master: NULL"
+
+to fix:
+	disable the firewall for port 3388
+	brute force as root:  iptables -F
+
+----------
+REPLICATED, WATCHDOG RUNNING: 
+the HA package is running fully replicated, and the primary node is serving
+agents with metric storage, and the UI is responsive.  the secondary is
+monitoring the primary appserver with a watchdog process.
+
+diagnosis:
+	service appdcontroller status on the primary reports:
+	db running as <user> - active
+	primary
+		Slave_IO_State: Waiting for master to send event
+	controller running
+
+	service appdcontroller status on the secondary reports:
+	db running as <user> - passive
+	secondary
+		Slave_IO_State: Waiting for master to send event
+	watchdog running
+
+to fix:
+	nothing to fix
+
+----------
+REPLICATED, WATCHDOG NOT RUNNING: 
+the HA package is running fully replicated, and the primary node is serving
+agents with metric storage, and the UI is responsive.  the secondary is
+not monitoring the primary appserver with a watchdog process.
+
+diagnosis:
+	service appdcontroller status on the primary reports:
+	db running as <user> - active
+	primary
+		Slave_IO_State: Waiting for master to send event
+	controller running
+
+	service appdcontroller status on the secondary reports:
+	db running as <user> - passive
+	secondary
+		Slave_IO_State: Waiting for master to send event
+	watchdog not running
+
+to fix:
+	on the secondary
+	cd <controller root>/HA
+	touch WATCHDOG_ENABLE
+	/sbin/appdservice appdcontroller start
+
+---------
+FAILED OVER, old primary broken
+The current active node has become active because of a failover.  the prior
+active node's database is inaccessible.  the assassin is running on the new
+active node to mark the old active node passive once it comes up.
+
+diagnosis:
+	service appdcontroller status on the primary reports:
+	db running as <user> - active
+	secondary
+		Slave_IO_State:
+		Seconds_Behind_Master: NULL
+	assassin running
+
+to fix:
+	replicate from the new active node to the old active node using
+	the formula for UNREPLICATED
+
+------------
+FAILED OVER, watchdog running
+The current active node has become active because of a failover.  the prior
+active node database is still intact, and replication is valid. the new
+secondary node has a watchdog running.  this is identical to the REPLICATED,
+WATCHDOG_RUNNING state.
+
+diagnosis:
+	service appdcontroller status on the original primary reports:
+	db running as <user> - passive
+		Slave_IO_State: Waiting for master to send event
+	secondary
+	watchdog running
+
+	service appdcontroller status on the original secondary reports:
+	db running as <user> - active
+	primary
+		Slave_IO_State: Waiting for master to send event
+	controller running
+
+to-fix:
+	no need to fix anything.  should it be desired to make the original node
+	the active node:
+
+	on the original primary,
+	cd <controller root>/HA
+	./failover.sh
+
+-------------
+PASSIVE DOWN
+this is a state deliberately caused to perform a consistent backup of the
+database.   it is initiated on the passive node by running:
+/sbin/appdservice appdcontroller-db stop
+
+diagnosis:
+	/sbin/appdservice appdcontroller-db status on the passive node reports:
+	db not running
+
+to-fix:
+	on the passive controller,
+	/sbin/appdservice appdcontroller start
+
+-------------
+ERROR: bash: get_mysql_passwd: unable to get MySQL root passwd. As appdyn user run HA/save_mysql_passwd.sh interactively and try again.
+
+diagnosis:
+	A stored MySQL root password, obfuscated or clear has not been found. Storing the 
+	MySQL root password to disk is a requirement for the HA Toolkit running with
+	service which in turn needs privilege escalation eg /sbin/appdservice or sudo or pbrun
+
+to-fix:
+	> on the server as the intended AppD user (here "appdyn"):
+	HA/save_mysql_passwd.sh 
+	> this will persist the password after obfuscating it
+
+Version and Copyright:
+----------------------
+$Id: RUNBOOK 3.0 2016-08-04 03:09:49 cmayer Exp $
+
+ Copyright 2016 AppDynamics, Inc
+
+   Licensed under the Apache License, Version 2.0 (the "License");
+   you may not use this file except in compliance with the License.
+   You may obtain a copy of the License at
+
+       http://www.apache.org/licenses/LICENSE-2.0
+
+   Unless required by applicable law or agreed to in writing, software
+   distributed under the License is distributed on an "AS IS" BASIS,
+   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+   See the License for the specific language governing permissions and
+   limitations under the License.
