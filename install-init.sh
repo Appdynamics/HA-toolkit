@@ -340,6 +340,6 @@ done
 #
 # ensure the machine agent directory is owned by RUNUSER
 #
-if [ -d $machine_agent ] ; then
+if [ -d "$machine_agent" ] ; then
 	chown -R $RUNUSER $machine_agent
 fi
