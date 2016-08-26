@@ -154,4 +154,10 @@ function check_sanity {
 	fi
 }
 
+#
+# locate a machine agent install directory and print out it's path
+#
+function find_machine_agent {
+	find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print | head -1 | sed "s,/[^/]*$,,"
+}
 

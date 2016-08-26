@@ -419,8 +419,8 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS flag; do
 		rsync_compression="-z"
 		;;
 	a)
-		machine_agent=$OPTARG
-		[[ -f $machine_agent/machineagent.jar ]] || fatal 1 "-a directory $machine_agent is not a machine agent install directory"
+		machine_agent="$OPTARG"
+		[[ -f "$machine_agent/machineagent.jar" ]] || fatal 1 "-a directory $machine_agent is not a machine agent install directory"
 		;;
 	F)
 		final=true
@@ -470,20 +470,15 @@ fi
 # search for a machine agent in a few likely places
 #
 if [ -z "$machine_agent" ] ; then
-	for ma in ../* ../../* ; do
-		if [ -f $ma/machineagent.jar ] ; then
-			machine_agent=$ma
-			break;
-		fi
-	done
+	machine_agent=`find_machine_agent`
 fi
 if [ -n "$machine_agent" ] ; then
-	machine_agent=`cd $machine_agent ; pwd -P`
-	ma_conf=$machine_agent/conf
+	machine_agent=`cd "$machine_agent" ; pwd -P`
+	ma_conf="$machine_agent/conf"
 	message "found machine agent in $machine_agent"
 	message "copying monitors"
-	cp -r monitors/* $machine_agent/monitors
-	chmod +x $machine_agent/monitors/*/*.sh
+	cp -r monitors/* "$machine_agent/monitors"
+	chmod +x "$machine_agent"/monitors/*/*.sh
 fi
 
 if [ -z "$internal_vip" ] ; then
@@ -658,7 +653,7 @@ if $unencrypted ; then
 	done
 	ROOTDEST=rsync://$secondary:$RSYNC_PORT/default$APPD_ROOT
 	DATADEST=rsync://$secondary:$RSYNC_PORT/default$datadir
-	MADEST=rsync://$secondary:$RSYNC_PORT/default$machine_agent
+	MADEST="rsync://$secondary:$RSYNC_PORT/default$machine_agent"
 	kill_rsyncd
 	ssh $secondary mkdir -p $APPD_ROOT/HA
 	scp -q $APPD_ROOT/HA/rsyncd.conf $secondary:$APPD_ROOT/HA/rsyncd.conf
@@ -668,7 +663,7 @@ if $unencrypted ; then
 else
 	ROOTDEST=$secondary:$APPD_ROOT
 	DATADEST=$secondary:$datadir
-	MADEST=$secondary:$machine_agent
+	MADEST="$secondary:$machine_agent"
 fi
 
 if ! $appserver_only_sync ; then
@@ -937,7 +932,7 @@ else
 		message "Rsync'ing Machine Agent: $machine_agent"
 		logcmd rsync $rsync_opts \
 			$rsync_throttle $rsync_compression \
-			$machine_agent/ $MADEST
+			"$machine_agent/" "$MADEST"
 	fi
 
 	message "Rsync'ing Data: $datadir"

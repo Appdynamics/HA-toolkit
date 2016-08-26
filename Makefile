@@ -41,7 +41,7 @@ MONITORS= \
 	monitors/MysqlMonitor/monitor.xml monitors/MysqlMonitor/mysql-stat.sh \
 	monitors/DiskMonitor/README monitors/MysqlMonitor/README
 
-NOT_EMBEDDED= VERSION README RUNBOOK Release_Notes $(C_SRC)
+NOT_EMBEDDED= VERSION README.txt RUNBOOK UPGRADING Release_Notes $(C_SRC)
 
 BASH_SRC_EMBEDDED := $(addprefix build/,$(BASH_SRC))
 
@@ -54,7 +54,9 @@ HA.shar: build $(SOURCES) Makefile
 	echo "if echo '" >> HA.shar
 	echo "' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true" >> HA.shar
 	cd build && shar $(NOT_EMBEDDED) $(DIRS) $(MONITORS) $(BASH_SRC) >> ../HA.shar
-	sed -i '' 's/^exit/chmod ugo+rx . .. ; find . -name \\*.sh -print | xargs chmod ugo+rx; exit/' HA.shar
+	rm -f HA.shar.tmp ; mv HA.shar HA.shar.tmp
+	sed 's/^exit/chmod ugo+rx . .. ; find . -name \\*.sh -print | xargs chmod ugo+rx; exit/' < HA.shar.tmp >HA.shar
+	rm HA.shar.tmp
 
 build/%: % tools/embed.pl
 	perl tools/embed.pl $< > $@
@@ -79,7 +81,7 @@ print-%:
 #
 
 clean:
-	rm -f appdservice
+	rm -f appdservice HA.shar.tmp
 	rm -rf build
 
 clobber: clean

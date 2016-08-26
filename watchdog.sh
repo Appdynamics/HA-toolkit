@@ -22,6 +22,8 @@
 #
 cd $(dirname $0)
 
+LOGNAME=watchdog.log
+
 # source function libraries
 . lib/log.sh
 . lib/runuser.sh
