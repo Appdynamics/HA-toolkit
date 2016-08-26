@@ -1,4 +1,4 @@
-# HA package version 3.0.1 built Tue Aug  9 14:47:31 2016
+# HA package version 3.1 built Thu Aug 25 23:30:07 2016
 if echo '
 ' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true
 # This is a shell archive.  Save it in a file, remove anything before
@@ -11,6 +11,7 @@ if echo '
 #	VERSION
 #	README
 #	RUNBOOK
+#	UPGRADING
 #	Release_Notes
 #	appdservice.c
 #	lib
@@ -56,7 +57,7 @@ if echo '
 #
 echo x - VERSION
 sed 's/^X//' >VERSION << 'END-of-VERSION'
-X3.0.1
+X3.1
 END-of-VERSION
 echo x - README
 sed 's/^X//' >README << 'END-of-README'
@@ -608,6 +609,30 @@ X   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 X   See the License for the specific language governing permissions and
 X   limitations under the License.
 END-of-RUNBOOK
+echo x - UPGRADING
+sed 's/^X//' >UPGRADING << 'END-of-UPGRADING'
+X$Id: UPGRADING 3.1 2016-08-25 23:01:49 cmayer Exp $
+X
+Xupgrading the HA toolkit usually does not require a re-replicate or restart of the 
+Xapplication or database.
+X
+Xto upgrade the HA toolkit, 
+X
+X1) copy or move the HA.shar to the HA directory
+X2) unpack it using bash HA.shar
+X3) inspect the /etc/sysconfig or /etc/default versions of
+X   the *.sysconfig files to see if any midifications have been made to them.
+X   if so, merge the differences to the sysconfig files in this directory.
+X   edit any settings you might need in the sysconfig files.
+X4) inspect the watchdog.settings.template file to see if any additions have
+X   been made, and merge them into your watchdog.settings file
+X5) recursively copy the HA directory to the secondary HA directory
+X6) run install-init with the appropriate options as root on the primary
+X7) run install-init on the secondary in the same way
+X8) restart the watchdog on the secondary if enabled. do this
+X   by stopping the secondary appdcontroller service and then starting it.
+X9) validate both installations by running appdstatus.sh
+END-of-UPGRADING
 echo x - Release_Notes
 sed 's/^X//' >Release_Notes << 'END-of-Release_Notes'
 X
@@ -708,6 +733,26 @@ X
 X5) install_init.sh changes ownership of the machine agent to RUNUSER
 X
 X6) Documentation on machine agent startup additions
+X
+X--------------------------------------
+XRelease notes for version 3.1
+X
+Xthis is a bugfix version
+X
+X1) some customer systems had paths with spaces in them.  this broke the machine
+Xagent directory detection.  this code was pulled into a library function.
+X
+X2) the watchdog.sh did no logging due to a coding error
+X
+X3) numa machines with numa.settings need to disable the transparent huge page
+Xfacility.   this is done in the appdcontroller-db script.
+X
+X4) some older systems xmllint does not support the --xpath option.  this is
+Xavoided by using the universally available, but uglier, --shell option.
+X
+X5) a better message is emitted when no password is available
+X
+X6) README.md, a source hygiene document, was added
 END-of-Release_Notes
 echo x - appdservice.c
 sed 's/^X//' >appdservice.c << 'END-of-appdservice.c'
@@ -1678,6 +1723,8 @@ X#   limitations under the License.
 X#
 Xcd $(dirname $0)
 X
+XLOGNAME=watchdog.log
+X
 X# source function libraries
 X. lib/log.sh
 X. lib/runuser.sh
@@ -2625,8 +2672,8 @@ X	z)
 X		rsync_compression="-z"
 X		;;
 X	a)
-X		machine_agent=$OPTARG
-X		[[ -f $machine_agent/machineagent.jar ]] || fatal 1 "-a directory $machine_agent is not a machine agent install directory"
+X		machine_agent="$OPTARG"
+X		[[ -f "$machine_agent/machineagent.jar" ]] || fatal 1 "-a directory $machine_agent is not a machine agent install directory"
 X		;;
 X	F)
 X		final=true
@@ -2676,20 +2723,15 @@ X#
 X# search for a machine agent in a few likely places
 X#
 Xif [ -z "$machine_agent" ] ; then
-X	for ma in ../* ../../* ; do
-X		if [ -f $ma/machineagent.jar ] ; then
-X			machine_agent=$ma
-X			break;
-X		fi
-X	done
+X	machine_agent=`find_machine_agent`
 Xfi
 Xif [ -n "$machine_agent" ] ; then
-X	machine_agent=`cd $machine_agent ; pwd -P`
-X	ma_conf=$machine_agent/conf
+X	machine_agent=`cd "$machine_agent" ; pwd -P`
+X	ma_conf="$machine_agent/conf"
 X	message "found machine agent in $machine_agent"
 X	message "copying monitors"
-X	cp -r monitors/* $machine_agent/monitors
-X	chmod +x $machine_agent/monitors/*/*.sh
+X	cp -r monitors/* "$machine_agent/monitors"
+X	chmod +x "$machine_agent"/monitors/*/*.sh
 Xfi
 X
 Xif [ -z "$internal_vip" ] ; then
@@ -2864,7 +2906,7 @@ X		RSYNC_PORT=$((RSYNC_PORT+1))
 X	done
 X	ROOTDEST=rsync://$secondary:$RSYNC_PORT/default$APPD_ROOT
 X	DATADEST=rsync://$secondary:$RSYNC_PORT/default$datadir
-X	MADEST=rsync://$secondary:$RSYNC_PORT/default$machine_agent
+X	MADEST="rsync://$secondary:$RSYNC_PORT/default$machine_agent"
 X	kill_rsyncd
 X	ssh $secondary mkdir -p $APPD_ROOT/HA
 X	scp -q $APPD_ROOT/HA/rsyncd.conf $secondary:$APPD_ROOT/HA/rsyncd.conf
@@ -2874,7 +2916,7 @@ X		--port=$RSYNC_PORT
 Xelse
 X	ROOTDEST=$secondary:$APPD_ROOT
 X	DATADEST=$secondary:$datadir
-X	MADEST=$secondary:$machine_agent
+X	MADEST="$secondary:$machine_agent"
 Xfi
 X
 Xif ! $appserver_only_sync ; then
@@ -3143,7 +3185,7 @@ X	if [ -n "$machine_agent" ] ; then
 X		message "Rsync'ing Machine Agent: $machine_agent"
 X		logcmd rsync $rsync_opts \
 X			$rsync_throttle $rsync_compression \
-X			$machine_agent/ $MADEST
+X			"$machine_agent/" "$MADEST"
 X	fi
 X
 X	message "Rsync'ing Data: $datadir"
@@ -3758,8 +3800,8 @@ X			exit 1
 X		fi
 X		;;
 X	a)	
-X		machine_agent=$OPTARG
-X		if ! [ -f $machine_agent/machineagent.jar ] ; then
+X		machine_agent="$OPTARG"
+X		if ! [ -f "$machine_agent/machineagent.jar" ] ; then
 X			echo "$machine_agent is not a machine agent install directory"
 X			exit 1
 X		fi
@@ -3778,12 +3820,7 @@ X#
 X# search for a machine agent in a few likely places
 X#
 Xif [ -z "$machine_agent" ] ; then
-X	for ma in ../* ../../* ; do
-X		if [ -f $ma/machineagent.jar ] ; then
-X			machine_agent=`cd $ma ; pwd -P`
-X			break;
-X		fi
-X	done
+X	machine_agent=`find_machine_agent`
 Xfi
 Xif [ -n "$machine_agent" ] ; then
 X	machine_agent_service=appdynamics-machine-agent
@@ -4007,8 +4044,7 @@ X		chmod 755 $APPDSERVICE
 X		echo "installed root wrapper as $APPDSERVICE"
 X	fi
 X
-X	if [[ `echo "cat //*[@port<1024]" | xmllint --shell $DOMAIN_XML | wc -l` -gt 1 ]] && \
-X		! require setcap libcap libcap2-bin; then
+X	if use_privileged_ports && ! require setcap libcap libcap2-bin; then
 X		echo "\
 XERROR: AppDynamics is configured to bind to at least one port < 1024 as an
 Xunprivileged user, but the setcap utility is not available on this host.
@@ -4029,8 +4065,8 @@ X
 X#
 X# ensure the machine agent directory is owned by RUNUSER
 X#
-Xif [ -d $machine_agent ] ; then
-X	chown -R $RUNUSER $machine_agent
+Xif [ -d "$machine_agent" ] ; then
+X	chown -R $RUNUSER "$machine_agent"
 Xfi
 END-of-install-init.sh
 echo x - uninstall-init.sh
@@ -5126,7 +5162,7 @@ X		[[ -n "$clear" ]] || \
 X			fatal 2 "unable to deobfuscate passwd from $rootpw_obf"
 X		echo $clear
 X	else
-X		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD"
+X		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD please run save_mysql_passwd.sh"
 X	fi
 X}
 Xexport -f get_mysql_passwd
@@ -5301,7 +5337,7 @@ X		changer="s,\(-D$property\)[=]*[^<]*,\1$valueset,"
 X		;;
 X	esac
 X
-X	if runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+X	if echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 X		grep -q -e "$selector" ; then
 X		# if property already present
 X		runuser sed -i "$changer" $DOMAIN_XML
@@ -5334,7 +5370,7 @@ X# domain_get_jvm_option
 Xfunction domain_get_jvm_option {
 X	local property=$1
 X
-X	runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+X	echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 X		sed -e 's/<[^>]*>/\n/g' -e 's/\n\n/\n/g' | \
 X		get_jvm_option $property
 X}
@@ -5451,7 +5487,7 @@ X# look in the domain.xml to see if any privileged ports are in use
 X# return success if they are
 X#
 Xfunction use_privileged_ports {
-X	runuser xmllint --xpath '//*[@port<1024]' $DOMAIN_XML >/dev/null 2>&1
+X	echo 'cat //*[@port<1024]' | runuser xmllint --shell $DOMAIN_XML | grep -q port
 X}
 X
 X#
@@ -6046,7 +6082,7 @@ X		[[ -n "$clear" ]] || \
 X			fatal 2 "unable to deobfuscate passwd from $rootpw_obf"
 X		echo $clear
 X	else
-X		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD"
+X		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD please run save_mysql_passwd.sh"
 X	fi
 X}
 Xexport -f get_mysql_passwd
@@ -6221,7 +6257,7 @@ X		changer="s,\(-D$property\)[=]*[^<]*,\1$valueset,"
 X		;;
 X	esac
 X
-X	if runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+X	if echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 X		grep -q -e "$selector" ; then
 X		# if property already present
 X		runuser sed -i "$changer" $DOMAIN_XML
@@ -6254,7 +6290,7 @@ X# domain_get_jvm_option
 Xfunction domain_get_jvm_option {
 X	local property=$1
 X
-X	runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+X	echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 X		sed -e 's/<[^>]*>/\n/g' -e 's/\n\n/\n/g' | \
 X		get_jvm_option $property
 X}
@@ -6371,7 +6407,7 @@ X# look in the domain.xml to see if any privileged ports are in use
 X# return success if they are
 X#
 Xfunction use_privileged_ports {
-X	runuser xmllint --xpath '//*[@port<1024]' $DOMAIN_XML >/dev/null 2>&1
+X	echo 'cat //*[@port<1024]' | runuser xmllint --shell $DOMAIN_XML | grep -q port
 X}
 X
 X#
@@ -6420,6 +6456,16 @@ XOPEN_FD_LIMIT=`dbcnf_get open_files_limit`
 Xif [ "$OPEN_FD_LIMIT" -lt 65536 ]; then
 X	OPEN_FD_LIMIT=65536
 Xfi
+X
+X#
+X# if the numa settings file exists, then disable transparent huge pages
+X#
+Xfunction do_numa_settings {
+X	if [ -f $APPD_ROOT/HA/numa.settings ] ; then
+X		echo never >/sys/kernel/mm/transparent_hugepage/defrag
+X		echo never >/sys/kernel/mm/transparent_hugepage/enabled
+X	fi
+X}
 X
 X#
 X# Create (touch) a file called LARGE_PAGES_ENABLE in $APPD_ROOT/HA
@@ -6756,6 +6802,7 @@ X	# conditionally run reserve_memory
 X	# if no lockfile or host crash (stale lockfile precedes last startup): reserve memory
 X	# mysql crashed or shut down outside of intit: stale lockfile that is younger than last boot: noop
 X	# mysql already running: noop
+X	do_numa_settings
 X	if ! db_running ; then
 X		set_open_fd_limits
 X		# if numa settings, then we need to disable transparent huge pages
@@ -7261,7 +7308,7 @@ X		[[ -n "$clear" ]] || \
 X			fatal 2 "unable to deobfuscate passwd from $rootpw_obf"
 X		echo $clear
 X	else
-X		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD"
+X		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD please run save_mysql_passwd.sh"
 X	fi
 X}
 Xexport -f get_mysql_passwd
@@ -7424,6 +7471,12 @@ X		fatal 4 "$0 must run as $dbuser"
 X	fi
 X}
 X
+X#
+X# locate a machine agent install directory and print out it's path
+X#
+Xfunction find_machine_agent {
+X	find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print | head -1 | sed "s,/[^/]*$,,"
+X}
 X
 END-of-lib/ha.sh
 echo x - lib/sql.sh
@@ -7785,7 +7838,7 @@ X		changer="s,\(-D$property\)[=]*[^<]*,\1$valueset,"
 X		;;
 X	esac
 X
-X	if runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+X	if echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 X		grep -q -e "$selector" ; then
 X		# if property already present
 X		runuser sed -i "$changer" $DOMAIN_XML
@@ -7818,7 +7871,7 @@ X# domain_get_jvm_option
 Xfunction domain_get_jvm_option {
 X	local property=$1
 X
-X	runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+X	echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 X		sed -e 's/<[^>]*>/\n/g' -e 's/\n\n/\n/g' | \
 X		get_jvm_option $property
 X}
@@ -7935,7 +7988,7 @@ X# look in the domain.xml to see if any privileged ports are in use
 X# return success if they are
 X#
 Xfunction use_privileged_ports {
-X	runuser xmllint --xpath '//*[@port<1024]' $DOMAIN_XML >/dev/null 2>&1
+X	echo 'cat //*[@port<1024]' | runuser xmllint --shell $DOMAIN_XML | grep -q port
 X}
 X
 X#

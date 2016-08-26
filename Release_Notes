@@ -96,3 +96,23 @@ operation.
 5) install_init.sh changes ownership of the machine agent to RUNUSER
 
 6) Documentation on machine agent startup additions
+
+--------------------------------------
+Release notes for version 3.1
+
+this is a bugfix version
+
+1) some customer systems had paths with spaces in them.  this broke the machine
+agent directory detection.  this code was pulled into a library function.
+
+2) the watchdog.sh did no logging due to a coding error
+
+3) numa machines with numa.settings need to disable the transparent huge page
+facility.   this is done in the appdcontroller-db script.
+
+4) some older systems xmllint does not support the --xpath option.  this is
+avoided by using the universally available, but uglier, --shell option.
+
+5) a better message is emitted when no password is available
+
+6) README.md, a source hygiene document, was added

@@ -1,0 +1,21 @@
+$Id: UPGRADING 3.1 2016-08-25 23:01:49 cmayer Exp $
+
+upgrading the HA toolkit usually does not require a re-replicate or restart of the 
+application or database.
+
+to upgrade the HA toolkit, 
+
+1) copy or move the HA.shar to the HA directory
+2) unpack it using bash HA.shar
+3) inspect the /etc/sysconfig or /etc/default versions of
+   the *.sysconfig files to see if any midifications have been made to them.
+   if so, merge the differences to the sysconfig files in this directory.
+   edit any settings you might need in the sysconfig files.
+4) inspect the watchdog.settings.template file to see if any additions have
+   been made, and merge them into your watchdog.settings file
+5) recursively copy the HA directory to the secondary HA directory
+6) run install-init with the appropriate options as root on the primary
+7) run install-init on the secondary in the same way
+8) restart the watchdog on the secondary if enabled. do this
+   by stopping the secondary appdcontroller service and then starting it.
+9) validate both installations by running appdstatus.sh

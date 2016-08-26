@@ -176,7 +176,7 @@ function get_mysql_passwd {
 			fatal 2 "unable to deobfuscate passwd from $rootpw_obf"
 		echo $clear
 	else
-		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD"
+		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD please run save_mysql_passwd.sh"
 	fi
 }
 export -f get_mysql_passwd

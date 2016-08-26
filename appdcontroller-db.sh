@@ -80,6 +80,16 @@ if [ "$OPEN_FD_LIMIT" -lt 65536 ]; then
 fi
 
 #
+# if the numa settings file exists, then disable transparent huge pages
+#
+function do_numa_settings {
+	if [ -f $APPD_ROOT/HA/numa.settings ] ; then
+		echo never >/sys/kernel/mm/transparent_hugepage/defrag
+		echo never >/sys/kernel/mm/transparent_hugepage/enabled
+	fi
+}
+
+#
 # Create (touch) a file called LARGE_PAGES_ENABLE in $APPD_ROOT/HA
 # to enable explicit huge pages support for mysqld and java.
 #
@@ -414,6 +424,7 @@ start)
 	# if no lockfile or host crash (stale lockfile precedes last startup): reserve memory
 	# mysql crashed or shut down outside of intit: stale lockfile that is younger than last boot: noop
 	# mysql already running: noop
+	do_numa_settings
 	if ! db_running ; then
 		set_open_fd_limits
 		# if numa settings, then we need to disable transparent huge pages

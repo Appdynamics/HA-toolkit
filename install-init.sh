@@ -69,8 +69,8 @@ while getopts ":csprxa:" flag; do
 		fi
 		;;
 	a)	
-		machine_agent=$OPTARG
-		if ! [ -f $machine_agent/machineagent.jar ] ; then
+		machine_agent="$OPTARG"
+		if ! [ -f "$machine_agent/machineagent.jar" ] ; then
 			echo "$machine_agent is not a machine agent install directory"
 			exit 1
 		fi
@@ -89,12 +89,7 @@ done
 # search for a machine agent in a few likely places
 #
 if [ -z "$machine_agent" ] ; then
-	for ma in ../* ../../* ; do
-		if [ -f $ma/machineagent.jar ] ; then
-			machine_agent=`cd $ma ; pwd -P`
-			break;
-		fi
-	done
+	machine_agent=`find_machine_agent`
 fi
 if [ -n "$machine_agent" ] ; then
 	machine_agent_service=appdynamics-machine-agent
@@ -318,8 +313,7 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 		echo "installed root wrapper as $APPDSERVICE"
 	fi
 
-	if [[ `echo "cat //*[@port<1024]" | xmllint --shell $DOMAIN_XML | wc -l` -gt 1 ]] && \
-		! require setcap libcap libcap2-bin; then
+	if use_privileged_ports && ! require setcap libcap libcap2-bin; then
 		echo "\
 ERROR: AppDynamics is configured to bind to at least one port < 1024 as an
 unprivileged user, but the setcap utility is not available on this host.
@@ -340,6 +334,6 @@ done
 #
 # ensure the machine agent directory is owned by RUNUSER
 #
-if [ -d $machine_agent ] ; then
-	chown -R $RUNUSER $machine_agent
+if [ -d "$machine_agent" ] ; then
+	chown -R $RUNUSER "$machine_agent"
 fi

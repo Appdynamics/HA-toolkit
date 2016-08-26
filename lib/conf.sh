@@ -70,7 +70,7 @@ function domain_set_jvm_option {
 		;;
 	esac
 
-	if runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+	if echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 		grep -q -e "$selector" ; then
 		# if property already present
 		runuser sed -i "$changer" $DOMAIN_XML
@@ -103,7 +103,7 @@ function get_jvm_option
 function domain_get_jvm_option {
 	local property=$1
 
-	runuser xmllint --xpath '/domain/configs/config[1]/java-config/*' $DOMAIN_XML | \
+	echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
 		sed -e 's/<[^>]*>/\n/g' -e 's/\n\n/\n/g' | \
 		get_jvm_option $property
 }
@@ -220,7 +220,7 @@ function dbcnf_get {
 # return success if they are
 #
 function use_privileged_ports {
-	runuser xmllint --xpath '//*[@port<1024]' $DOMAIN_XML >/dev/null 2>&1
+	echo 'cat //*[@port<1024]' | runuser xmllint --shell $DOMAIN_XML | grep -q port
 }
 
 #
