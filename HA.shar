@@ -1,4 +1,4 @@
-# HA package version 3.1 built Thu Aug 25 23:30:07 2016
+# HA package version 3.1 built Thu Aug 25 23:52:56 2016
 if echo '
 ' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true
 # This is a shell archive.  Save it in a file, remove anything before
@@ -9,7 +9,7 @@ if echo '
 # This archive contains:
 #
 #	VERSION
-#	README
+#	README.txt
 #	RUNBOOK
 #	UPGRADING
 #	Release_Notes
@@ -59,8 +59,8 @@ echo x - VERSION
 sed 's/^X//' >VERSION << 'END-of-VERSION'
 X3.1
 END-of-VERSION
-echo x - README
-sed 's/^X//' >README << 'END-of-README'
+echo x - README.txt
+sed 's/^X//' >README.txt << 'END-of-README.txt'
 XContents:
 X
 X	README: this file
@@ -382,7 +382,7 @@ X  distributed under the License is distributed on an "AS IS" BASIS,
 X  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 X  See the License for the specific language governing permissions and
 X  limitations under the License.
-END-of-README
+END-of-README.txt
 echo x - RUNBOOK
 sed 's/^X//' >RUNBOOK << 'END-of-RUNBOOK'
 XThe HA environment can be in several states, and it is desireable to place 
