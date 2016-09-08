@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+# $Id: replicate.sh 3.2 2016-09-08 13:40:17 cmayer $
 #
 # install HA to a controller pair
 #
@@ -169,7 +169,7 @@ function stop_appdynamics_services()
 		if [ -z "$host" ] ; then
 			service $s stop || ((errors++))
 		else
-			remservice -q $host $s stop || ((errors++))
+			remservice -tq $host $s stop || ((errors++))
 		fi
 	done
 	return $errors;
@@ -500,6 +500,7 @@ eval `parse_vip monitor $monitor`
 monitor_access_key=${cmargs['access_key']}
 monitor_account=${cmargs['account_name']}
 monitor_application=${cmargs['app_name']}
+monitor_tier="App Server"
 
 if [ -z "$monitor_account" ] ; then
 	if [ "$monitor" = "$internal_vip" ] ; then
@@ -727,7 +728,7 @@ if ! $appserver_only_sync ; then
 	ssh $secondary rm -f $APPD_ROOT/bin/controller.sh \
 		"$innodb_logdir/ib_logfile*"
 		"$datadir/*log*" \
-		$datadir/ibdata1 | logonly 2>&1
+		$datadir/ibdata1 2>&1 | logonly
 	
 	#
 	# disable automatic start of replication slave
@@ -1012,6 +1013,7 @@ message "monitoring port: $monitor_port"
 message "monitoring account: $monitor_account"
 message "monitoring access key: $monitor_access_key"
 message "monitoring application: $monitor_application"
+message "monitoring tier: $monitor_tier"
 
 #
 # plug the various communications endpoints into domain.xml
@@ -1067,6 +1069,7 @@ for info in ${controller_infos[*]} ; do
 			%s/\(<controller-host>\)[^<]*/\1$monitor_host/
 			%s/\(<controller-port>\)[^<]*/\1$monitor_port/
 			%s/\(<application-name>\)[^<]*/\1$monitor_application/
+			%s/\(<tier-name>\)[^<]*/\1$monitor_tier/
 			%s/\(<account-name>\)[^<]*/\1$monitor_account/
 			%s/\(<account-access-key>\)[^<]*/\1$monitor_access_key/
 			wq

@@ -1,4 +1,4 @@
-# $Id: TODO 3.0 2016-08-04 03:09:49 cmayer $
+# $Id: TODO 3.2 2016-09-08 03:09:49 cmayer $
 
 replicate bug: https:// vip with no port does not set -Dappdynamics.controller.port= jvm-option and did not set <controller-ssl-enabled>true</... in controller agent controller-info.xml files
 
@@ -21,10 +21,16 @@ port number for https://external without port number generates bogus hostname
 
 monitoring extension:
 
-surface:
+surface in machine agent monitor
 	watchdog running
 
 excludefiles
 numeric host names only
 
 watchdog:  only ping ports that are listening
+
+need to revisit large page support
+test and fix paths with spaces - APPD_ROOT, machine_agent - get quoting right
+
+add upgrade for HA replicate
+document HA upgrade process

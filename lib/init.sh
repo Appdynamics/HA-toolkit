@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/init.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: lib/init.sh 3.2 2016-09-08 03:09:03 cmayer $
 #
 # init.sh
 # contains functions to change user and run processes
@@ -32,7 +32,7 @@ fi
 # exactly when you want $ to be expanded and make that explicit, passing
 # escaped $ signs when you want the expansion deferred
 #
-# finally, the bb_runuser function should return the pid
+# finally, the bg_runuser function should return the pid
 #
 if [ `id -un` == "$RUNUSER" ] ; then
 	function bg_runuser {

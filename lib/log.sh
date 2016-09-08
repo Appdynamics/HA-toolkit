@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/log.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: lib/log.sh 3.2 2016-09-08 03:09:03 cmayer $
 #
 # logging code for the HA toolkit - include this first
 #
@@ -20,8 +20,10 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+#
 if [ -z "$APPD_ROOT" ] ; then
-	APPD_ROOT=$( cd $(dirname "$0"); cd .. ; pwd -P)
+	# let's assume that whoever is calling us has cd'd to the HA directory
+	APPD_ROOT=$( cd .. ; pwd -P)
 fi
 
 #
@@ -35,7 +37,7 @@ LOGFILE=$APPD_ROOT/logs/$LOGNAME
 
 function log {
 	local out=/dev/tty
-	if ! [ -c $out ] ; then
+	if ! tty -s ; then
 		out=/dev/null
 	fi
 
@@ -48,7 +50,7 @@ function logonly {
 
 function gripe {
 	local out=/dev/tty
-	if ! [ -c $out ] ; then
+	if ! tty -s ; then
 		out=/dev/null
 	fi
 
@@ -61,7 +63,7 @@ function logmsg {
 
 function message {
 	local out=/dev/tty
-	if ! [ -c $out ] ; then
+	if ! tty -s ; then
 		out=/dev/null
 	fi
 

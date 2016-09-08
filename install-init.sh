@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.0.1 2016-08-08 14:52:22 cmayer $
+# $Id: install-init.sh 3.2 2016-09-08 14:52:22 cmayer $
 #
 # install init scripts, including the machine agent.
 #
@@ -18,6 +18,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+cd $(dirname $0)
+
 function usage {
 	echo "$0 [-options] where:"
 	echo "   -c  # use setuid c wrapper"
@@ -28,7 +30,6 @@ function usage {
 	exit 1
 }
 
-cd $(dirname $0)
 APPD_ROOT=`cd .. ; pwd -P`			# ignore sym links
 PBRUN=`grep PBRUN= appdservice-pbrun.sh | awk -F= '{print $2}'`
 
@@ -37,9 +38,12 @@ if ! [ -d $APPD_ROOT/bin ] ; then
 	echo using default path $APPD_ROOT
 fi
 DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
+RUNUSER=`su -s /bin/bash -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
 
 # source function library
 . $APPD_ROOT/HA/lib/ha.sh
+. $APPD_ROOT/HA/lib/init.sh
+. $APPD_ROOT/HA/lib/conf.sh
 
 machine_agent_service=""
 machine_agent=""
@@ -101,8 +105,6 @@ if [ `id -u` != 0 ] ; then
 	exit 0
 fi
 
-SCRIPTNAME=$(basename $(readlink -e $0))
-
 export PATH=/sbin:/usr/sbin:$PATH
 
 # list of AppDynamics services in start order
@@ -122,7 +124,6 @@ fi
 APPDSERVICE=/sbin/appdservice
 
 ROOTOWNER=`ls -ld $APPD_ROOT | awk '{print $3}'`
-RUNUSER=`su -s /bin/bash -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
 if [[ `id -u $RUNUSER` != "0" ]] ; then
 	if [ `expr $use_cwrapper + $use_sudo + $use_pbrun + $use_xuser` == 0 ] ; then
 		echo non-root MySQL usage requires at least one privilege escalation method
