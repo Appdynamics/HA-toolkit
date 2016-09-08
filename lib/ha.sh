@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+# $Id: lib/ha.sh 3.2 2016-09-08 13:40:17 cmayer $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -90,6 +90,7 @@ function save_mysql_passwd {
 	obf=$(obfuscate $__inpw1) || exit 1
 	echo $obf > $rootpw_obf || err "$thisfn: failed to save obfuscated passwd to $rootpw_obf"
 	chmod 600 $rootpw_obf || warn "$thisfn: failed to make $rootpw_obf readonly"
+	chown $RUNUSER $rootpw_obf
 }
 
 #
@@ -158,6 +159,11 @@ function check_sanity {
 # locate a machine agent install directory and print out it's path
 #
 function find_machine_agent {
-	find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print | head -1 | sed "s,/[^/]*$,,"
+	relpath=`find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print 2>/dev/null | head -1 | sed "s,/[^/]*$,,"`
+	if [ -n "$relpath" ] ; then
+		(cd $relpath ; pwd -P)
+	else
+		echo ""
+	fi
 }
 

@@ -116,3 +116,45 @@ avoided by using the universally available, but uglier, --shell option.
 5) a better message is emitted when no password is available
 
 6) README.md, a source hygiene document, was added
+
+--------------------------------------
+Release notes for version 3.2
+
+this is a bugfix version
+
+1) backwards compatibility with 3.9 series controllers enhanced
+
+2) a new operations mode, triggered by the presence of HA/SHUTDOWN_FAILOVER,
+   will automatically and immediately trigger the secondary to take over
+   without breaking replication.   this is intended for external orderly
+   shutdown handling of the HA pair as might occur on the azure platform
+   support for this is present in appdcontroller init script and a new option
+   to the failover.sh script
+
+3) install_init.sh had an error when detecting if the controller uses ports
+   less than 1024
+
+4) the failover.sh script waited forever if there was a database replication 
+   failure
+
+5) running scripts outside the HA subdirectory printed a spurious error message
+   from lib/log.sh
+
+6) replicate.sh now plugs in a tier name into the controller_info.xml for the
+   machine agent.
+
+7) mysqlclient.sh now starts up faster for interactive use. an additional 
+   option has been added that makes it compatible to controller.sh login-db 
+   if line-oriented output is desired.
+
+8) the HA.shar file automatically creates the HA directory if needed, and cd's
+   into the HA directory if it is not already there.  it should be unpacked as 
+   before, but this behavior is backward compatible and prevents problems.
+
+9) the init scripts were further rationalized with common code removal,
+   fixing a problem with memory size complaints and adding automatic setting
+   of limits
+
+10) the logging functions had a bug where the existence of /dev/tty was used
+    instead of running /usr/bin/tty to test if tty output was possible
+

@@ -43,6 +43,10 @@ PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 NAME=$(basename $(readlink -e $0))
 
+# uncomment for debug logging
+#exec 2> /tmp/$NAME.out
+#set -x
+
 APPD_ROOT=/opt/AppDynamics/Controller
 RUNUSER=root
 
@@ -54,11 +58,12 @@ OPEN_FD_LIMIT=65536
 
 APPD_BIN="$APPD_ROOT/bin"
 lockfile=/var/lock/subsys/$NAME
-WATCHDOG=$APPD_ROOT/HA/appd_watchdog.pid
-ASSASSIN=$APPD_ROOT/HA/appd_assassin.pid
+WATCHDOG="$APPD_ROOT/HA/appd_watchdog.pid"
+ASSASSIN="$APPD_ROOT/HA/appd_assassin.pid"
 WATCHDOG_ENABLE="$APPD_ROOT/HA/WATCHDOG_ENABLE"
-WATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status
+WATCHDOG_STATUS="$APPD_ROOT/logs/watchdog.status"
 APPSERVER_DISABLE="$APPD_ROOT/HA/APPSERVER_DISABLE"
+SHUTDOWN_FAILOVER="$APPD_ROOT/HA/SHUTDOWN_FAILOVER"
 
 # For security reasons, locally embed/include function library at HA.shar build time
 embed lib/password.sh
@@ -73,49 +78,9 @@ DB_SKIP_SLAVE_START=`dbcnf_get skip-slave-start`
 
 MYSQLCLIENT="$APPD_ROOT/HA/mysqlclient.sh"
 
-if [ -f $APPD_ROOT/HA/LARGE_PAGES_ENABLE ] ; then
+if [ -f "$APPD_ROOT/HA/LARGE_PAGES_ENABLE" ] ; then
 	ENABLE_HUGE_PAGES="true"
 fi
-
-function enable_pam_limits {
-	if [ -f /etc/pam.d/common-session ] && ! grep  -Eq "^\s*session\s+required\s+pam_limits\.so" /etc/pam.d/common-session
-		then
-		echo "session required	pam_limits.so" >> /etc/pam.d/common-session
-	elif [ -f /etc/pam.d/system-auth ] && ! grep  -Eq "^\s*session\s+required\s+pam_limits\.so" /etc/pam.d/system-auth
-		then
-		echo "session required	pam_limits.so" >> /etc/pam.d/system-auth
-	fi
-}
-
-# always make sure this gets called before any other functions that modify
-# /etc/security/limits.d/appdynamics.com, i.e. set_unlimited_memlock
-function set_open_fd_limits {
-	if [ "$RUNUSER" == "root" ] && [[ `ulimit -S -n` -lt $OPEN_FD_LIMIT ]]
-		then
-		ulimit -n $OPEN_FD_LIMIT
-	elif [[ `su -s /bin/bash -c "ulimit -S -n" $RUNUSER` -lt "$OPEN_FD_LIMIT" ]]
-		then
-		echo "$RUNUSER  soft  nofile $OPEN_FD_LIMIT" > /etc/security/limits.d/appdynamics.conf
-		echo "$RUNUSER  hard  nofile $OPEN_FD_LIMIT" >> /etc/security/limits.d/appdynamics.conf
-		enable_pam_limits
-	fi
-}
-
-function set_unlimited_memlock {
-	if [ "$ENABLE_HUGE_PAGES" == "true" ] ; then
-		if [[ $RUNUSER == "root" ]]
-			then
-			ulimit -l unlimited
-		else
-			if [[ $(su -s /bin/bash -c "ulimit -l" $RUNUSER) != "unlimited" ]]
-				then
-				echo "$RUNUSER  soft  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-				echo "$RUNUSER  hard  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-				enable_pam_limits
-			fi
-		fi
-	fi
-}
 
 function watchdog_running {
 	if runuser [ -f "$WATCHDOG" ] ; then
@@ -192,7 +157,7 @@ function controllerrunning {
 	if pgrep -f -u $RUNUSER "$APPD_ROOT/jre/bin/java -jar ./../modules/admin-cli.jar" >/dev/null ; then
 		return 1
 	fi
-	if runuser $APPD_ROOT/appserver/glassfish/bin/asadmin list-domains | \
+	if runuser "$APPD_ROOT/appserver/glassfish/bin/asadmin" list-domains | \
 		grep -q "domain1 running" ; then
 		return 0
 	fi
@@ -232,11 +197,9 @@ start)
 		exit 1
 	fi
 	service appdcontroller-db start
-	set_open_fd_limits
-	set_unlimited_memlock
 	if [[ `id -u $RUNUSER` != "0" ]] && use_privileged_ports ; then
 		#trying to bind java to a privilged port as an unpriviliged user
-		setcap cap_net_bind_service=+ep $APPD_ROOT/jre/bin/java
+		setcap cap_net_bind_service=+ep "$APPD_ROOT/jre/bin/java"
 		echo "$APPD_ROOT/jre/lib/$(uname -m | sed -e 's/x86_64/amd64/')/jli" > \
 			/etc/ld.so.conf.d/appdynamics.conf
 		ldconfig            
@@ -248,13 +211,13 @@ start)
 				echo assassin already running
 			else
 				echo starting assassin 
-				bg_runuser $APPD_ROOT/HA/assassin.sh
+				bg_runuser "$APPD_ROOT/HA/assassin.sh"
 			fi
 		fi
-		if runuser [ -d $APPD_ROOT/events_service ] ; then
+		if runuser [ -d "$APPD_ROOT/events_service" ] ; then
 			bg_runuser $APPD_BIN/controller.sh start-events-service >/dev/null
 		fi
-		if runuser [ -d $APPD_ROOT/reporting_service ] ; then
+		if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
 			bg_runuser $APPD_BIN/controller.sh start-reporting-service >/dev/null
 		fi
 	else
@@ -268,7 +231,7 @@ start)
 				echo appd watchdog already running 
 			else
 				echo starting appd watchdog
-				bg_runuser $APPD_ROOT/HA/watchdog.sh >/dev/null
+				bg_runuser "$APPD_ROOT/HA/watchdog.sh" >/dev/null
 			fi
 		else
 			echo watchdog disabled
@@ -282,20 +245,23 @@ stop)
 	require_root
 	if watchdog_running ; then
 		kill -9 $WATCHPID && ( echo appd watchdog killed; \
-		runuser "echo `date` appd watchdog killed >> $APPD_ROOT/logs/watchdog.log" )
+			runuser "echo `date` appd watchdog killed \ 
+				>> $APPD_ROOT/logs/watchdog.log" )
 	fi
 	runuser rm -f $WATCHDOG
 	if assassin_running ; then
 		kill -9 $ASSASSINPID && ( echo appd assassin killed; \
-		runuser "echo `date` appd assassin killed >> $APPD_ROOT/logs/assassin.log" )		
+		runuser "echo `date` appd assassin killed \
+			>> $APPD_ROOT/logs/assassin.log" )		
 	fi
 	runuser rm -f $ASSASSIN
-	# TODO: stop automatically starting and stopping the local events service since
-	#   an HA controller pair should be talking to a separate events service cluster.
-	if runuser [ -d $APPD_ROOT/events_service ] ; then
+	# TODO: stop automatically starting and stopping the local events service 
+	# since an HA controller pair should be talking to a separate events 
+	# service cluster.
+	if runuser [ -d "$APPD_ROOT/events_service" ] ; then
 		runuser $APPD_BIN/controller.sh stop-events-service
 	fi
-	if runuser [ -d $APPD_ROOT/reporting_service ] ; then
+	if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
 		runuser $APPD_BIN/controller.sh stop-reporting-service
 	fi
 	# The default controller shutdown timeout is 45 minutes 
@@ -309,9 +275,24 @@ stop)
 		pkill -9 -f "$APPD_ROOT/appserver/glassfish/domains/domain1"
 		echo "truncate ejb__timer__tbl;" | runuser $MYSQLCLIENT 
 	fi
+	#
+	# an interesting case is if we are the active node, and replication is up,
+	# and HA/SHUTDOWN_FAILOVER exists, we will make tell the secondary to start
+	# an appserver
+	#
+	if [ -f $SHUTDOWN_FAILOVER -a "`controller_mode`" == active ] ; then
+		secondary=`echo "show slave status\G" | runuser $MYSQLCLIENT | \
+			awk '/Master_Host:/ {print $2}'`
+        echo 'update global_configuration_local set value="passive" \
+			where name="appserver.mode"' | runuser $MYSQLCLIENT
+        echo 'update global_configuration_local set value="secondary" \
+			where name="ha.controller.type"' | runuser $MYSQLCLIENT
+		runuser ssh $secondary "$APPD_ROOT/HA/failover.sh" \
+			-n primary_has_been_set_passive_and_stopped >/dev/null
+	fi
 
-	if [ -e $APPD_ROOT/logs/server.log.lck ] ; then
-		runuser rm -f $APPD_ROOT/logs/server.log.lck
+	if [ -e "$APPD_ROOT/logs/server.log.lck" ] ; then
+		runuser rm -f "$APPD_ROOT/logs/server.log.lck"
 	fi
 	rm -f $lockfile
 ;;

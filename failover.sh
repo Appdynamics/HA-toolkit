@@ -1,10 +1,12 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+# $Id: failover.sh 3.2 2016-09-08 13:40:17 cmayer $
 #
 # run on the passive node, activate this HA node.
 # 
 # if run with the -f option, force hard failover
+# if run with the -n option, don't remote stop
+#    this is usually invoked from the remote side on an orderly shutdown
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -64,15 +66,28 @@ function slave_status {
 force=false
 break_replication=false
 primary_up=false
+remote=true
+no_assassin=false
 
-while getopts f flag; do
+while getopts fn: flag; do
 	case $flag in
 	f)
 		force=true
 		;;
+	n)
+		sanity_check=$OPTARG
+		if [ "$sanity_check" == "primary_has_been_set_passive_and_stopped" ] ; then
+			remote=false
+			no_assassin=true
+		else
+			echo "the -n option is not intended to be run manually"
+			exit 1
+		fi
+		;;
 	*)
 		echo "usage: $0 <options>"
 		echo "    [ -f ] force replication break"
+		echo "    [ -n primary_has_been_set_passive_and_stopped ] - not intended for manual use"
 		exit
 		;;
 	esac
@@ -216,27 +231,29 @@ fi
 # also, if the old primary is not reachable, ha.controller.type will be changed by the assassin when it finally makes contact.
 #
 if [ "$primary_up" = "true" ] ; then
-	message "Stop primary appserver"
-	remservice -tq $primary appdcontroller stop
-	message "Mark primary passive + secondary"
-	if \
-		sql $primary "update global_configuration_local set value='passive' \
-			where name = 'appserver.mode';" 10 &&
-		sql $primary "update global_configuration_local set value='secondary' \
-			where name = 'ha.controller.type';" 10 ; then
-		message "Mark local primary"
-		sql localhost "update global_configuration_local set value='primary' \
-			where name = 'ha.controller.type';"
-	else
-		message "Primary DB timeout"
-		break_replication=true
-	fi
-	if $break_replication ; then
-		primary_up=false
-		message "Stop secondary database"
-		remservice -tq $primary appdcontroller-db stop
-		dbcnf_unset skip-slave-start $primary
-		dbcnf_set skip-slave-start true $primary
+	if $remote ; then
+		message "Mark primary passive + secondary"
+		if \
+			sql $primary "update global_configuration_local set value='passive' \
+				where name = 'appserver.mode';" 10 &&
+			sql $primary "update global_configuration_local set value='secondary' \
+				where name = 'ha.controller.type';" 10 ; then
+			message "Mark local primary"
+			no_assassin=true
+		else
+			message "Primary DB timeout"
+			break_replication=true
+			no_assassin=false
+		fi
+		message "Stop primary appserver"
+		remservice -tq $primary appdcontroller stop
+		if $break_replication ; then
+			primary_up=false
+			message "Stop secondary database"
+			remservice -tq $primary appdcontroller-db stop
+			dbcnf_unset skip-slave-start $primary
+			dbcnf_set skip-slave-start true $primary
+		fi
 	fi
 fi
 
@@ -246,6 +263,11 @@ fi
 message "Mark local active"
 sql localhost "update global_configuration_local set value='active' \
 	where name = 'appserver.mode';"
+
+if $no_assassin ; then
+	sql localhost "update global_configuration_local set value='primary' \
+	where name = 'ha.controller.type';"
+fi
 
 #
 # start the replication sql thread.
@@ -267,7 +289,13 @@ while true ; do
 		fi
 	fi
 	if $waited ; then
-		message "waiting for relay logs to drain $exec_file:$exec_pos to $read_file:$read_pos"
+		sql_slave=`sql localhost "show slave status" | get Slave_SQL_Running`
+		if [ "$sql_slave" == "Yes" ] ; then
+			message "waiting for relay logs to drain $exec_file:$exec_pos to $read_file:$read_pos"
+		else
+			message "sql slave died - replication errors see logs/database.log"
+			break
+		fi
 	fi
 	sleep 10
 	echo -n "."
@@ -288,11 +316,11 @@ service appdcontroller start
 # if the other side was ok, then we can start the service in passive mode
 #
 if [ "$primary_up" = "true" ] ; then
-	message "start passive secondary" | tee -a $fo_log
-	remservice -nqf $primary appdcontroller start
+	if $remote ; then
+		message "start passive secondary" | tee -a $fo_log
+		remservice -nqf $primary appdcontroller start
+	fi
 fi
-
-message "Failover complete at " `date`
 
 if $break_replication ; then
 	message "replication has been persistently broken"
@@ -306,4 +334,7 @@ replication using replicate.sh -f option to re-establish HA
 MESSAGE
 
 fi
+
+message "Failover complete at " `date`
+
 exit 0

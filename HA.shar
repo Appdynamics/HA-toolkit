@@ -1,6 +1,8 @@
-# HA package version 3.1 built Fri Aug 26 00:43:58 2016
+# HA package version 3.2 built Thu Sep  8 12:29:32 2016
 if echo '
 ' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true
+if [ $(basename $(pwd -P)) != HA ] ; then
+mkdir -p HA ; if ! [ -d HA ] ; then echo "no HA directory" ; exit 0 ; fi; echo cd to HA ; cd HA; fi
 # This is a shell archive.  Save it in a file, remove anything before
 # this line, and then unpack it by entering "sh file".  Note, it may
 # create directories; files and directories will be owned by you and
@@ -57,7 +59,7 @@ if echo '
 #
 echo x - VERSION
 sed 's/^X//' >VERSION << 'END-of-VERSION'
-X3.1
+X3.2
 END-of-VERSION
 echo x - README.txt
 sed 's/^X//' >README.txt << 'END-of-README.txt'
@@ -753,6 +755,48 @@ X
 X5) a better message is emitted when no password is available
 X
 X6) README.md, a source hygiene document, was added
+X
+X--------------------------------------
+XRelease notes for version 3.2
+X
+Xthis is a bugfix version
+X
+X1) backwards compatibility with 3.9 series controllers enhanced
+X
+X2) a new operations mode, triggered by the presence of HA/SHUTDOWN_FAILOVER,
+X   will automatically and immediately trigger the secondary to take over
+X   without breaking replication.   this is intended for external orderly
+X   shutdown handling of the HA pair as might occur on the azure platform
+X   support for this is present in appdcontroller init script and a new option
+X   to the failover.sh script
+X
+X3) install_init.sh had an error when detecting if the controller uses ports
+X   less than 1024
+X
+X4) the failover.sh script waited forever if there was a database replication 
+X   failure
+X
+X5) running scripts outside the HA subdirectory printed a spurious error message
+X   from lib/log.sh
+X
+X6) replicate.sh now plugs in a tier name into the controller_info.xml for the
+X   machine agent.
+X
+X7) mysqlclient.sh now starts up faster for interactive use. an additional 
+X   option has been added that makes it compatible to controller.sh login-db 
+X   if line-oriented output is desired.
+X
+X8) the HA.shar file automatically creates the HA directory if needed, and cd's
+X   into the HA directory if it is not already there.  it should be unpacked as 
+X   before, but this behavior is backward compatible and prevents problems.
+X
+X9) the init scripts were further rationalized with common code removal,
+X   fixing a problem with memory size complaints and adding automatic setting
+X   of limits
+X
+X10) the logging functions had a bug where the existence of /dev/tty was used
+X    instead of running /usr/bin/tty to test if tty output was possible
+X
 END-of-Release_Notes
 echo x - appdservice.c
 sed 's/^X//' >appdservice.c << 'END-of-appdservice.c'
@@ -1389,11 +1433,13 @@ echo x - failover.sh
 sed 's/^X//' >failover.sh << 'END-of-failover.sh'
 X#!/bin/bash
 X#
-X# $Id: failover.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+X# $Id: failover.sh 3.2 2016-09-08 13:40:17 cmayer $
 X#
 X# run on the passive node, activate this HA node.
 X# 
 X# if run with the -f option, force hard failover
+X# if run with the -n option, don't remote stop
+X#    this is usually invoked from the remote side on an orderly shutdown
 X#
 X# Copyright 2016 AppDynamics, Inc
 X#
@@ -1453,15 +1499,28 @@ X#
 Xforce=false
 Xbreak_replication=false
 Xprimary_up=false
+Xremote=true
+Xno_assassin=false
 X
-Xwhile getopts f flag; do
+Xwhile getopts fn: flag; do
 X	case $flag in
 X	f)
 X		force=true
 X		;;
+X	n)
+X		sanity_check=$OPTARG
+X		if [ "$sanity_check" == "primary_has_been_set_passive_and_stopped" ] ; then
+X			remote=false
+X			no_assassin=true
+X		else
+X			echo "the -n option is not intended to be run manually"
+X			exit 1
+X		fi
+X		;;
 X	*)
 X		echo "usage: $0 <options>"
 X		echo "    [ -f ] force replication break"
+X		echo "    [ -n primary_has_been_set_passive_and_stopped ] - not intended for manual use"
 X		exit
 X		;;
 X	esac
@@ -1605,27 +1664,29 @@ X# if the primary is up, mark it passive, and stop the appserver
 X# also, if the old primary is not reachable, ha.controller.type will be changed by the assassin when it finally makes contact.
 X#
 Xif [ "$primary_up" = "true" ] ; then
-X	message "Stop primary appserver"
-X	remservice -tq $primary appdcontroller stop
-X	message "Mark primary passive + secondary"
-X	if \
-X		sql $primary "update global_configuration_local set value='passive' \
-X			where name = 'appserver.mode';" 10 &&
-X		sql $primary "update global_configuration_local set value='secondary' \
-X			where name = 'ha.controller.type';" 10 ; then
-X		message "Mark local primary"
-X		sql localhost "update global_configuration_local set value='primary' \
-X			where name = 'ha.controller.type';"
-X	else
-X		message "Primary DB timeout"
-X		break_replication=true
-X	fi
-X	if $break_replication ; then
-X		primary_up=false
-X		message "Stop secondary database"
-X		remservice -tq $primary appdcontroller-db stop
-X		dbcnf_unset skip-slave-start $primary
-X		dbcnf_set skip-slave-start true $primary
+X	if $remote ; then
+X		message "Mark primary passive + secondary"
+X		if \
+X			sql $primary "update global_configuration_local set value='passive' \
+X				where name = 'appserver.mode';" 10 &&
+X			sql $primary "update global_configuration_local set value='secondary' \
+X				where name = 'ha.controller.type';" 10 ; then
+X			message "Mark local primary"
+X			no_assassin=true
+X		else
+X			message "Primary DB timeout"
+X			break_replication=true
+X			no_assassin=false
+X		fi
+X		message "Stop primary appserver"
+X		remservice -tq $primary appdcontroller stop
+X		if $break_replication ; then
+X			primary_up=false
+X			message "Stop secondary database"
+X			remservice -tq $primary appdcontroller-db stop
+X			dbcnf_unset skip-slave-start $primary
+X			dbcnf_set skip-slave-start true $primary
+X		fi
 X	fi
 Xfi
 X
@@ -1635,6 +1696,11 @@ X#
 Xmessage "Mark local active"
 Xsql localhost "update global_configuration_local set value='active' \
 X	where name = 'appserver.mode';"
+X
+Xif $no_assassin ; then
+X	sql localhost "update global_configuration_local set value='primary' \
+X	where name = 'ha.controller.type';"
+Xfi
 X
 X#
 X# start the replication sql thread.
@@ -1656,7 +1722,13 @@ X			break
 X		fi
 X	fi
 X	if $waited ; then
-X		message "waiting for relay logs to drain $exec_file:$exec_pos to $read_file:$read_pos"
+X		sql_slave=`sql localhost "show slave status" | get Slave_SQL_Running`
+X		if [ "$sql_slave" == "Yes" ] ; then
+X			message "waiting for relay logs to drain $exec_file:$exec_pos to $read_file:$read_pos"
+X		else
+X			message "sql slave died - replication errors see logs/database.log"
+X			break
+X		fi
 X	fi
 X	sleep 10
 X	echo -n "."
@@ -1677,11 +1749,11 @@ X#
 X# if the other side was ok, then we can start the service in passive mode
 X#
 Xif [ "$primary_up" = "true" ] ; then
-X	message "start passive secondary" | tee -a $fo_log
-X	remservice -nqf $primary appdcontroller start
+X	if $remote ; then
+X		message "start passive secondary" | tee -a $fo_log
+X		remservice -nqf $primary appdcontroller start
+X	fi
 Xfi
-X
-Xmessage "Failover complete at " `date`
 X
 Xif $break_replication ; then
 X	message "replication has been persistently broken"
@@ -1695,6 +1767,9 @@ Xreplication using replicate.sh -f option to re-establish HA
 XMESSAGE
 X
 Xfi
+X
+Xmessage "Failover complete at " `date`
+X
 Xexit 0
 END-of-failover.sh
 echo x - watchdog.sh
@@ -2253,7 +2328,7 @@ echo x - replicate.sh
 sed 's/^X//' >replicate.sh << 'END-of-replicate.sh'
 X#!/bin/bash
 X#
-X# $Id: replicate.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+X# $Id: replicate.sh 3.2 2016-09-08 13:40:17 cmayer $
 X#
 X# install HA to a controller pair
 X#
@@ -2422,7 +2497,7 @@ X	do
 X		if [ -z "$host" ] ; then
 X			service $s stop || ((errors++))
 X		else
-X			remservice -q $host $s stop || ((errors++))
+X			remservice -tq $host $s stop || ((errors++))
 X		fi
 X	done
 X	return $errors;
@@ -2753,6 +2828,7 @@ X#
 Xmonitor_access_key=${cmargs['access_key']}
 Xmonitor_account=${cmargs['account_name']}
 Xmonitor_application=${cmargs['app_name']}
+Xmonitor_tier="App Server"
 X
 Xif [ -z "$monitor_account" ] ; then
 X	if [ "$monitor" = "$internal_vip" ] ; then
@@ -2980,7 +3056,7 @@ X	message "inhibit running of secondary and delete mysql/innodb logfiles"
 X	ssh $secondary rm -f $APPD_ROOT/bin/controller.sh \
 X		"$innodb_logdir/ib_logfile*"
 X		"$datadir/*log*" \
-X		$datadir/ibdata1 | logonly 2>&1
+X		$datadir/ibdata1 2>&1 | logonly
 X	
 X	#
 X	# disable automatic start of replication slave
@@ -3265,6 +3341,7 @@ Xmessage "monitoring port: $monitor_port"
 Xmessage "monitoring account: $monitor_account"
 Xmessage "monitoring access key: $monitor_access_key"
 Xmessage "monitoring application: $monitor_application"
+Xmessage "monitoring tier: $monitor_tier"
 X
 X#
 X# plug the various communications endpoints into domain.xml
@@ -3320,6 +3397,7 @@ X		ex -s $info <<- SETMACHINE
 X			%s/\(<controller-host>\)[^<]*/\1$monitor_host/
 X			%s/\(<controller-port>\)[^<]*/\1$monitor_port/
 X			%s/\(<application-name>\)[^<]*/\1$monitor_application/
+X			%s/\(<tier-name>\)[^<]*/\1$monitor_tier/
 X			%s/\(<account-name>\)[^<]*/\1$monitor_account/
 X			%s/\(<account-access-key>\)[^<]*/\1$monitor_access_key/
 X			wq
@@ -3731,7 +3809,7 @@ echo x - install-init.sh
 sed 's/^X//' >install-init.sh << 'END-of-install-init.sh'
 X#!/bin/bash
 X#
-X# $Id: install-init.sh 3.0.1 2016-08-08 14:52:22 cmayer $
+X# $Id: install-init.sh 3.2 2016-09-08 14:52:22 cmayer $
 X#
 X# install init scripts, including the machine agent.
 X#
@@ -3749,6 +3827,8 @@ X#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 X#   See the License for the specific language governing permissions and
 X#   limitations under the License.
 X#
+Xcd $(dirname $0)
+X
 Xfunction usage {
 X	echo "$0 [-options] where:"
 X	echo "   -c  # use setuid c wrapper"
@@ -3759,7 +3839,6 @@ X	echo "   -a  <Machine Agent install directory>"
 X	exit 1
 X}
 X
-Xcd $(dirname $0)
 XAPPD_ROOT=`cd .. ; pwd -P`			# ignore sym links
 XPBRUN=`grep PBRUN= appdservice-pbrun.sh | awk -F= '{print $2}'`
 X
@@ -3768,9 +3847,12 @@ X	APPD_ROOT=/opt/AppDynamics/Controller
 X	echo using default path $APPD_ROOT
 Xfi
 XDOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
+XRUNUSER=`su -s /bin/bash -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
 X
 X# source function library
 X. $APPD_ROOT/HA/lib/ha.sh
+X. $APPD_ROOT/HA/lib/init.sh
+X. $APPD_ROOT/HA/lib/conf.sh
 X
 Xmachine_agent_service=""
 Xmachine_agent=""
@@ -3832,8 +3914,6 @@ X	echo $0 must be run as root
 X	exit 0
 Xfi
 X
-XSCRIPTNAME=$(basename $(readlink -e $0))
-X
 Xexport PATH=/sbin:/usr/sbin:$PATH
 X
 X# list of AppDynamics services in start order
@@ -3853,7 +3933,6 @@ X
 XAPPDSERVICE=/sbin/appdservice
 X
 XROOTOWNER=`ls -ld $APPD_ROOT | awk '{print $3}'`
-XRUNUSER=`su -s /bin/bash -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
 Xif [[ `id -u $RUNUSER` != "0" ]] ; then
 X	if [ `expr $use_cwrapper + $use_sudo + $use_pbrun + $use_xuser` == 0 ] ; then
 X		echo non-root MySQL usage requires at least one privilege escalation method
@@ -4073,7 +4152,7 @@ echo x - uninstall-init.sh
 sed 's/^X//' >uninstall-init.sh << 'END-of-uninstall-init.sh'
 X#!/bin/bash
 X#
-X# $Id: uninstall-init.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: uninstall-init.sh 3.2 2016-09-08 03:09:03 cmayer $
 X#
 X# uninstall init script
 X#
@@ -4091,6 +4170,8 @@ X#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 X#   See the License for the specific language governing permissions and
 X#   limitations under the License.
 X#
+Xcd $(dirname $0)
+X
 Xexport PATH=/sbin:/usr/sbin:$PATH
 X
 Xfunction remove {
@@ -4615,7 +4696,7 @@ X
 X###################### Start of embedded file: lib/init.sh
 X#!/bin/bash
 X#
-X# $Id: lib/init.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: lib/init.sh 3.2 2016-09-08 03:09:03 cmayer $
 X#
 X# init.sh
 X# contains functions to change user and run processes
@@ -4647,7 +4728,7 @@ X# runuser quoting is a definite PITA.  the way to stay sane is to note
 X# exactly when you want $ to be expanded and make that explicit, passing
 X# escaped $ signs when you want the expansion deferred
 X#
-X# finally, the bb_runuser function should return the pid
+X# finally, the bg_runuser function should return the pid
 X#
 Xif [ `id -un` == "$RUNUSER" ] ; then
 X	function bg_runuser {
@@ -4792,7 +4873,7 @@ echo x - mysqlclient.sh
 sed 's/^X//' >mysqlclient.sh << 'END-of-mysqlclient.sh'
 X#!/bin/bash
 X#
-X# $Id: mysqlclient.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+X# $Id: mysqlclient.sh 3.2 2016-09-08 13:40:17 cmayer $
 X#
 X# trivial command that executes sql for us.  this is intended
 X# to be invoked from an init script via runuser, so we can log
@@ -4824,8 +4905,31 @@ X. lib/ha.sh
 X. lib/password.sh
 X. lib/sql.sh
 X
+Xterminal=false
 Xif [ -t 0 ] ; then
-X	$MYSQL --host=localhost "${CONNECT[@]}" controller
+X	terminal=true
+Xfi
+Xmysqlopts=-EB
+X
+Xwhile getopts ct flag; do
+X	case $flag in
+X	t)
+X		terminal=true
+X		;;
+X	c)
+X		mysqlopts=
+X		;;
+X	*)
+X		echo "usage: $0 <options>"
+X		echo "    [ -t ] interactive"
+X		echo "    [ -c ] compatible with controller-sh login-db"
+X		exit 0
+X		;;
+X	esac
+Xdone
+X
+Xif $terminal ; then
+X	$MYSQL -A --host=localhost "${CONNECT[@]}" controller
 X	exit 0
 Xfi
 X
@@ -4833,7 +4937,7 @@ XSQL=/tmp/mysqlclient.$$.sql
 XRESULT=/tmp/mysqlclient.$$.result
 X
 Xcat > $SQL
-X$MYSQL -EB --host=localhost "${CONNECT[@]}" controller 2>> $LOGFILE 1> $RESULT < $SQL
+X$MYSQL $mysqlopts --host=localhost "${CONNECT[@]}" controller 2>> $LOGFILE 1> $RESULT < $SQL
 X
 Xif [ -f $APPD_ROOT/HA/LOG_SQL ] ; then
 X	echo "mysqlclient: " `date` >> $LOGFILE
@@ -4964,6 +5068,10 @@ XPATH=/bin:/usr/bin:/sbin:/usr/sbin
 X
 XNAME=$(basename $(readlink -e $0))
 X
+X# uncomment for debug logging
+X#exec 2> /tmp/$NAME.out
+X#set -x
+X
 XAPPD_ROOT=/opt/AppDynamics/Controller
 XRUNUSER=root
 X
@@ -4975,11 +5083,12 @@ XOPEN_FD_LIMIT=65536
 X
 XAPPD_BIN="$APPD_ROOT/bin"
 Xlockfile=/var/lock/subsys/$NAME
-XWATCHDOG=$APPD_ROOT/HA/appd_watchdog.pid
-XASSASSIN=$APPD_ROOT/HA/appd_assassin.pid
+XWATCHDOG="$APPD_ROOT/HA/appd_watchdog.pid"
+XASSASSIN="$APPD_ROOT/HA/appd_assassin.pid"
 XWATCHDOG_ENABLE="$APPD_ROOT/HA/WATCHDOG_ENABLE"
-XWATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status
+XWATCHDOG_STATUS="$APPD_ROOT/logs/watchdog.status"
 XAPPSERVER_DISABLE="$APPD_ROOT/HA/APPSERVER_DISABLE"
+XSHUTDOWN_FAILOVER="$APPD_ROOT/HA/SHUTDOWN_FAILOVER"
 X
 X# For security reasons, locally embed/include function library at HA.shar build time
 X
@@ -5172,7 +5281,7 @@ X
 X###################### Start of embedded file: lib/init.sh
 X#!/bin/bash
 X#
-X# $Id: lib/init.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: lib/init.sh 3.2 2016-09-08 03:09:03 cmayer $
 X#
 X# init.sh
 X# contains functions to change user and run processes
@@ -5204,7 +5313,7 @@ X# runuser quoting is a definite PITA.  the way to stay sane is to note
 X# exactly when you want $ to be expanded and make that explicit, passing
 X# escaped $ signs when you want the expansion deferred
 X#
-X# finally, the bb_runuser function should return the pid
+X# finally, the bg_runuser function should return the pid
 X#
 Xif [ `id -un` == "$RUNUSER" ] ; then
 X	function bg_runuser {
@@ -5527,49 +5636,9 @@ XDB_SKIP_SLAVE_START=`dbcnf_get skip-slave-start`
 X
 XMYSQLCLIENT="$APPD_ROOT/HA/mysqlclient.sh"
 X
-Xif [ -f $APPD_ROOT/HA/LARGE_PAGES_ENABLE ] ; then
+Xif [ -f "$APPD_ROOT/HA/LARGE_PAGES_ENABLE" ] ; then
 X	ENABLE_HUGE_PAGES="true"
 Xfi
-X
-Xfunction enable_pam_limits {
-X	if [ -f /etc/pam.d/common-session ] && ! grep  -Eq "^\s*session\s+required\s+pam_limits\.so" /etc/pam.d/common-session
-X		then
-X		echo "session required	pam_limits.so" >> /etc/pam.d/common-session
-X	elif [ -f /etc/pam.d/system-auth ] && ! grep  -Eq "^\s*session\s+required\s+pam_limits\.so" /etc/pam.d/system-auth
-X		then
-X		echo "session required	pam_limits.so" >> /etc/pam.d/system-auth
-X	fi
-X}
-X
-X# always make sure this gets called before any other functions that modify
-X# /etc/security/limits.d/appdynamics.com, i.e. set_unlimited_memlock
-Xfunction set_open_fd_limits {
-X	if [ "$RUNUSER" == "root" ] && [[ `ulimit -S -n` -lt $OPEN_FD_LIMIT ]]
-X		then
-X		ulimit -n $OPEN_FD_LIMIT
-X	elif [[ `su -s /bin/bash -c "ulimit -S -n" $RUNUSER` -lt "$OPEN_FD_LIMIT" ]]
-X		then
-X		echo "$RUNUSER  soft  nofile $OPEN_FD_LIMIT" > /etc/security/limits.d/appdynamics.conf
-X		echo "$RUNUSER  hard  nofile $OPEN_FD_LIMIT" >> /etc/security/limits.d/appdynamics.conf
-X		enable_pam_limits
-X	fi
-X}
-X
-Xfunction set_unlimited_memlock {
-X	if [ "$ENABLE_HUGE_PAGES" == "true" ] ; then
-X		if [[ $RUNUSER == "root" ]]
-X			then
-X			ulimit -l unlimited
-X		else
-X			if [[ $(su -s /bin/bash -c "ulimit -l" $RUNUSER) != "unlimited" ]]
-X				then
-X				echo "$RUNUSER  soft  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-X				echo "$RUNUSER  hard  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-X				enable_pam_limits
-X			fi
-X		fi
-X	fi
-X}
 X
 Xfunction watchdog_running {
 X	if runuser [ -f "$WATCHDOG" ] ; then
@@ -5646,7 +5715,7 @@ Xfunction controllerrunning {
 X	if pgrep -f -u $RUNUSER "$APPD_ROOT/jre/bin/java -jar ./../modules/admin-cli.jar" >/dev/null ; then
 X		return 1
 X	fi
-X	if runuser $APPD_ROOT/appserver/glassfish/bin/asadmin list-domains | \
+X	if runuser "$APPD_ROOT/appserver/glassfish/bin/asadmin" list-domains | \
 X		grep -q "domain1 running" ; then
 X		return 0
 X	fi
@@ -5686,11 +5755,9 @@ X		echo appdcontroller disabled - incomplete replica:w
 X		exit 1
 X	fi
 X	service appdcontroller-db start
-X	set_open_fd_limits
-X	set_unlimited_memlock
 X	if [[ `id -u $RUNUSER` != "0" ]] && use_privileged_ports ; then
 X		#trying to bind java to a privilged port as an unpriviliged user
-X		setcap cap_net_bind_service=+ep $APPD_ROOT/jre/bin/java
+X		setcap cap_net_bind_service=+ep "$APPD_ROOT/jre/bin/java"
 X		echo "$APPD_ROOT/jre/lib/$(uname -m | sed -e 's/x86_64/amd64/')/jli" > \
 X			/etc/ld.so.conf.d/appdynamics.conf
 X		ldconfig            
@@ -5702,13 +5769,13 @@ X			if assassin_running ; then
 X				echo assassin already running
 X			else
 X				echo starting assassin 
-X				bg_runuser $APPD_ROOT/HA/assassin.sh
+X				bg_runuser "$APPD_ROOT/HA/assassin.sh"
 X			fi
 X		fi
-X		if runuser [ -d $APPD_ROOT/events_service ] ; then
+X		if runuser [ -d "$APPD_ROOT/events_service" ] ; then
 X			bg_runuser $APPD_BIN/controller.sh start-events-service >/dev/null
 X		fi
-X		if runuser [ -d $APPD_ROOT/reporting_service ] ; then
+X		if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
 X			bg_runuser $APPD_BIN/controller.sh start-reporting-service >/dev/null
 X		fi
 X	else
@@ -5722,7 +5789,7 @@ X			if watchdog_running ; then
 X				echo appd watchdog already running 
 X			else
 X				echo starting appd watchdog
-X				bg_runuser $APPD_ROOT/HA/watchdog.sh >/dev/null
+X				bg_runuser "$APPD_ROOT/HA/watchdog.sh" >/dev/null
 X			fi
 X		else
 X			echo watchdog disabled
@@ -5736,20 +5803,23 @@ Xstop)
 X	require_root
 X	if watchdog_running ; then
 X		kill -9 $WATCHPID && ( echo appd watchdog killed; \
-X		runuser "echo `date` appd watchdog killed >> $APPD_ROOT/logs/watchdog.log" )
+X			runuser "echo `date` appd watchdog killed \ 
+X				>> $APPD_ROOT/logs/watchdog.log" )
 X	fi
 X	runuser rm -f $WATCHDOG
 X	if assassin_running ; then
 X		kill -9 $ASSASSINPID && ( echo appd assassin killed; \
-X		runuser "echo `date` appd assassin killed >> $APPD_ROOT/logs/assassin.log" )		
+X		runuser "echo `date` appd assassin killed \
+X			>> $APPD_ROOT/logs/assassin.log" )		
 X	fi
 X	runuser rm -f $ASSASSIN
-X	# TODO: stop automatically starting and stopping the local events service since
-X	#   an HA controller pair should be talking to a separate events service cluster.
-X	if runuser [ -d $APPD_ROOT/events_service ] ; then
+X	# TODO: stop automatically starting and stopping the local events service 
+X	# since an HA controller pair should be talking to a separate events 
+X	# service cluster.
+X	if runuser [ -d "$APPD_ROOT/events_service" ] ; then
 X		runuser $APPD_BIN/controller.sh stop-events-service
 X	fi
-X	if runuser [ -d $APPD_ROOT/reporting_service ] ; then
+X	if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
 X		runuser $APPD_BIN/controller.sh stop-reporting-service
 X	fi
 X	# The default controller shutdown timeout is 45 minutes 
@@ -5763,9 +5833,24 @@ X		echo "forcibly killing appserver"
 X		pkill -9 -f "$APPD_ROOT/appserver/glassfish/domains/domain1"
 X		echo "truncate ejb__timer__tbl;" | runuser $MYSQLCLIENT 
 X	fi
+X	#
+X	# an interesting case is if we are the active node, and replication is up,
+X	# and HA/SHUTDOWN_FAILOVER exists, we will make tell the secondary to start
+X	# an appserver
+X	#
+X	if [ -f $SHUTDOWN_FAILOVER -a "`controller_mode`" == active ] ; then
+X		secondary=`echo "show slave status\G" | runuser $MYSQLCLIENT | \
+X			awk '/Master_Host:/ {print $2}'`
+X        echo 'update global_configuration_local set value="passive" \
+X			where name="appserver.mode"' | runuser $MYSQLCLIENT
+X        echo 'update global_configuration_local set value="secondary" \
+X			where name="ha.controller.type"' | runuser $MYSQLCLIENT
+X		runuser ssh $secondary "$APPD_ROOT/HA/failover.sh" \
+X			-n primary_has_been_set_passive_and_stopped >/dev/null
+X	fi
 X
-X	if [ -e $APPD_ROOT/logs/server.log.lck ] ; then
-X		runuser rm -f $APPD_ROOT/logs/server.log.lck
+X	if [ -e "$APPD_ROOT/logs/server.log.lck" ] ; then
+X		runuser rm -f "$APPD_ROOT/logs/server.log.lck"
 X	fi
 X	rm -f $lockfile
 X;;
@@ -5857,7 +5942,7 @@ X# Description:       This script starts and stops the AppDynamics Controller
 X#                    Database, appserver, and HA components.
 X### END INIT INFO
 X#
-X# $Id: appdcontroller-db.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: appdcontroller-db.sh 3.2 2016-09-08 03:09:03 cmayer $
 X# 
 X# Copyright 2016 AppDynamics, Inc
 X#
@@ -5889,6 +5974,10 @@ XPATH=/bin:/usr/bin:/sbin:/usr/sbin
 X
 XNAME=$(basename $(readlink -e $0))
 X
+X# uncomment for debug logging
+X#exec 2> /tmp/$NAME.out
+X#set -x
+X
 XAPPD_ROOT=/opt/AppDynamics/Controller
 XRUNUSER=root
 X
@@ -5899,7 +5988,10 @@ X
 XAPPD_BIN="$APPD_ROOT/bin"
 XDOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 XEVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/conf/events-service.vmoptions
-X[[ -r $EVENTS_VMOPTIONS_FILE ]] || EVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/analytics-processor/conf/analytics-processor.vmoptions
+Xif [ ! -f $EVENTS_VMOPTIONS_FILE ] ; then
+X	EVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/analytics-processor/conf/analytics-processor.vmoptions
+Xfi
+XLIMITS=/etc/security/limits.d/appdynamics.conf
 X
 X# For security reasons, locally embed/include function library at HA.shar build time
 X
@@ -6092,7 +6184,7 @@ X
 X###################### Start of embedded file: lib/init.sh
 X#!/bin/bash
 X#
-X# $Id: lib/init.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: lib/init.sh 3.2 2016-09-08 03:09:03 cmayer $
 X#
 X# init.sh
 X# contains functions to change user and run processes
@@ -6124,7 +6216,7 @@ X# runuser quoting is a definite PITA.  the way to stay sane is to note
 X# exactly when you want $ to be expanded and make that explicit, passing
 X# escaped $ signs when you want the expansion deferred
 X#
-X# finally, the bb_runuser function should return the pid
+X# finally, the bg_runuser function should return the pid
 X#
 Xif [ `id -un` == "$RUNUSER" ] ; then
 X	function bg_runuser {
@@ -6452,19 +6544,23 @@ X	echo appd controller not installed in $APPD_ROOT
 X	exit 1
 Xfi
 X
-XOPEN_FD_LIMIT=`dbcnf_get open_files_limit`
-Xif [ "$OPEN_FD_LIMIT" -lt 65536 ]; then
-X	OPEN_FD_LIMIT=65536
-Xfi
-X
 X#
 X# if the numa settings file exists, then disable transparent huge pages
 X#
 Xfunction do_numa_settings {
-X	if [ -f $APPD_ROOT/HA/numa.settings ] ; then
-X		echo never >/sys/kernel/mm/transparent_hugepage/defrag
-X		echo never >/sys/kernel/mm/transparent_hugepage/enabled
+X	if [ ! -f $APPD_ROOT/HA/numa.settings ] ; then
+X		return
 X	fi
+X
+X	for dir in /sys/kernel/mm/transparent_hugepage \
+X		/sys/kernel/mm/redhat_transparent_hugepage ; do
+X		if [ -f $dir/enabled ] ; then
+X			echo "never" > $dir/enabled
+X		fi
+X		if [ -f $dir/defrag ] ; then
+X			echo "never" > $dir/defrag
+X		fi
+X	done
 X}
 X
 X#
@@ -6483,36 +6579,52 @@ X#
 XENABLE_HUGE_PAGES="false"
 XHUGE_PAGE_SIZE_BYTES=`awk '/Hugepagesize:/{print $2*1024}' /proc/meminfo`
 X
-Xif [ -f $APPD_ROOT/HA/LARGE_PAGES_ENABLE ] ; then
+Xif [ -f $APPD_ROOT/HA/LARGE_PAGES_ENABLE -a -n "$HUGE_PAGE_SIZE_BYTES" ] ; then
 X	ENABLE_HUGE_PAGES="true"
 Xfi
 X
 Xlockfile=/var/lock/subsys/$NAME
 X[ -d /var/lock/subsys ] || mkdir /var/lock/subsys
 X
+X#
+X# set appropriate limits for the appd user
+X#
+Xfunction set_limits {
 X
-Xfunction enable_pam_limits {
-X	if [ -f /etc/pam.d/common-session ] && \
-X		! grep  -Eq "^[\t ]*session[\t ]+required[\t ]+pam_limits\.so" /etc/pam.d/common-session ; then
-X		echo "session required	pam_limits.so" >> /etc/pam.d/common-session
-X	elif [ -f /etc/pam.d/system-auth ] && \
-X		! grep  -Eq "^[\t ]*session[\t ]+required[\t ]+pam_limits\.so" /etc/pam.d/system-auth ; then
-X		echo "session required	pam_limits.so" >> /etc/pam.d/system-auth
+X	FD_LIMIT=`dbcnf_get open_files_limit`
+X	if [ "$FD_LIMIT" -lt 65536 ]; then
+X		FD_LIMIT=65536
 X	fi
-X}
 X
-X# always make sure this gets called before any other functions that modify
-X# /etc/security/limits.d/appdynamics.com, i.e. reserve_memory
-Xfunction set_open_fd_limits {
-X	if [ "$RUNUSER" == "root" ] && [[ `ulimit -S -n` -lt $OPEN_FD_LIMIT ]]
-X		then
-X		ulimit -n $OPEN_FD_LIMIT
-X	elif [[ `su -s /bin/bash -c "ulimit -S -n" $RUNUSER` -lt "$OPEN_FD_LIMIT" ]]
-X		then
-X		echo "$RUNUSER  soft  nofile $OPEN_FD_LIMIT" > /etc/security/limits.d/appdynamics.conf
-X		echo "$RUNUSER  hard  nofile $OPEN_FD_LIMIT" >> /etc/security/limits.d/appdynamics.conf
-X		enable_pam_limits
+X	if [ "$RUNUSER" == "root" ] ; then
+X		if [ `ulimit -S -n` -lt $FD_LIMIT ] ; then
+X			ulimit -n $FD_LIMIT
+X		fi
+X		if $ENABLE_HUGE_PAGES ; then
+X			ulimit -l unlimited
+X		fi
+X		return
 X	fi
+X
+X	if [ `runuser ulimit -S -n` -lt "$FD_LIMIT" ] ; then
+X		echo "$RUNUSER  soft  nofile $FD_LIMIT" > $LIMITS
+X		echo "$RUNUSER  hard  nofile $FD_LIMIT" >> $LIMITS
+X	fi
+X
+X	if $ENABLE_HUGE_PAGES && [ `runuser ulimit -l` != "unlimited" ] ; then
+X		echo "$RUNUSER  soft  memlock  unlimited" >> $LIMITS
+X		echo "$RUNUSER  hard  memlock  unlimited" >> $LIMITS
+X	fi
+X
+X	for pam in /etc/pam.d/common-session /etc/pam.d/system-auth ; do
+X		if [ ! -f $pam ] ; then 
+X			continue
+X		fi
+X		if grep -Eq "^\s*session\s+required\s+pam_limits\.so" $pam ; then
+X			echo "session required	pam_limits.so" >> $pam
+X			break
+X		fi
+X	done
 X}
 X
 Xfunction db_running {
@@ -6542,6 +6654,9 @@ X	echo select value from global_configuration_local \
 X			where "name='appserver.mode'" | runuser $MYSQLCLIENT | get value
 X}
 X
+X#
+X# if the lockfile is older than uptime, we crashed
+X#
 Xfunction host_crash {
 X	local lockfile_age=$(($(date +%s)-$(ls -l --time-style=+%s $lockfile | cut -d \  -f 6)))
 X	local uptime=$(printf '%.0f\n' $(cat /proc/uptime | cut -d \  -f 1))
@@ -6553,7 +6668,7 @@ X	# multiply by 1.05 and round to account for extra 2% allocation overhead +
 X	#  headroom
 X	CONTROLLER_HEAP=`domain_get_jvm_option Xmx | scale 1.04`
 X		
-X	#Parse controller JVM OPTIONS to get MaxPermSize
+X	# Parse controller JVM OPTIONS to get MaxPermSize
 X	CONTROLLER_MAXPERMSIZE=`domain_get_jvm_option MaxPermSize | scale`
 X
 X	# multiplying by 1.1 and rounding in awk to account for the extra
@@ -6564,11 +6679,11 @@ X
 X	# multiply by 1.05 and round to account for extra 2% allocation overhead +
 X	#  headroom
 X	EVENTS_HEAP=`runuser \
-X		awk -F= "'/^\s*EVENTS_HEAP_SETTINGS=/{ print \$2 }'" \
+X		awk -F= "'/^\s*EVENTS_HEAP_SETTINGS=/ { print \$2 }'" \
 X			$APPD_ROOT/bin/controller.sh | \
 X		sed -e 's/ /\n/g' | get_jvm_option Xmx | scale 1.05`
 X	
-X	if [ -z "$EVENTS_HEAP" ] ; then
+X	if [ -z "$EVENTS_HEAP" -a -f $EVENTS_VMOPTIONS_FILE ] ; then
 X		EVENTS_HEAP=`runuser cat $EVENTS_VMOPTIONS_FILE \
 X			| get_jvm_option Xmx | scale 1.05`
 X	fi
@@ -6579,244 +6694,153 @@ X	fi
 X		
 X	# Parse events service JVM options for MaxPermSize.  
 X	# Default to 64M if not set
-X	EVENTS_MAXPERMSIZE=`runuser cat $EVENTS_VMOPTIONS_FILE | \
-X		get_jvm_option MaxPermSize | scale 1.05`
-X		
-X	if [ -n "$EVENTS_MAXPERMSIZE" ] && [ "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
+X	if [ -f $EVENTS_VMOPTIONS_FILE ] ; then
+X		EVENTS_MAXPERMSIZE=`runuser cat $EVENTS_VMOPTIONS_FILE | \
+X			get_jvm_option MaxPermSize | scale 1.05`
+X	fi
+X	
+X	if [ -n "$EVENTS_MAXPERMSIZE" -a "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
 X		# Java permsize defaults to 64MiB
 X		EVENTS_MAXPERMSIZE=67108864
 X	fi
 X	
-X	((APPD_TOTAL_RESERVED_BYTES=\
-XCONTROLLER_HEAP+\
-XCONTROLLER_MAXPERMSIZE+\
-XINNODB_BUFFER_POOL+\
-XINNODB_ADDITIONAL_MEM+\
-XEVENTS_HEAP+\
-XEVENTS_MAXPERMSIZE))
+X	(( APPD_TOTAL_RESERVED_BYTES = \
+X		CONTROLLER_HEAP + \
+X		CONTROLLER_MAXPERMSIZE + \
+X		INNODB_BUFFER_POOL + \
+X		INNODB_ADDITIONAL_MEM + \
+X		EVENTS_HEAP + \
+X		EVENTS_MAXPERMSIZE ))
 X	
-X	((APPD_HUGE_PAGES=APPD_TOTAL_RESERVED_BYTES/HUGE_PAGE_SIZE_BYTES))
-X	if [ $((APPD_TOTAL_RESERVED_BYTES%HUGE_PAGE_SIZE_BYTES)) -gt 0 ]
-X		then
-X		# Round up
-X		((APPD_HUGE_PAGES++))
+X	(( APPD_HUGE_PAGES = APPD_TOTAL_RESERVED_BYTES / HUGE_PAGE_SIZE_BYTES ))
+X	# Round up
+X	if [ $(( APPD_TOTAL_RESERVED_BYTES % HUGE_PAGE_SIZE_BYTES )) -gt 0 ] ; then
+X		(( APPD_HUGE_PAGES++ ))
 X	fi
 X	
 X	PAGE_SIZE_BYTES=`getconf PAGE_SIZE`
-X}
-X
-X#
-X# Explicitly reserve memory for major controller components
-X#
-Xfunction reserve_memory {
-X	# set swappiness to 1 after (CORE-68175):
-X	# https://www.percona.com/blog/2014/04/28/oom-relation-vm-swappiness0-new-kernel/
-X	# and
-X	# https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Performance_Tuning_Guide/s-memory-tunables.html
-X	echo 1 > /proc/sys/vm/swappiness
-X	
-X	calculate_memory
 X
 X	#
 X	# If zfs is running on this host
 X	# Carve room for controller heap, innodb_buffer_pool_size and
 X	# innodb_additional_mem_pool_size.  Leave 20% system RAM uncommitted.
 X	#
+X	TOTAL_RESERVABLE_MEM=`free -b | awk '/Mem:/ { printf("%.0f\n", $2 * 0.8)}'`
 X
-X	TOTAL_RESERVABLE_MEM=`free -b | awk '/Mem:/{RESERVABLE_MEM=$2*0.8; printf("%.0f\n", RESERVABLE_MEM)}'`
-X	(( REQ_ZFS_ARC_MAX=TOTAL_RESERVABLE_MEM-APPD_TOTAL_RESERVED_BYTES ))
+X	(( REQ_ZFS_ARC_MAX = TOTAL_RESERVABLE_MEM - APPD_TOTAL_RESERVED_BYTES ))
+X}
+X
+X#
+X# change a memory allocation
+X#
+Xfunction increment {
+X	local resourcefile=$1
+X	local amount=$2
+X	echo `cat $resourcefile` + $APPD_HUGE_PAGES | bc > $resourcefile
+X}
+X
+X#
+X# Explicitly reserve memory for major controller components
+X#
+Xfunction reserve_memory {
+X	echo 1 > /proc/sys/vm/swappiness
+X	
+X	calculate_memory
+X
 X	# warn if heap plus innodb_buffer_pool_size is greater than available RAM
 X	if [ "$REQ_ZFS_ARC_MAX" -lt "0" ] ; then
-X		echo "\
-X$NAME: Warning!  Controller Heap + innodb_buffer_pool_size
-X+ innodb_additional_mem_pool_size, ($APPD_TOTAL_RESERVED_BYTES bytes), greater
-Xthan reservable system RAM, ($TOTAL_RESERVABLE_MEM bytes)."
+X		echo "$NAME: Warning!  controller memory $APPD_TOTAL_RESERVED_BYTES \
+X			exceeds available memory $TOTAL_RESERVABLE_MEM"
 X	else
 X		if zpool list >/dev/null 2>&1 ; then 
 X			ZFS_ARC_MAX=`cat /sys/module/zfs/parameters/zfs_arc_max`
-X			if ([ "$ZFS_ARC_MAX" -eq "0" ] || [ "$ZFS_ARC_MAX" -gt "$REQ_ZFS_ARC_MAX" ]) ; then
+X			if [ "$ZFS_ARC_MAX" -eq "0" -o "$ZFS_ARC_MAX" -gt "$REQ_ZFS_ARC_MAX" ] ; then
 X				echo $REQ_ZFS_ARC_MAX > /sys/module/zfs/parameters/zfs_arc_max
 X			fi
 X		fi
 X	fi
 X	
-X	# If huge pages are supported and enabled.
-X	if [ -n "$HUGE_PAGE_SIZE_BYTES" ] && [ "$ENABLE_HUGE_PAGES" == "true" ]
-X		then
-X		local SHMMAX_MAX
-X		local SHMALL_MAX
-X		if [[ `uname -m` == "x86_64" ]]
-X			then
-X			SHMMAX_MAX=`echo "2^64 - 16777217" | bc`
-X		else
-X			SHMMAX_MAX=`echo "2^32 - 16777217" | bc`
-X		fi
-X		SHMALL_MAX=$SHMMAX_MAX
-X		
-X	  	# Explicitly allocate and enable huge pages for the controller's
-X		# java and mysql processes
-X		
-X		echo $(($(cat /proc/sys/vm/nr_hugepages)+APPD_HUGE_PAGES)) > /proc/sys/vm/nr_hugepages
+X	#
+X	# unconditionally disable controller MySQL and Java huge page support
+X	# we re-enable it below.   much cleaner code
+X	#
+X	dbcnf_unset large-pages
+X	domain_unset_jvm_option +UseLargePages
+X	domain_unset_jvm_option LargePageSizeInBytes
 X
-X		# Allow the AppDynamics user to access the huge pages we're allocating.
-X		if ! id -G $RUNUSER | grep -wq `cat /proc/sys/vm/hugetlb_shm_group`
-X			then
-X			echo $(id -g $RUNUSER) > /proc/sys/vm/hugetlb_shm_group
-X		fi
-X		
-X		#check/set shmmax
-X		#use bc to handle unsigned 64-bit unsigned integers
-X		((APPD_SHMMAX=APPD_HUGE_PAGES*HUGE_PAGE_SIZE_BYTES))
-X		local PROC_SHMMAX=$(cat /proc/sys/kernel/shmmax)
-X		[[ $(echo "$PROC_SHMMAX < $SHMMAX_MAX"|bc) == "1" ]] \
-X			&& echo "shmmax = $PROC_SHMMAX+$APPD_SHMMAX; \
-X			if (shmmax > $SHMMAX_MAX) shmmax=$SHMMAX_MAX; print shmmax;"\
-X				| bc > /proc/sys/kernel/shmmax
-X
-X		#check/set shmmall
-X		#use bc to handle unsigned 64-bit unsigned integers
-X		((APPD_SHMALL=APPD_SHMMAX/PAGE_SIZE_BYTES))
-X		local PROC_SHMALL=$(cat /proc/sys/kernel/shmall)
-X		[[ $(echo "$PROC_SHMALL < $SHMALL_MAX"|bc) == "1" ]] \
-X			&& echo "shmall = $PROC_SHMALL+$APPD_SHMALL; \
-X			if(shmall > $SHMALL_MAX) shmall=$SHMALL_MAX; print shmall;" \
-X				| bc > /proc/sys/kernel/shmall
-X	
-X		# check/set unlimited memlock limit for $RUNUSER
-X		if [[ $RUNUSER == "root" ]]
-X			then
-X			ulimit -l unlimited
-X		else
-X			if [[ $(su -s /bin/bash -c "ulimit -l" $RUNUSER) != "unlimited" ]]
-X				then
-X				echo "$RUNUSER  soft  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-X				echo "$RUNUSER  hard  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-X			fi
-X		fi
-X		
-X		dbcnf_set large_pages ""
-X		
-X		# check/tweak domain.xml
-X
-X		domain_set_jvm_option +UseLargePages
-X		domain_set_jvm_option LargePageSizeInBytes $HUGE_PAGE_SIZE_BYTES
-X		
-X		# XXX
-X		# check / tweak events service settings
-X		if ! runuser cat $EVENTS_VMOPTIONS_FILE | \
-X			grep -q "\-XX:+UseLargePages" ; then
-X			runuser ex -s $EVENTS_VMOPTIONS_FILE <<- EVENTS_LARGE_PAGES
-X				a
-X				-XX:+UseLargePages 
-X				-XX:LargePageSizeInBytes=$HUGE_PAGE_SIZE_BYTES
-X				.
-X				wq
-X			EVENTS_LARGE_PAGES
-X		# simplify the awk-fu below...
-X		elif [[ `( runuser cat $EVENTS_VMOPTIONS_FILE ) \
-X			| awk -F= '/^[\t ]*-XX:LargePageSizeInBytes=/{
-X				if(sub(/[k,K]$/,"",$2)==1){ 
-X					BYTES=$2*1024 
-X				}
-X				else if(sub(/[m,M]$/,"",$2)==1){ 
-X					BYTES=$2*1048576 
-X				}
-X				else if(sub(/[g,G]$/,"",$2)==1){ 
-X					BYTES=$2*1073741824 
-X				} else { 
-X					gsub(/[^0-9]/,"",$2) 
-X					BYTES=$2
-X				} 
-X				print BYTES; 
-X				exit;
-X			}'` != "$HUGE_PAGE_SIZE_BYTES" ]] ; then
-X			#update large page size
-X			runuser ex -s $EVENTS_VMOPTIONS_FILE <<- ADJUST_EVENT_LARGE_PAGE_SIZE
-X				%s/-XX:LargePageSizeInBytes=[1-9][0-9]*[k,K,m,M,g,G]\?/-XX:LargePageSizeInBytes=$HUGE_PAGE_SIZE_BYTES/g
-X				wq
-X			ADJUST_EVENT_LARGE_PAGE_SIZE
-X		fi
-X	else
-X		# disable controller MySQL and Java huge page support
-X		dbcnf_unset large-pages
-X		domain_unset_jvm_option +UseLargePages
-X		domain_unset_jvm_option LargePageSizeInBytes
-X
-X		# remove events service large pages config from controller.sh
-X		if ( runuser cat $EVENTS_VMOPTIONS_FILE ) \
-X			 | grep -q "^[\t ]*\-XX:+UseLargePages[\t ]*" ; then
-X			runuser ex -s $EVENTS_VMOPTIONS_FILE <<- DELETE_EVENTS_LARGE_PAGES
-X				%s/^[\t ]*-XX:+UseLargePages[\t ]*\n//g
-X				%s/^[\t ]*-XX:LargePageSizeInBytes=.*\n//g
-X				wq
-X			DELETE_EVENTS_LARGE_PAGES
-X		fi
+X	# remove events service large pages config from controller.sh
+X	if [ -f $EVENTS_VMOPTIONS_FILE ] ; then
+X		runuser ex -s $EVENTS_VMOPTIONS_FILE <<- DELETE_EVENTS_LARGE_PAGES
+X			%s/^[\t ]*-XX:+UseLargePages[\t ]*\n//g
+X			%s/^[\t ]*-XX:LargePageSizeInBytes=.*\n//g
+X			wq
+X		DELETE_EVENTS_LARGE_PAGES
 X	fi
-X	# XXX
+X
+X	#
+X	# If huge pages are supported and enabled,
+X	# Explicitly allocate and enable huge pages 
+X	# for the controller's java and mysql processes
+X	#
+X	if ! $ENABLE_HUGE_PAGES ; then
+X		return
+X	fi
+X	
+X	increment /proc/sys/vm/nf_hugepages $APPD_HUGE_PAGES
+X
+X	# Allow the AppDynamics user to access the huge pages we're allocating.
+X	if ! id -G $RUNUSER | grep -wq /proc/sys/vm/hugetlb_shm_group ; then
+X		echo $(id -g $RUNUSER) > /proc/sys/vm/hugetlb_shm_group
+X	fi
+X		
+X	# this code will break if we try to allocate 2 ^ 64 memory. let it.
+X	(( APPD_SHMMAX = APPD_HUGE_PAGES * HUGE_PAGE_SIZE_BYTES))
+X
+X	increment /proc/sys/kernel/shmmax $APPD_SHMMAX
+X	increment /proc/sys/kernel/shmall $APPD_SHMMAX
+X
+X	dbcnf_set large_pages ""
+X		
+X	domain_set_jvm_option +UseLargePages
+X	domain_set_jvm_option LargePageSizeInBytes $HUGE_PAGE_SIZE_BYTES
+X		
+X	if [ -f $EVENTS_VMOPTIONS_FILE ] ; then
+X		runuser ex -s $EVENTS_VMOPTIONS_FILE <<- EVENTS_LARGE_PAGES
+X			a
+X			-XX:+UseLargePages 
+X			-XX:LargePageSizeInBytes=$HUGE_PAGE_SIZE_BYTES
+X			.
+X			wq
+X		EVENTS_LARGE_PAGES
+X	fi
 X}
 X
 Xfunction unreserve_memory {
-X	# If huge pages are supported and enabled.
-X	if [ -n "$HUGE_PAGE_SIZE_BYTES" ] && [ "$ENABLE_HUGE_PAGES" == "true" ]
-X		then
-X		calculate_memory
-X		local SHMMAX_MAX
-X		local SHMALL_MAX
-X		if [[ `uname -m` == "x86_64" ]]
-X			then
-X			SHMMAX_MAX=`echo "2^64 - 16777217" | bc`
-X		else
-X			SHMMAX_MAX=`echo "2^32 - 16777217" | bc`
-X		fi
-X		SHMALL_MAX=$SHMMAX_MAX
-X		
-X	  	# Explicitly allocate and enable huge pages for the controller's
-X		# java and mysql processes
-X		
-X		echo $(($(cat /proc/sys/vm/nr_hugepages)-APPD_HUGE_PAGES)) > /proc/sys/vm/nr_hugepages
-X		
-X		#check/set shmmax
-X		#use bc to handle unsigned 64-bit unsigned integers
-X		((APPD_SHMMAX=APPD_HUGE_PAGES*HUGE_PAGE_SIZE_BYTES))
-X		local PROC_SHMMAX=$(cat /proc/sys/kernel/shmmax)
-X		[[ $(echo "$PROC_SHMMAX < $SHMMAX_MAX"|bc) == "1" ]] \
-X			&& echo "shmmax = $PROC_SHMMAX-$APPD_SHMMAX; \
-X			if (shmmax > $SHMMAX_MAX) shmmax=$SHMMAX_MAX; print shmmax;"\
-X				| bc > /proc/sys/kernel/shmmax
-X
-X		#check/set shmmall
-X		#use bc to handle unsigned 64-bit unsigned integers
-X		((APPD_SHMALL=APPD_SHMMAX/PAGE_SIZE_BYTES))
-X		local PROC_SHMALL=$(cat /proc/sys/kernel/shmall)
-X		[[ $(echo "$PROC_SHMALL < $SHMALL_MAX"|bc) == "1" ]] \
-X			&& echo "shmall = $PROC_SHMALL-$APPD_SHMALL; \
-X			if(shmall > $SHMALL_MAX) shmall=$SHMALL_MAX; print shmall;" \
-X				| bc > /proc/sys/kernel/shmall
+X	if ! $ENABLE_HUGE_PAGES ; then
+X		return
 X	fi
+X	calculate_memory
+X	increment /proc/sys/vm/nr_hugepages -$APPD_HUGE_PAGES
+X	increment /proc/sys/kernel/shmmax -$APPD_SHMMAX
+X	increment /proc/sys/kernel/shmall -$APPD_SHMMAX
 X}
 X
 Xcase "$1" in  
 Xstart)  
 X	require_root
-X	# conditionally run reserve_memory
-X	# if no lockfile or host crash (stale lockfile precedes last startup): reserve memory
-X	# mysql crashed or shut down outside of intit: stale lockfile that is younger than last boot: noop
-X	# mysql already running: noop
+X
 X	do_numa_settings
+X	set_limits
+X
+X	#
+X	# we only run reserve_memory
+X	# if no lockfile or stale lockfile precedes last startup (crash?)
+X	# we do not reserve memory if
+X	# a) mysql crashed or shut down outside of init: 
+X	# b) stale lockfile that is younger than last boot
+X	# c) mysql already running
+X	#
 X	if ! db_running ; then
-X		set_open_fd_limits
-X		# if numa settings, then we need to disable transparent huge pages
-X		if [ -f $APPD_ROOT/HA/numa.settings ] ; then
-X			for dir in /sys/kernel/mm/transparent_hugepage \
-X				/sys/kernel/mm/redhat_transparent_hugepage ; do
-X				if [ -f $dir/enabled ] ; then
-X					echo "never" > $dir/enabled
-X				fi
-X				if [ -f $dir/defrag ] ; then
-X					echo "never" > $dir/defrag
-X				fi
-X			done
-X		fi
 X		if ! [ -f $lockfile ] || host_crash ; then
 X			reserve_memory
 X		fi
@@ -7317,7 +7341,7 @@ echo x - lib/ha.sh
 sed 's/^X//' >lib/ha.sh << 'END-of-lib/ha.sh'
 X#!/bin/bash
 X#
-X# $Id: lib/ha.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+X# $Id: lib/ha.sh 3.2 2016-09-08 13:40:17 cmayer $
 X#
 X# ha.sh
 X# contains common code used by the HA toolkit
@@ -7407,6 +7431,7 @@ X	getpw __inpw1 || exit 1		# updates __inpw1 *ONLY* if global variable
 X	obf=$(obfuscate $__inpw1) || exit 1
 X	echo $obf > $rootpw_obf || err "$thisfn: failed to save obfuscated passwd to $rootpw_obf"
 X	chmod 600 $rootpw_obf || warn "$thisfn: failed to make $rootpw_obf readonly"
+X	chown $RUNUSER $rootpw_obf
 X}
 X
 X#
@@ -7475,7 +7500,12 @@ X#
 X# locate a machine agent install directory and print out it's path
 X#
 Xfunction find_machine_agent {
-X	find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print | head -1 | sed "s,/[^/]*$,,"
+X	relpath=`find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print 2>/dev/null | head -1 | sed "s,/[^/]*$,,"`
+X	if [ -n "$relpath" ] ; then
+X		(cd $relpath ; pwd -P)
+X	else
+X		echo ""
+X	fi
 X}
 X
 END-of-lib/ha.sh
@@ -7646,7 +7676,7 @@ echo x - lib/log.sh
 sed 's/^X//' >lib/log.sh << 'END-of-lib/log.sh'
 X#!/bin/bash
 X#
-X# $Id: lib/log.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: lib/log.sh 3.2 2016-09-08 03:09:03 cmayer $
 X#
 X# logging code for the HA toolkit - include this first
 X#
@@ -7666,8 +7696,10 @@ X#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 X#   See the License for the specific language governing permissions and
 X#   limitations under the License.
 X#
+X#
 Xif [ -z "$APPD_ROOT" ] ; then
-X	APPD_ROOT=$( cd $(dirname "$0"); cd .. ; pwd -P)
+X	# let's assume that whoever is calling us has cd'd to the HA directory
+X	APPD_ROOT=$( cd .. ; pwd -P)
 Xfi
 X
 X#
@@ -7681,7 +7713,7 @@ XLOGFILE=$APPD_ROOT/logs/$LOGNAME
 X
 Xfunction log {
 X	local out=/dev/tty
-X	if ! [ -c $out ] ; then
+X	if ! tty -s ; then
 X		out=/dev/null
 X	fi
 X
@@ -7694,7 +7726,7 @@ X}
 X
 Xfunction gripe {
 X	local out=/dev/tty
-X	if ! [ -c $out ] ; then
+X	if ! tty -s ; then
 X		out=/dev/null
 X	fi
 X
@@ -7707,7 +7739,7 @@ X}
 X
 Xfunction message {
 X	local out=/dev/tty
-X	if ! [ -c $out ] ; then
+X	if ! tty -s ; then
 X		out=/dev/null
 X	fi
 X
@@ -8060,7 +8092,7 @@ echo x - lib/init.sh
 sed 's/^X//' >lib/init.sh << 'END-of-lib/init.sh'
 X#!/bin/bash
 X#
-X# $Id: lib/init.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: lib/init.sh 3.2 2016-09-08 03:09:03 cmayer $
 X#
 X# init.sh
 X# contains functions to change user and run processes
@@ -8092,7 +8124,7 @@ X# runuser quoting is a definite PITA.  the way to stay sane is to note
 X# exactly when you want $ to be expanded and make that explicit, passing
 X# escaped $ signs when you want the expansion deferred
 X#
-X# finally, the bb_runuser function should return the pid
+X# finally, the bg_runuser function should return the pid
 X#
 Xif [ `id -un` == "$RUNUSER" ] ; then
 X	function bg_runuser {

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: mysqlclient.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+# $Id: mysqlclient.sh 3.2 2016-09-08 13:40:17 cmayer $
 #
 # trivial command that executes sql for us.  this is intended
 # to be invoked from an init script via runuser, so we can log
@@ -32,8 +32,31 @@ LOGNAME=mysqlclient.log
 . lib/password.sh
 . lib/sql.sh
 
+terminal=false
 if [ -t 0 ] ; then
-	$MYSQL --host=localhost "${CONNECT[@]}" controller
+	terminal=true
+fi
+mysqlopts=-EB
+
+while getopts ct flag; do
+	case $flag in
+	t)
+		terminal=true
+		;;
+	c)
+		mysqlopts=
+		;;
+	*)
+		echo "usage: $0 <options>"
+		echo "    [ -t ] interactive"
+		echo "    [ -c ] compatible with controller-sh login-db"
+		exit 0
+		;;
+	esac
+done
+
+if $terminal ; then
+	$MYSQL -A --host=localhost "${CONNECT[@]}" controller
 	exit 0
 fi
 
@@ -41,7 +64,7 @@ SQL=/tmp/mysqlclient.$$.sql
 RESULT=/tmp/mysqlclient.$$.result
 
 cat > $SQL
-$MYSQL -EB --host=localhost "${CONNECT[@]}" controller 2>> $LOGFILE 1> $RESULT < $SQL
+$MYSQL $mysqlopts --host=localhost "${CONNECT[@]}" controller 2>> $LOGFILE 1> $RESULT < $SQL
 
 if [ -f $APPD_ROOT/HA/LOG_SQL ] ; then
 	echo "mysqlclient: " `date` >> $LOGFILE

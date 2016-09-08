@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: appdcontroller-db.sh 3.2 2016-09-08 03:09:03 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -44,6 +44,10 @@ PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 NAME=$(basename $(readlink -e $0))
 
+# uncomment for debug logging
+#exec 2> /tmp/$NAME.out
+#set -x
+
 APPD_ROOT=/opt/AppDynamics/Controller
 RUNUSER=root
 
@@ -54,7 +58,10 @@ RUNUSER=root
 APPD_BIN="$APPD_ROOT/bin"
 DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 EVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/conf/events-service.vmoptions
-[[ -r $EVENTS_VMOPTIONS_FILE ]] || EVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/analytics-processor/conf/analytics-processor.vmoptions
+if [ ! -f $EVENTS_VMOPTIONS_FILE ] ; then
+	EVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/analytics-processor/conf/analytics-processor.vmoptions
+fi
+LIMITS=/etc/security/limits.d/appdynamics.conf
 
 # For security reasons, locally embed/include function library at HA.shar build time
 embed lib/password.sh
@@ -74,19 +81,23 @@ if runuser [ ! -f $APPD_ROOT/db/db.cnf ] ; then
 	exit 1
 fi
 
-OPEN_FD_LIMIT=`dbcnf_get open_files_limit`
-if [ "$OPEN_FD_LIMIT" -lt 65536 ]; then
-	OPEN_FD_LIMIT=65536
-fi
-
 #
 # if the numa settings file exists, then disable transparent huge pages
 #
 function do_numa_settings {
-	if [ -f $APPD_ROOT/HA/numa.settings ] ; then
-		echo never >/sys/kernel/mm/transparent_hugepage/defrag
-		echo never >/sys/kernel/mm/transparent_hugepage/enabled
+	if [ ! -f $APPD_ROOT/HA/numa.settings ] ; then
+		return
 	fi
+
+	for dir in /sys/kernel/mm/transparent_hugepage \
+		/sys/kernel/mm/redhat_transparent_hugepage ; do
+		if [ -f $dir/enabled ] ; then
+			echo "never" > $dir/enabled
+		fi
+		if [ -f $dir/defrag ] ; then
+			echo "never" > $dir/defrag
+		fi
+	done
 }
 
 #
@@ -105,36 +116,52 @@ function do_numa_settings {
 ENABLE_HUGE_PAGES="false"
 HUGE_PAGE_SIZE_BYTES=`awk '/Hugepagesize:/{print $2*1024}' /proc/meminfo`
 
-if [ -f $APPD_ROOT/HA/LARGE_PAGES_ENABLE ] ; then
+if [ -f $APPD_ROOT/HA/LARGE_PAGES_ENABLE -a -n "$HUGE_PAGE_SIZE_BYTES" ] ; then
 	ENABLE_HUGE_PAGES="true"
 fi
 
 lockfile=/var/lock/subsys/$NAME
 [ -d /var/lock/subsys ] || mkdir /var/lock/subsys
 
+#
+# set appropriate limits for the appd user
+#
+function set_limits {
 
-function enable_pam_limits {
-	if [ -f /etc/pam.d/common-session ] && \
-		! grep  -Eq "^[\t ]*session[\t ]+required[\t ]+pam_limits\.so" /etc/pam.d/common-session ; then
-		echo "session required	pam_limits.so" >> /etc/pam.d/common-session
-	elif [ -f /etc/pam.d/system-auth ] && \
-		! grep  -Eq "^[\t ]*session[\t ]+required[\t ]+pam_limits\.so" /etc/pam.d/system-auth ; then
-		echo "session required	pam_limits.so" >> /etc/pam.d/system-auth
+	FD_LIMIT=`dbcnf_get open_files_limit`
+	if [ "$FD_LIMIT" -lt 65536 ]; then
+		FD_LIMIT=65536
 	fi
-}
 
-# always make sure this gets called before any other functions that modify
-# /etc/security/limits.d/appdynamics.com, i.e. reserve_memory
-function set_open_fd_limits {
-	if [ "$RUNUSER" == "root" ] && [[ `ulimit -S -n` -lt $OPEN_FD_LIMIT ]]
-		then
-		ulimit -n $OPEN_FD_LIMIT
-	elif [[ `su -s /bin/bash -c "ulimit -S -n" $RUNUSER` -lt "$OPEN_FD_LIMIT" ]]
-		then
-		echo "$RUNUSER  soft  nofile $OPEN_FD_LIMIT" > /etc/security/limits.d/appdynamics.conf
-		echo "$RUNUSER  hard  nofile $OPEN_FD_LIMIT" >> /etc/security/limits.d/appdynamics.conf
-		enable_pam_limits
+	if [ "$RUNUSER" == "root" ] ; then
+		if [ `ulimit -S -n` -lt $FD_LIMIT ] ; then
+			ulimit -n $FD_LIMIT
+		fi
+		if $ENABLE_HUGE_PAGES ; then
+			ulimit -l unlimited
+		fi
+		return
 	fi
+
+	if [ `runuser ulimit -S -n` -lt "$FD_LIMIT" ] ; then
+		echo "$RUNUSER  soft  nofile $FD_LIMIT" > $LIMITS
+		echo "$RUNUSER  hard  nofile $FD_LIMIT" >> $LIMITS
+	fi
+
+	if $ENABLE_HUGE_PAGES && [ `runuser ulimit -l` != "unlimited" ] ; then
+		echo "$RUNUSER  soft  memlock  unlimited" >> $LIMITS
+		echo "$RUNUSER  hard  memlock  unlimited" >> $LIMITS
+	fi
+
+	for pam in /etc/pam.d/common-session /etc/pam.d/system-auth ; do
+		if [ ! -f $pam ] ; then 
+			continue
+		fi
+		if grep -Eq "^\s*session\s+required\s+pam_limits\.so" $pam ; then
+			echo "session required	pam_limits.so" >> $pam
+			break
+		fi
+	done
 }
 
 function db_running {
@@ -164,6 +191,9 @@ function controller_mode {
 			where "name='appserver.mode'" | runuser $MYSQLCLIENT | get value
 }
 
+#
+# if the lockfile is older than uptime, we crashed
+#
 function host_crash {
 	local lockfile_age=$(($(date +%s)-$(ls -l --time-style=+%s $lockfile | cut -d \  -f 6)))
 	local uptime=$(printf '%.0f\n' $(cat /proc/uptime | cut -d \  -f 1))
@@ -175,7 +205,7 @@ function calculate_memory {
 	#  headroom
 	CONTROLLER_HEAP=`domain_get_jvm_option Xmx | scale 1.04`
 		
-	#Parse controller JVM OPTIONS to get MaxPermSize
+	# Parse controller JVM OPTIONS to get MaxPermSize
 	CONTROLLER_MAXPERMSIZE=`domain_get_jvm_option MaxPermSize | scale`
 
 	# multiplying by 1.1 and rounding in awk to account for the extra
@@ -186,11 +216,11 @@ function calculate_memory {
 	# multiply by 1.05 and round to account for extra 2% allocation overhead +
 	#  headroom
 	EVENTS_HEAP=`runuser \
-		awk -F= "'/^\s*EVENTS_HEAP_SETTINGS=/{ print \$2 }'" \
+		awk -F= "'/^\s*EVENTS_HEAP_SETTINGS=/ { print \$2 }'" \
 			$APPD_ROOT/bin/controller.sh | \
 		sed -e 's/ /\n/g' | get_jvm_option Xmx | scale 1.05`
 	
-	if [ -z "$EVENTS_HEAP" ] ; then
+	if [ -z "$EVENTS_HEAP" -a -f $EVENTS_VMOPTIONS_FILE ] ; then
 		EVENTS_HEAP=`runuser cat $EVENTS_VMOPTIONS_FILE \
 			| get_jvm_option Xmx | scale 1.05`
 	fi
@@ -201,244 +231,153 @@ function calculate_memory {
 		
 	# Parse events service JVM options for MaxPermSize.  
 	# Default to 64M if not set
-	EVENTS_MAXPERMSIZE=`runuser cat $EVENTS_VMOPTIONS_FILE | \
-		get_jvm_option MaxPermSize | scale 1.05`
-		
-	if [ -n "$EVENTS_MAXPERMSIZE" ] && [ "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
+	if [ -f $EVENTS_VMOPTIONS_FILE ] ; then
+		EVENTS_MAXPERMSIZE=`runuser cat $EVENTS_VMOPTIONS_FILE | \
+			get_jvm_option MaxPermSize | scale 1.05`
+	fi
+	
+	if [ -n "$EVENTS_MAXPERMSIZE" -a "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
 		# Java permsize defaults to 64MiB
 		EVENTS_MAXPERMSIZE=67108864
 	fi
 	
-	((APPD_TOTAL_RESERVED_BYTES=\
-CONTROLLER_HEAP+\
-CONTROLLER_MAXPERMSIZE+\
-INNODB_BUFFER_POOL+\
-INNODB_ADDITIONAL_MEM+\
-EVENTS_HEAP+\
-EVENTS_MAXPERMSIZE))
+	(( APPD_TOTAL_RESERVED_BYTES = \
+		CONTROLLER_HEAP + \
+		CONTROLLER_MAXPERMSIZE + \
+		INNODB_BUFFER_POOL + \
+		INNODB_ADDITIONAL_MEM + \
+		EVENTS_HEAP + \
+		EVENTS_MAXPERMSIZE ))
 	
-	((APPD_HUGE_PAGES=APPD_TOTAL_RESERVED_BYTES/HUGE_PAGE_SIZE_BYTES))
-	if [ $((APPD_TOTAL_RESERVED_BYTES%HUGE_PAGE_SIZE_BYTES)) -gt 0 ]
-		then
-		# Round up
-		((APPD_HUGE_PAGES++))
+	(( APPD_HUGE_PAGES = APPD_TOTAL_RESERVED_BYTES / HUGE_PAGE_SIZE_BYTES ))
+	# Round up
+	if [ $(( APPD_TOTAL_RESERVED_BYTES % HUGE_PAGE_SIZE_BYTES )) -gt 0 ] ; then
+		(( APPD_HUGE_PAGES++ ))
 	fi
 	
 	PAGE_SIZE_BYTES=`getconf PAGE_SIZE`
-}
-
-#
-# Explicitly reserve memory for major controller components
-#
-function reserve_memory {
-	# set swappiness to 1 after (CORE-68175):
-	# https://www.percona.com/blog/2014/04/28/oom-relation-vm-swappiness0-new-kernel/
-	# and
-	# https://access.redhat.com/documentation/en-US/Red_Hat_Enterprise_Linux/6/html/Performance_Tuning_Guide/s-memory-tunables.html
-	echo 1 > /proc/sys/vm/swappiness
-	
-	calculate_memory
 
 	#
 	# If zfs is running on this host
 	# Carve room for controller heap, innodb_buffer_pool_size and
 	# innodb_additional_mem_pool_size.  Leave 20% system RAM uncommitted.
 	#
+	TOTAL_RESERVABLE_MEM=`free -b | awk '/Mem:/ { printf("%.0f\n", $2 * 0.8)}'`
 
-	TOTAL_RESERVABLE_MEM=`free -b | awk '/Mem:/{RESERVABLE_MEM=$2*0.8; printf("%.0f\n", RESERVABLE_MEM)}'`
-	(( REQ_ZFS_ARC_MAX=TOTAL_RESERVABLE_MEM-APPD_TOTAL_RESERVED_BYTES ))
+	(( REQ_ZFS_ARC_MAX = TOTAL_RESERVABLE_MEM - APPD_TOTAL_RESERVED_BYTES ))
+}
+
+#
+# change a memory allocation
+#
+function increment {
+	local resourcefile=$1
+	local amount=$2
+	echo `cat $resourcefile` + $APPD_HUGE_PAGES | bc > $resourcefile
+}
+
+#
+# Explicitly reserve memory for major controller components
+#
+function reserve_memory {
+	echo 1 > /proc/sys/vm/swappiness
+	
+	calculate_memory
+
 	# warn if heap plus innodb_buffer_pool_size is greater than available RAM
 	if [ "$REQ_ZFS_ARC_MAX" -lt "0" ] ; then
-		echo "\
-$NAME: Warning!  Controller Heap + innodb_buffer_pool_size
-+ innodb_additional_mem_pool_size, ($APPD_TOTAL_RESERVED_BYTES bytes), greater
-than reservable system RAM, ($TOTAL_RESERVABLE_MEM bytes)."
+		echo "$NAME: Warning!  controller memory $APPD_TOTAL_RESERVED_BYTES \
+			exceeds available memory $TOTAL_RESERVABLE_MEM"
 	else
 		if zpool list >/dev/null 2>&1 ; then 
 			ZFS_ARC_MAX=`cat /sys/module/zfs/parameters/zfs_arc_max`
-			if ([ "$ZFS_ARC_MAX" -eq "0" ] || [ "$ZFS_ARC_MAX" -gt "$REQ_ZFS_ARC_MAX" ]) ; then
+			if [ "$ZFS_ARC_MAX" -eq "0" -o "$ZFS_ARC_MAX" -gt "$REQ_ZFS_ARC_MAX" ] ; then
 				echo $REQ_ZFS_ARC_MAX > /sys/module/zfs/parameters/zfs_arc_max
 			fi
 		fi
 	fi
 	
-	# If huge pages are supported and enabled.
-	if [ -n "$HUGE_PAGE_SIZE_BYTES" ] && [ "$ENABLE_HUGE_PAGES" == "true" ]
-		then
-		local SHMMAX_MAX
-		local SHMALL_MAX
-		if [[ `uname -m` == "x86_64" ]]
-			then
-			SHMMAX_MAX=`echo "2^64 - 16777217" | bc`
-		else
-			SHMMAX_MAX=`echo "2^32 - 16777217" | bc`
-		fi
-		SHMALL_MAX=$SHMMAX_MAX
-		
-	  	# Explicitly allocate and enable huge pages for the controller's
-		# java and mysql processes
-		
-		echo $(($(cat /proc/sys/vm/nr_hugepages)+APPD_HUGE_PAGES)) > /proc/sys/vm/nr_hugepages
+	#
+	# unconditionally disable controller MySQL and Java huge page support
+	# we re-enable it below.   much cleaner code
+	#
+	dbcnf_unset large-pages
+	domain_unset_jvm_option +UseLargePages
+	domain_unset_jvm_option LargePageSizeInBytes
 
-		# Allow the AppDynamics user to access the huge pages we're allocating.
-		if ! id -G $RUNUSER | grep -wq `cat /proc/sys/vm/hugetlb_shm_group`
-			then
-			echo $(id -g $RUNUSER) > /proc/sys/vm/hugetlb_shm_group
-		fi
-		
-		#check/set shmmax
-		#use bc to handle unsigned 64-bit unsigned integers
-		((APPD_SHMMAX=APPD_HUGE_PAGES*HUGE_PAGE_SIZE_BYTES))
-		local PROC_SHMMAX=$(cat /proc/sys/kernel/shmmax)
-		[[ $(echo "$PROC_SHMMAX < $SHMMAX_MAX"|bc) == "1" ]] \
-			&& echo "shmmax = $PROC_SHMMAX+$APPD_SHMMAX; \
-			if (shmmax > $SHMMAX_MAX) shmmax=$SHMMAX_MAX; print shmmax;"\
-				| bc > /proc/sys/kernel/shmmax
-
-		#check/set shmmall
-		#use bc to handle unsigned 64-bit unsigned integers
-		((APPD_SHMALL=APPD_SHMMAX/PAGE_SIZE_BYTES))
-		local PROC_SHMALL=$(cat /proc/sys/kernel/shmall)
-		[[ $(echo "$PROC_SHMALL < $SHMALL_MAX"|bc) == "1" ]] \
-			&& echo "shmall = $PROC_SHMALL+$APPD_SHMALL; \
-			if(shmall > $SHMALL_MAX) shmall=$SHMALL_MAX; print shmall;" \
-				| bc > /proc/sys/kernel/shmall
-	
-		# check/set unlimited memlock limit for $RUNUSER
-		if [[ $RUNUSER == "root" ]]
-			then
-			ulimit -l unlimited
-		else
-			if [[ $(su -s /bin/bash -c "ulimit -l" $RUNUSER) != "unlimited" ]]
-				then
-				echo "$RUNUSER  soft  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-				echo "$RUNUSER  hard  memlock  unlimited" >> /etc/security/limits.d/appdynamics.conf
-			fi
-		fi
-		
-		dbcnf_set large_pages ""
-		
-		# check/tweak domain.xml
-
-		domain_set_jvm_option +UseLargePages
-		domain_set_jvm_option LargePageSizeInBytes $HUGE_PAGE_SIZE_BYTES
-		
-		# XXX
-		# check / tweak events service settings
-		if ! runuser cat $EVENTS_VMOPTIONS_FILE | \
-			grep -q "\-XX:+UseLargePages" ; then
-			runuser ex -s $EVENTS_VMOPTIONS_FILE <<- EVENTS_LARGE_PAGES
-				a
-				-XX:+UseLargePages 
-				-XX:LargePageSizeInBytes=$HUGE_PAGE_SIZE_BYTES
-				.
-				wq
-			EVENTS_LARGE_PAGES
-		# simplify the awk-fu below...
-		elif [[ `( runuser cat $EVENTS_VMOPTIONS_FILE ) \
-			| awk -F= '/^[\t ]*-XX:LargePageSizeInBytes=/{
-				if(sub(/[k,K]$/,"",$2)==1){ 
-					BYTES=$2*1024 
-				}
-				else if(sub(/[m,M]$/,"",$2)==1){ 
-					BYTES=$2*1048576 
-				}
-				else if(sub(/[g,G]$/,"",$2)==1){ 
-					BYTES=$2*1073741824 
-				} else { 
-					gsub(/[^0-9]/,"",$2) 
-					BYTES=$2
-				} 
-				print BYTES; 
-				exit;
-			}'` != "$HUGE_PAGE_SIZE_BYTES" ]] ; then
-			#update large page size
-			runuser ex -s $EVENTS_VMOPTIONS_FILE <<- ADJUST_EVENT_LARGE_PAGE_SIZE
-				%s/-XX:LargePageSizeInBytes=[1-9][0-9]*[k,K,m,M,g,G]\?/-XX:LargePageSizeInBytes=$HUGE_PAGE_SIZE_BYTES/g
-				wq
-			ADJUST_EVENT_LARGE_PAGE_SIZE
-		fi
-	else
-		# disable controller MySQL and Java huge page support
-		dbcnf_unset large-pages
-		domain_unset_jvm_option +UseLargePages
-		domain_unset_jvm_option LargePageSizeInBytes
-
-		# remove events service large pages config from controller.sh
-		if ( runuser cat $EVENTS_VMOPTIONS_FILE ) \
-			 | grep -q "^[\t ]*\-XX:+UseLargePages[\t ]*" ; then
-			runuser ex -s $EVENTS_VMOPTIONS_FILE <<- DELETE_EVENTS_LARGE_PAGES
-				%s/^[\t ]*-XX:+UseLargePages[\t ]*\n//g
-				%s/^[\t ]*-XX:LargePageSizeInBytes=.*\n//g
-				wq
-			DELETE_EVENTS_LARGE_PAGES
-		fi
+	# remove events service large pages config from controller.sh
+	if [ -f $EVENTS_VMOPTIONS_FILE ] ; then
+		runuser ex -s $EVENTS_VMOPTIONS_FILE <<- DELETE_EVENTS_LARGE_PAGES
+			%s/^[\t ]*-XX:+UseLargePages[\t ]*\n//g
+			%s/^[\t ]*-XX:LargePageSizeInBytes=.*\n//g
+			wq
+		DELETE_EVENTS_LARGE_PAGES
 	fi
-	# XXX
+
+	#
+	# If huge pages are supported and enabled,
+	# Explicitly allocate and enable huge pages 
+	# for the controller's java and mysql processes
+	#
+	if ! $ENABLE_HUGE_PAGES ; then
+		return
+	fi
+	
+	increment /proc/sys/vm/nf_hugepages $APPD_HUGE_PAGES
+
+	# Allow the AppDynamics user to access the huge pages we're allocating.
+	if ! id -G $RUNUSER | grep -wq /proc/sys/vm/hugetlb_shm_group ; then
+		echo $(id -g $RUNUSER) > /proc/sys/vm/hugetlb_shm_group
+	fi
+		
+	# this code will break if we try to allocate 2 ^ 64 memory. let it.
+	(( APPD_SHMMAX = APPD_HUGE_PAGES * HUGE_PAGE_SIZE_BYTES))
+
+	increment /proc/sys/kernel/shmmax $APPD_SHMMAX
+	increment /proc/sys/kernel/shmall $APPD_SHMMAX
+
+	dbcnf_set large_pages ""
+		
+	domain_set_jvm_option +UseLargePages
+	domain_set_jvm_option LargePageSizeInBytes $HUGE_PAGE_SIZE_BYTES
+		
+	if [ -f $EVENTS_VMOPTIONS_FILE ] ; then
+		runuser ex -s $EVENTS_VMOPTIONS_FILE <<- EVENTS_LARGE_PAGES
+			a
+			-XX:+UseLargePages 
+			-XX:LargePageSizeInBytes=$HUGE_PAGE_SIZE_BYTES
+			.
+			wq
+		EVENTS_LARGE_PAGES
+	fi
 }
 
 function unreserve_memory {
-	# If huge pages are supported and enabled.
-	if [ -n "$HUGE_PAGE_SIZE_BYTES" ] && [ "$ENABLE_HUGE_PAGES" == "true" ]
-		then
-		calculate_memory
-		local SHMMAX_MAX
-		local SHMALL_MAX
-		if [[ `uname -m` == "x86_64" ]]
-			then
-			SHMMAX_MAX=`echo "2^64 - 16777217" | bc`
-		else
-			SHMMAX_MAX=`echo "2^32 - 16777217" | bc`
-		fi
-		SHMALL_MAX=$SHMMAX_MAX
-		
-	  	# Explicitly allocate and enable huge pages for the controller's
-		# java and mysql processes
-		
-		echo $(($(cat /proc/sys/vm/nr_hugepages)-APPD_HUGE_PAGES)) > /proc/sys/vm/nr_hugepages
-		
-		#check/set shmmax
-		#use bc to handle unsigned 64-bit unsigned integers
-		((APPD_SHMMAX=APPD_HUGE_PAGES*HUGE_PAGE_SIZE_BYTES))
-		local PROC_SHMMAX=$(cat /proc/sys/kernel/shmmax)
-		[[ $(echo "$PROC_SHMMAX < $SHMMAX_MAX"|bc) == "1" ]] \
-			&& echo "shmmax = $PROC_SHMMAX-$APPD_SHMMAX; \
-			if (shmmax > $SHMMAX_MAX) shmmax=$SHMMAX_MAX; print shmmax;"\
-				| bc > /proc/sys/kernel/shmmax
-
-		#check/set shmmall
-		#use bc to handle unsigned 64-bit unsigned integers
-		((APPD_SHMALL=APPD_SHMMAX/PAGE_SIZE_BYTES))
-		local PROC_SHMALL=$(cat /proc/sys/kernel/shmall)
-		[[ $(echo "$PROC_SHMALL < $SHMALL_MAX"|bc) == "1" ]] \
-			&& echo "shmall = $PROC_SHMALL-$APPD_SHMALL; \
-			if(shmall > $SHMALL_MAX) shmall=$SHMALL_MAX; print shmall;" \
-				| bc > /proc/sys/kernel/shmall
+	if ! $ENABLE_HUGE_PAGES ; then
+		return
 	fi
+	calculate_memory
+	increment /proc/sys/vm/nr_hugepages -$APPD_HUGE_PAGES
+	increment /proc/sys/kernel/shmmax -$APPD_SHMMAX
+	increment /proc/sys/kernel/shmall -$APPD_SHMMAX
 }
 
 case "$1" in  
 start)  
 	require_root
-	# conditionally run reserve_memory
-	# if no lockfile or host crash (stale lockfile precedes last startup): reserve memory
-	# mysql crashed or shut down outside of intit: stale lockfile that is younger than last boot: noop
-	# mysql already running: noop
+
 	do_numa_settings
+	set_limits
+
+	#
+	# we only run reserve_memory
+	# if no lockfile or stale lockfile precedes last startup (crash?)
+	# we do not reserve memory if
+	# a) mysql crashed or shut down outside of init: 
+	# b) stale lockfile that is younger than last boot
+	# c) mysql already running
+	#
 	if ! db_running ; then
-		set_open_fd_limits
-		# if numa settings, then we need to disable transparent huge pages
-		if [ -f $APPD_ROOT/HA/numa.settings ] ; then
-			for dir in /sys/kernel/mm/transparent_hugepage \
-				/sys/kernel/mm/redhat_transparent_hugepage ; do
-				if [ -f $dir/enabled ] ; then
-					echo "never" > $dir/enabled
-				fi
-				if [ -f $dir/defrag ] ; then
-					echo "never" > $dir/defrag
-				fi
-			done
-		fi
 		if ! [ -f $lockfile ] || host_crash ; then
 			reserve_memory
 		fi
