@@ -158,3 +158,26 @@ this is a bugfix version
 10) the logging functions had a bug where the existence of /dev/tty was used
     instead of running /usr/bin/tty to test if tty output was possible
 
+--------------------------------------
+Release notes for version 3.3
+
+this version adds limited function HA for systems without root escalation
+or service installation. this is triggered by the existence of HA/NOROOT.
+this functionality is currently undocumented, and failover has had only 
+limited testing.
+
+1) a new file, appdservice-noroot.sh, subsumes all the function in the
+   appdcontroller, appdcontroller-db and appdynamics-machine-agent init
+   scripts.
+
+2) replicate.sh now detects if a file NOROOT is in the HA subdirectory, and
+   does not check for init script installation or escalation methods
+
+3) lib/ha.sh modifies the service functions to use the appdservice-noroot.sh
+   script instead of using the /sbin/appdservice or sudo code if HA/NOROOT
+   exists
+
+4) the mysql monitor installed in the machine agent now searches for a controller
+   root directory in /opt/AppDynamics/Controller and /opt/appdynamics/controller
+   if it cannot find a definition in an appdynamics-machine-agent.sysconfig files.
+   this is a likely case if NOROOT is installed.

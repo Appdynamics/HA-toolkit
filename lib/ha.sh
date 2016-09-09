@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.2 2016-09-08 13:40:17 cmayer $
+# $Id: lib/ha.sh 3.3 2016-09-08 13:40:17 cmayer $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -119,7 +119,14 @@ if [[ `id -u` == 0 ]] ; then
 		ssh $1 $2 $service_bin $3 $4
 	}
 else
-	if [ -x /sbin/appdservice ] ; then
+	if [ -f $APPD_ROOT/HA/NOROOT ] ; then
+		function service {
+			$APPD_ROOT/HA/appdservice-noroot.sh $1 $2
+		}
+		function remservice {
+			ssh $1 $2 $APPD_ROOT/HA/appdservice-noroot.sh $3 $4
+		}
+	elif [ -x /sbin/appdservice ] ; then
 		function service {
 			/sbin/appdservice $1 $2
 		}

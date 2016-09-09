@@ -1,6 +1,6 @@
 #
 # makefile for HA script distro
-# $Id: Makefile 3.2 2016-09-08 03:09:23 cmayer $
+# $Id: Makefile 3.3 2016-09-08 03:09:23 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -21,7 +21,7 @@ SHELL=/bin/bash
 BASH_SRC= assassin.sh failover.sh watchdog.sh \
 	watchdog.settings.template \
 	replicate.sh install-init.sh uninstall-init.sh \
-	appdservice-pbrun.sh appdservice-root.sh \
+	appdservice-pbrun.sh appdservice-root.sh appdservice-noroot.sh \
 	appdservice-xuser.sh appdstatus.sh \
 	appdynamics-machine-agent.sh appdynamics-machine-agent.sysconfig \
 	mysqlclient.sh getaccess.sh \

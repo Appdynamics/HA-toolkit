@@ -2,7 +2,7 @@
 #
 # Monitors INNODB
 #
-# $Id: mysql-stat.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: mysql-stat.sh 3.3 2016-09-08 03:09:03 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -22,6 +22,21 @@ PATH=$PATH:/bin:/usr/sbin:/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 
 [ -f /etc/sysconfig/appdcontroller ] && . /etc/sysconfig/appdcontroller
 [ -f /etc/default/appdcontroller ] && . /etc/default/appdcontroller
+
+#
+# check in some likely places where a controller might be installed
+#
+if [ -z "$APPD_ROOT" ] ; then
+	for dir in /opt/AppDynamics/Controller /opt/appdynamics/controller ; do
+		if [ -f $dir/db/db.cnf ] ; then
+			APPD_ROOT=$dir
+			break
+		fi
+	done
+fi
+if [ -z "$APPD_ROOT" ] ; then
+	exit 1
+fi
 
 if [ -x $APPD_ROOT/HA/mysqlclient.sh ] ; then
 	MYSQLCLIENT="$APPD_ROOT/HA/mysqlclient.sh"

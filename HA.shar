@@ -1,4 +1,4 @@
-# HA package version 3.2 built Thu Sep  8 12:29:32 2016
+# HA package version 3.2 built Thu Sep  8 22:57:36 2016
 if echo '
 ' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true
 if [ $(basename $(pwd -P)) != HA ] ; then
@@ -35,6 +35,7 @@ mkdir -p HA ; if ! [ -d HA ] ; then echo "no HA directory" ; exit 0 ; fi; echo c
 #	uninstall-init.sh
 #	appdservice-pbrun.sh
 #	appdservice-root.sh
+#	appdservice-noroot.sh
 #	appdservice-xuser.sh
 #	appdstatus.sh
 #	appdynamics-machine-agent.sh
@@ -797,6 +798,29 @@ X
 X10) the logging functions had a bug where the existence of /dev/tty was used
 X    instead of running /usr/bin/tty to test if tty output was possible
 X
+X--------------------------------------
+XRelease notes for version 3.3
+X
+Xthis version adds limited function HA for systems without root escalation
+Xor service installation. this is triggered by the existence of HA/NOROOT.
+Xthis functionality is currently undocumented, and failover has had only 
+Xlimited testing.
+X
+X1) a new file, appdservice-noroot.sh, subsumes all the function in the
+X   appdcontroller, appdcontroller-db and appdynamics-machine-agent init
+X   scripts.
+X
+X2) replicate.sh now detects if a file NOROOT is in the HA subdirectory, and
+X   does not check for init script installation or escalation methods
+X
+X3) lib/ha.sh modifies the service functions to use the appdservice-noroot.sh
+X   script instead of using the /sbin/appdservice or sudo code if HA/NOROOT
+X   exists
+X
+X4) the mysql monitor installed in the machine agent now searches for a controller
+X   root directory in /opt/AppDynamics/Controller and /opt/appdynamics/controller
+X   if it cannot find a definition in an appdynamics-machine-agent.sysconfig files.
+X   this is a likely case if NOROOT is installed.
 END-of-Release_Notes
 echo x - appdservice.c
 sed 's/^X//' >appdservice.c << 'END-of-appdservice.c'
@@ -1138,7 +1162,7 @@ X#!/bin/bash
 X#
 X# Monitors INNODB
 X#
-X# $Id: mysql-stat.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: mysql-stat.sh 3.3 2016-09-08 03:09:03 cmayer $
 X#
 X# Copyright 2016 AppDynamics, Inc
 X#
@@ -1158,6 +1182,21 @@ XPATH=$PATH:/bin:/usr/sbin:/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 X
 X[ -f /etc/sysconfig/appdcontroller ] && . /etc/sysconfig/appdcontroller
 X[ -f /etc/default/appdcontroller ] && . /etc/default/appdcontroller
+X
+X#
+X# check in some likely places where a controller might be installed
+X#
+Xif [ -z "$APPD_ROOT" ] ; then
+X	for dir in /opt/AppDynamics/Controller /opt/appdynamics/controller ; do
+X		if [ -f $dir/db/db.cnf ] ; then
+X			APPD_ROOT=$dir
+X			break
+X		fi
+X	done
+Xfi
+Xif [ -z "$APPD_ROOT" ] ; then
+X	exit 1
+Xfi
 X
 Xif [ -x $APPD_ROOT/HA/mysqlclient.sh ] ; then
 X	MYSQLCLIENT="$APPD_ROOT/HA/mysqlclient.sh"
@@ -2328,7 +2367,7 @@ echo x - replicate.sh
 sed 's/^X//' >replicate.sh << 'END-of-replicate.sh'
 X#!/bin/bash
 X#
-X# $Id: replicate.sh 3.2 2016-09-08 13:40:17 cmayer $
+X# $Id: replicate.sh 3.3 2016-09-08 13:40:17 cmayer $
 X#
 X# install HA to a controller pair
 X#
@@ -2505,6 +2544,9 @@ X}
 X
 Xfunction verify_init_scripts()
 X{
+X	if [ -f $APPD_ROOT/HA/NOROOT ] ; then
+X		return 0
+X	fi
 X	local host=$1
 X	local ssh=`[ -n "$host" ] && echo "ssh -q"`
 X	local errors=0
@@ -2538,12 +2580,13 @@ X	local escalation_type=
 X	local errors=0
 X	for s in ${appdynamics_service_list[@]}
 X	do 
-X		if $ssh $host test -x /sbin/appdservice ; then
-X			if dd if=/sbin/appdservice bs=11 count=1 2>/dev/null \
-X				| grep -q '^#!/bin/bash' ; then
-X				escalation_type="pbrun"
-X			else
+X		if $ssh $host test -f $APPD_ROOT/HA/NOROOT ; then
+X			escalation_type="noroot"
+X		elif $ssh $host test -x /sbin/appdservice ; then
+X			if $ssh $host file /sbin/appdservice | grep -q setuid ; then
 X				escalation_type="setuid"
+X			else
+X				escalation_type="pbrun"
 X			fi
 X		else
 X			$ssh $host sudo -nl $service_bin $s start > /dev/null 2>&1 || ((errors++))
@@ -4328,6 +4371,114 @@ X
 X/sbin/service $service $action
 Xexit 0
 END-of-appdservice-root.sh
+echo x - appdservice-noroot.sh
+sed 's/^X//' >appdservice-noroot.sh << 'END-of-appdservice-noroot.sh'
+X#!/bin/bash
+X#
+X# $Id: appdservice-xuser.sh 3.3 2016-09-08 03:09:03 cmayer $
+X#
+X# no root shell wrapper for appdynamics service changes
+X#
+X# this file is intended to be a limited replacement of the service
+X# escalation function, and as such needs to implement an adequate subset
+X# of the machinery in the init scripts
+X#
+X# Copyright 2016 AppDynamics, Inc
+X#
+X#   Licensed under the Apache License, Version 2.0 (the "License");
+X#   you may not use this file except in compliance with the License.
+X#   You may obtain a copy of the License at
+X#
+X#       http://www.apache.org/licenses/LICENSE-2.0
+X#
+X#   Unless required by applicable law or agreed to in writing, software
+X#   distributed under the License is distributed on an "AS IS" BASIS,
+X#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+X#   See the License for the specific language governing permissions and
+X#   limitations under the License.
+X#
+X
+Xcd $(dirname $0)
+XAPPD=`cd .. ; pwd -P`
+X
+X. lib/ha.sh
+X. appdynamics-machine-agent.sysconfig
+X
+Xfunction usage {
+X	echo usage: "$0 [appdcontroller appdcontroller-db appdynamics-machine-agent] [start stop status]"
+X	exit 1
+X}
+X
+Xif [ $# -ne 2 ] ; then
+X	usage
+Xfi
+X
+Xservice=$1
+Xverb=$2
+X
+Xcase "$service:$verb" in
+X
+Xappdcontroller:status|appdcontroller-db:status|appdynamics-machine-agent:status)
+X	./appdstatus.sh
+X	;;
+X	
+Xappdcontroller:start)
+X	./appdservice-noroot.sh appdcontroller-db start
+X	if echo 'select value from global_configuration_local where name = "appserver.mode"' | ./mysqlclient.sh | grep -q active ; then
+X		nohup $APPD/bin/controller.sh start-appserver &
+X		if [ -d "$APPD/events_service" ] ; then
+X			nohup $APPD/bin/controller.sh start-events-service &
+X		fi
+X		if [ -d "$APPD/reporting_service" ] ; then
+X			nohup $APPD/bin/controller.sh start-reporting-service &
+X		fi
+X	fi
+X	;;
+X
+Xappdcontroller:stop)
+X	$APPD/bin/controller.sh stop-appserver
+X	if [ -d "$APPD/events_service" ] ; then
+X		$APPD/bin/controller.sh stop-events-service
+X	fi
+X	if [ -d "$APPD/reporting_service" ] ; then
+X		$APPD/bin/controller.sh stop-reporting-service
+X	fi
+X	;;
+X
+Xappdcontroller-db:start)
+X	$APPD/bin/controller.sh start-db
+X	false
+X	;;
+X
+Xappdcontroller-db:stop)
+X	./appdservice-noroot.sh appdcontroller stop
+X	$APPD/bin/controller.sh stop-db
+X	;;
+X
+Xappdynamics-machine-agent:start)
+X	ma_dir=`find_machine_agent`
+X	if [ ! -d "$ma_dir" ] ; then
+X		exit 0
+X	fi
+X	nohup $APPD/jre/bin/java $JAVA_OPTS -jar $ma_dir/machineagent.jar &
+X	;;
+X
+Xappdynamics-machine-agent:stop)
+X	for pid in `pgrep -f machineagent.jar` ; do
+X		for sub in `pgrep -P $pid` ; do
+X			kill -9 $sub
+X		done
+X		kill -9 $pid
+X	done
+X	;;
+X
+X*)
+X	usage
+X	;;
+Xesac
+X
+Xexit 0
+END-of-appdservice-noroot.sh
 echo x - appdservice-xuser.sh
 sed 's/^X//' >appdservice-xuser.sh << 'END-of-appdservice-xuser.sh'
 X#!/bin/bash
@@ -7341,7 +7492,7 @@ echo x - lib/ha.sh
 sed 's/^X//' >lib/ha.sh << 'END-of-lib/ha.sh'
 X#!/bin/bash
 X#
-X# $Id: lib/ha.sh 3.2 2016-09-08 13:40:17 cmayer $
+X# $Id: lib/ha.sh 3.3 2016-09-08 13:40:17 cmayer $
 X#
 X# ha.sh
 X# contains common code used by the HA toolkit
@@ -7460,7 +7611,14 @@ X	function remservice {
 X		ssh $1 $2 $service_bin $3 $4
 X	}
 Xelse
-X	if [ -x /sbin/appdservice ] ; then
+X	if [ -f $APPD_ROOT/HA/NOROOT ] ; then
+X		function service {
+X			$APPD_ROOT/HA/appdservice-noroot.sh $1 $2
+X		}
+X		function remservice {
+X			ssh $1 $2 $APPD_ROOT/HA/appdservice-noroot.sh $3 $4
+X		}
+X	elif [ -x /sbin/appdservice ] ; then
 X		function service {
 X			/sbin/appdservice $1 $2
 X		}
