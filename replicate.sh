@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.2 2016-09-08 13:40:17 cmayer $
+# $Id: replicate.sh 3.3 2016-09-08 13:40:17 cmayer $
 #
 # install HA to a controller pair
 #
@@ -177,6 +177,9 @@ function stop_appdynamics_services()
 
 function verify_init_scripts()
 {
+	if [ -f $APPD_ROOT/HA/NOROOT ] ; then
+		return 0
+	fi
 	local host=$1
 	local ssh=`[ -n "$host" ] && echo "ssh -q"`
 	local errors=0
@@ -210,12 +213,13 @@ function get_privilege_escalation(){
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		if $ssh $host test -x /sbin/appdservice ; then
-			if dd if=/sbin/appdservice bs=11 count=1 2>/dev/null \
-				| grep -q '^#!/bin/bash' ; then
-				escalation_type="pbrun"
-			else
+		if $ssh $host test -f $APPD_ROOT/HA/NOROOT ; then
+			escalation_type="noroot"
+		elif $ssh $host test -x /sbin/appdservice ; then
+			if $ssh $host file /sbin/appdservice | grep -q setuid ; then
 				escalation_type="setuid"
+			else
+				escalation_type="pbrun"
 			fi
 		else
 			$ssh $host sudo -nl $service_bin $s start > /dev/null 2>&1 || ((errors++))
