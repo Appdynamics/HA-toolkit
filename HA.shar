@@ -1,4 +1,4 @@
-# HA package version 3.2 built Thu Sep  8 22:57:36 2016
+# HA package version 3.3 built Thu Sep  8 23:39:15 2016
 if echo '
 ' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true
 if [ $(basename $(pwd -P)) != HA ] ; then
@@ -60,7 +60,7 @@ mkdir -p HA ; if ! [ -d HA ] ; then echo "no HA directory" ; exit 0 ; fi; echo c
 #
 echo x - VERSION
 sed 's/^X//' >VERSION << 'END-of-VERSION'
-X3.2
+X3.3
 END-of-VERSION
 echo x - README.txt
 sed 's/^X//' >README.txt << 'END-of-README.txt'
