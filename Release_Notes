@@ -181,3 +181,30 @@ limited testing.
    root directory in /opt/AppDynamics/Controller and /opt/appdynamics/controller
    if it cannot find a definition in an appdynamics-machine-agent.sysconfig files.
    this is a likely case if NOROOT is installed.
+
+--------------------------------------
+Release notes for version 3.4
+
+1) the machine agent init script now kills child processes of the machine
+   agent.  this avoids leaving orphan monitor scripts running.
+
+2) added the ability to trace the execution of the init scripts by putting
+   a file INITDEBUG into the HA directory.  it creates a log file of the
+   form /tmp/service_name.out where service_name is one of appdcontroller,
+   appdcontroller-db, or appdynamics-machine-agent.
+
+3) a bug in the memory calculation printed a spurious error message.
+
+4) the save_mysql_password script erroneously tried to chmod the obfuscated
+   password file.
+
+5) the machine agent disk monitor now works with both 12 and 14 field
+   iostat -x output
+
+6) some additional documentation is added listing the commands that are
+   added to the sudoers resource.
+
+7) the sysconfig files are now templates.  any custom modifications are
+   preserved if a file exists of the form service.sysconfig
+
+8) an informative message is printed when non-root user runs install-init.sh.

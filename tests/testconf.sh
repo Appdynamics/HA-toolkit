@@ -26,6 +26,7 @@ cat > testfile1.xml << FIN1
 	<configs port="1024">
 		<config>
 			<java-config>
+				<jvm-options>-DFroo=99</jvm-options>
 				<jvm-options>-Dfoo.bar.baz=99</jvm-options>
 				<jvm-options>-Dappdynamics.controller.port=8090</jvm-options>
 				<jvm-options>-Dfoobie.bar.baz=88</jvm-options>
@@ -59,6 +60,13 @@ domain_unset_jvm_option +Gnarl
 if [ "`domain_get_jvm_option Gnarl`" != "" ] ; then fail 7 ; fi
 
 if [ "`domain_get_jvm_option foo.bar.bax`" != "" ] ; then fail 5 ; fi
+domain_set_jvm_option Froo host
+domain_set_jvm_option Froo cookie
+if [ "`domain_get_jvm_option Froo`" != "cookie" ] ; then fail 8 ; fi
+domain_set_jvm_option Froo host
+if [ "`domain_get_jvm_option Froo`" != "host" ] ; then fail 9 ; fi
+
+cat testfile1.xml
 
 if [ "`domain_get_jvm_option +LogVMOutput`" != '+' ] ;then fail 10 ; fi
 if [ "`domain_get_jvm_option +LoseLose`" != '-' ] ;then fail 11 ; fi

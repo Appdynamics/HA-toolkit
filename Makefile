@@ -23,14 +23,16 @@ BASH_SRC= assassin.sh failover.sh watchdog.sh \
 	replicate.sh install-init.sh uninstall-init.sh \
 	appdservice-pbrun.sh appdservice-root.sh appdservice-noroot.sh \
 	appdservice-xuser.sh appdstatus.sh \
-	appdynamics-machine-agent.sh appdynamics-machine-agent.sysconfig \
+	appdynamics-machine-agent.sh \
 	mysqlclient.sh getaccess.sh \
 	appdcontroller.sh appdcontroller-db.sh \
-	appdcontroller.sysconfig appdcontroller-db.sysconfig \
+	appdynamics-machine-agent.sysconfig.template \
+	appdcontroller.sysconfig.template \
+	appdcontroller-db.sysconfig.template \
 	numa.settings.template numa-patch-controller.sh \
 	save_mysql_passwd.sh rsyncd.conf \
 	lib/password.sh lib/ha.sh lib/sql.sh lib/log.sh lib/conf.sh \
-	lib/runuser.sh lib/init.sh \
+	lib/runuser.sh lib/init.sh
 
 C_SRC= appdservice.c
 

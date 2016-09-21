@@ -18,4 +18,4 @@
 APPD_ROOT=/opt/AppDynamics/Controller
 MACHINE_AGENT_HOME=/opt/appdynamics/machine-agent
 RUNUSER=root
-JAVA_OPTS="-Xmx512m -Xms512m -Dappdynamics.agent.nodeName=`hostname`"
+JAVA_OPTS="-Xmx512m -Xms512m -Dappdynamics.agent.nodeName=`hostname` -Dappdynamics.agent.maxMetrics=500"

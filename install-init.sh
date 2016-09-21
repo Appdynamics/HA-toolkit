@@ -33,6 +33,11 @@ function usage {
 APPD_ROOT=`cd .. ; pwd -P`			# ignore sym links
 PBRUN=`grep PBRUN= appdservice-pbrun.sh | awk -F= '{print $2}'`
 
+if [ `id -un` != root ] ; then
+	echo install-init.sh must be run as root
+	exit 1
+fi
+
 if ! [ -d $APPD_ROOT/bin ] ; then
 	APPD_ROOT=/opt/AppDynamics/Controller
 	echo using default path $APPD_ROOT
@@ -183,7 +188,7 @@ function install_init {
 	local stop_pri=$3
 
 	echo "installing /etc/init.d/$service"
-	cp ./$service${EXTN}.sh /etc/init.d/$service
+	cp ./$service.sh /etc/init.d/$service
 	chmod 0755 /etc/init.d/$service
 
 	if [ -x "$CHKCONFIG" ] ; then
@@ -199,13 +204,18 @@ function install_init {
 	fi
 
 	echo "installing $SYS_CONFIG_DIR/$1"
-	if [[ -f ./$service${EXTN}.sysconfig ]] ; then
-		sed < ./$service${EXTN}.sysconfig > $SYS_CONFIG_DIR/$1 \
-			-e "/^RUNUSER=/s,=.*,=$RUNUSER," \
-			-e "/^APPD_ROOT=/s,=.*,=$APPD_ROOT," \
-			-e "/^MACHINE_AGENT_HOME=/s,=.*,=$machine_agent,"
-		chmod 644 $SYS_CONFIG_DIR/$service
+	sysconfig_file=$service.sysconfig
+	if [ ! -f $sysconfig_file ] ; then
+		sysconfig_file=$service.sysconfig.template
+	else
+		echo using customized $service configuration file
 	fi
+
+	sed < $sysconfig_file > $SYS_CONFIG_DIR/$1 \
+		-e "/^RUNUSER=/s,=.*,=$RUNUSER," \
+		-e "/^APPD_ROOT=/s,=.*,=$APPD_ROOT," \
+		-e "/^MACHINE_AGENT_HOME=/s,=.*,=$machine_agent,"
+	chmod 644 $SYS_CONFIG_DIR/$service
 }
 
 #

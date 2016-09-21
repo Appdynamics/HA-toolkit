@@ -90,7 +90,6 @@ function save_mysql_passwd {
 	obf=$(obfuscate $__inpw1) || exit 1
 	echo $obf > $rootpw_obf || err "$thisfn: failed to save obfuscated passwd to $rootpw_obf"
 	chmod 600 $rootpw_obf || warn "$thisfn: failed to make $rootpw_obf readonly"
-	chown $RUNUSER $rootpw_obf
 }
 
 #
