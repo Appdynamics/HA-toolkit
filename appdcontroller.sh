@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: appdcontroller.sh 3.4 2016-09-20 23:31:12 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -43,16 +43,17 @@ PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 NAME=$(basename $(readlink -e $0))
 
-# uncomment for debug logging
-#exec 2> /tmp/$NAME.out
-#set -x
-
 APPD_ROOT=/opt/AppDynamics/Controller
 RUNUSER=root
 
 # source script config
 [ -f /etc/sysconfig/appdcontroller ] && . /etc/sysconfig/appdcontroller
 [ -f /etc/default/appdcontroller ] && . /etc/default/appdcontroller
+
+if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+    exec 2> /tmp/$NAME.out
+    set -x
+fi
 
 OPEN_FD_LIMIT=65536
 

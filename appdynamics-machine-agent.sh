@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: appdynamics-machine-agent.sh 3.4 2016-09-20 23:31:12 cmayer $
 #
 # /etc/init.d/appdynamics-machine-agent
 #
@@ -52,6 +52,13 @@ JAVA_OPTS=""
 [ -f /etc/default/appdynamics-machine-agent ] && . /etc/default/appdynamics-machine-agent
 
 JAVA=$APPD_ROOT/jre/bin/java
+NAME=$(basename $(readlink -e $0))
+
+if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+	exec 2> /tmp/$NAME.out
+	set -x
+fi
+
 
 # For security reasons, locally embed/include function library at HA.shar build time
 embed lib/init.sh
@@ -75,7 +82,12 @@ function stop() {
 	if [ -f $pidfile ] ; then
 		pid=`cat $pidfile`
 		if [ -d /proc/$pid ] ; then
-			kill -9 $pid
+			process_group=`ps -o pgrp -h $pid`
+			if [ -n "$process_group" ] ; then
+				for i in $process_group ; do
+					kill -9 -$i
+				done
+			fi
 		fi
 		rm -f $pidfile
 	fi

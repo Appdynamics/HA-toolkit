@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.2 2016-09-08 03:09:03 cmayer $
+# $Id: appdcontroller-db.sh 3.4 2016-09-20 23:31:12 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -44,16 +44,17 @@ PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 NAME=$(basename $(readlink -e $0))
 
-# uncomment for debug logging
-#exec 2> /tmp/$NAME.out
-#set -x
-
 APPD_ROOT=/opt/AppDynamics/Controller
 RUNUSER=root
 
 # source script config
 [ -f /etc/sysconfig/appdcontroller-db ] && . /etc/sysconfig/appdcontroller-db
 [ -f /etc/default/appdcontroller-db ] && . /etc/default/appdcontroller-db
+
+if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+	exec 2> /tmp/$NAME.out
+	set -x
+fi
 
 APPD_BIN="$APPD_ROOT/bin"
 DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
@@ -201,8 +202,7 @@ function host_crash {
 }
 
 function calculate_memory {
-	# multiply by 1.05 and round to account for extra 2% allocation overhead +
-	#  headroom
+	# multiply by 1.05 and round to account for extra 2% headroom
 	CONTROLLER_HEAP=`domain_get_jvm_option Xmx | scale 1.04`
 		
 	# Parse controller JVM OPTIONS to get MaxPermSize
@@ -213,8 +213,7 @@ function calculate_memory {
 	INNODB_BUFFER_POOL=`dbcnf_get innodb_buffer_pool_size | scale 1.1`
 	INNODB_ADDITIONAL_MEM=`dbcnf_get innodb_additional_mem_pool_size | scale`
 	
-	# multiply by 1.05 and round to account for extra 2% allocation overhead +
-	#  headroom
+	# multiply by 1.05 and round to account for extra 2% headroom
 	EVENTS_HEAP=`runuser \
 		awk -F= "'/^\s*EVENTS_HEAP_SETTINGS=/ { print \$2 }'" \
 			$APPD_ROOT/bin/controller.sh | \
@@ -224,7 +223,6 @@ function calculate_memory {
 		EVENTS_HEAP=`runuser cat $EVENTS_VMOPTIONS_FILE \
 			| get_jvm_option Xmx | scale 1.05`
 	fi
-
 	if [ -z "$EVENTS_HEAP" ] ; then
 		EVENTS_HEAP=0
 	fi
@@ -236,7 +234,7 @@ function calculate_memory {
 			get_jvm_option MaxPermSize | scale 1.05`
 	fi
 	
-	if [ -n "$EVENTS_MAXPERMSIZE" -a "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
+	if [ -z "$EVENTS_MAXPERMSIZE" ] || [ "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
 		# Java permsize defaults to 64MiB
 		EVENTS_MAXPERMSIZE=67108864
 	fi

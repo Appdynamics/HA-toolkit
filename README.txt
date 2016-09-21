@@ -162,6 +162,23 @@ the install-init.sh script is used to install the init scripts, and to set
 up a controlled privilege escalation.  this can take the form of sudo settings,
 or one of 3 flavors of /sbin/appdservice. run install-init.sh for usage.
 
+Sudo:
+----
+if sudo is used, the following commands need to be executed by the appd user,
+and should be added to the sudoers file or LDAP resource.  note that they
+need to be executable without entering a password, so the NOPASSWD: flag
+must be used.
+
+service appdcontroller * 
+service appdcontroller-db *
+service appdynamics-machine-agent *
+chkconfig appdcontroller * 
+chkconfig appdcontroller-db *
+chkconfig appdynamics-machine-agent *
+update-rc.d appdcontroller * 
+update-rc.d appdcontroller-db *
+update-rc.d appdynamics-machine-agent *
+
 Service Control:
 ----------------
 After activation, the controller service and HA facility can be controlled 
@@ -304,7 +321,7 @@ is the place to add code.
 
 Version and Copyright
 ---------------------
-$Id: README 1.13 2016-08-04 03:09:49 cmayer Exp $
+$Id: README.txt 3.4 2016-09-20 23:32:12 cmayer Exp $
 
  Copyright 2016 AppDynamics, Inc
 
