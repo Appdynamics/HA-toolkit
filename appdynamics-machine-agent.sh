@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.1 2016-09-20 15:01:13 cmayer $
+# $Id: appdynamics-machine-agent.sh 3.4 2016-09-20 23:31:12 cmayer $
 #
 # /etc/init.d/appdynamics-machine-agent
 #

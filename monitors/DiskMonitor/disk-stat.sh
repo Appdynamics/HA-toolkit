@@ -2,7 +2,7 @@
 # 
 # Monitors Disks on Linux 
 # 
-# version 1.5 
+# $Id: disk-stat.sh 3.4 2016-09-20 23:38:07 cmayer $
 # 
 # using only: iostat, awk
 # 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.3 2016-09-08 13:40:17 cmayer $
+# $Id: ha.sh 3.4 2016-09-20 23:39:01 cmayer $
 #
 # ha.sh
 # contains common code used by the HA toolkit

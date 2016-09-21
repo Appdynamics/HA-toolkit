@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.2 2016-09-08 03:09:03 cmayer $
+# $Id: appdcontroller-db.sh 3.4 2016-09-20 23:31:12 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #

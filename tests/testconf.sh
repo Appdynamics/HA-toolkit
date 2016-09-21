@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: testconf.sh 3.0 2016-08-03 19:23:30 cmayer $
+# $Id: testconf.sh 3.4 2016-09-20 23:39:28 cmayer $
 # must run this on linux!
 
 tmpdir=/tmp

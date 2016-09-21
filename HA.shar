@@ -1,4 +1,4 @@
-# HA package version 3.3 built Thu Sep  8 23:39:15 2016
+# HA package version 3.4 built Tue Sep 20 23:50:36 2016
 if echo '
 ' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true
 if [ $(basename $(pwd -P)) != HA ] ; then
@@ -39,13 +39,13 @@ mkdir -p HA ; if ! [ -d HA ] ; then echo "no HA directory" ; exit 0 ; fi; echo c
 #	appdservice-xuser.sh
 #	appdstatus.sh
 #	appdynamics-machine-agent.sh
-#	appdynamics-machine-agent.sysconfig
 #	mysqlclient.sh
 #	getaccess.sh
 #	appdcontroller.sh
 #	appdcontroller-db.sh
-#	appdcontroller.sysconfig
-#	appdcontroller-db.sysconfig
+#	appdynamics-machine-agent.sysconfig.template
+#	appdcontroller.sysconfig.template
+#	appdcontroller-db.sysconfig.template
 #	numa.settings.template
 #	numa-patch-controller.sh
 #	save_mysql_passwd.sh
@@ -60,7 +60,7 @@ mkdir -p HA ; if ! [ -d HA ] ; then echo "no HA directory" ; exit 0 ; fi; echo c
 #
 echo x - VERSION
 sed 's/^X//' >VERSION << 'END-of-VERSION'
-X3.3
+X3.4
 END-of-VERSION
 echo x - README.txt
 sed 's/^X//' >README.txt << 'END-of-README.txt'
@@ -228,6 +228,23 @@ Xthe install-init.sh script is used to install the init scripts, and to set
 Xup a controlled privilege escalation.  this can take the form of sudo settings,
 Xor one of 3 flavors of /sbin/appdservice. run install-init.sh for usage.
 X
+XSudo:
+X----
+Xif sudo is used, the following commands need to be executed by the appd user,
+Xand should be added to the sudoers file or LDAP resource.  note that they
+Xneed to be executable without entering a password, so the NOPASSWD: flag
+Xmust be used.
+X
+Xservice appdcontroller * 
+Xservice appdcontroller-db *
+Xservice appdynamics-machine-agent *
+Xchkconfig appdcontroller * 
+Xchkconfig appdcontroller-db *
+Xchkconfig appdynamics-machine-agent *
+Xupdate-rc.d appdcontroller * 
+Xupdate-rc.d appdcontroller-db *
+Xupdate-rc.d appdynamics-machine-agent *
+X
 XService Control:
 X----------------
 XAfter activation, the controller service and HA facility can be controlled 
@@ -370,7 +387,7 @@ Xis the place to add code.
 X
 XVersion and Copyright
 X---------------------
-X$Id: README 1.13 2016-08-04 03:09:49 cmayer Exp $
+X$Id: README.txt 3.4 2016-09-20 23:32:12 cmayer Exp $
 X
 X Copyright 2016 AppDynamics, Inc
 X
@@ -821,6 +838,33 @@ X4) the mysql monitor installed in the machine agent now searches for a controll
 X   root directory in /opt/AppDynamics/Controller and /opt/appdynamics/controller
 X   if it cannot find a definition in an appdynamics-machine-agent.sysconfig files.
 X   this is a likely case if NOROOT is installed.
+X
+X--------------------------------------
+XRelease notes for version 3.4
+X
+X1) the machine agent init script now kills child processes of the machine
+X   agent.  this avoids leaving orphan monitor scripts running.
+X
+X2) added the ability to trace the execution of the init scripts by putting
+X   a file INITDEBUG into the HA directory.  it creates a log file of the
+X   form /tmp/service_name.out where service_name is one of appdcontroller,
+X   appdcontroller-db, or appdynamics-machine-agent.
+X
+X3) a bug in the memory calculation printed a spurious error message.
+X
+X4) the save_mysql_password script erroneously tried to chmod the obfuscated
+X   password file.
+X
+X5) the machine agent disk monitor now works with both 12 and 14 field
+X   iostat -x output
+X
+X6) some additional documentation is added listing the commands that are
+X   added to the sudoers resource.
+X
+X7) the sysconfig files are now templates.  any custom modifications are
+X   preserved if a file exists of the form service.sysconfig
+X
+X8) an informative message is printed when non-root user runs install-init.sh.
 END-of-Release_Notes
 echo x - appdservice.c
 sed 's/^X//' >appdservice.c << 'END-of-appdservice.c'
@@ -1078,58 +1122,57 @@ X</monitor>
 END-of-monitors/DiskMonitor/monitor.xml
 echo x - monitors/DiskMonitor/disk-stat.sh
 sed 's/^X//' >monitors/DiskMonitor/disk-stat.sh << 'END-of-monitors/DiskMonitor/disk-stat.sh'
-X#!/bin/bash
+X#!/bin/bash 
+X# 
+X# Monitors Disks on Linux 
+X# 
+X# $Id: disk-stat.sh 3.4 2016-09-20 23:38:07 cmayer $
+X# 
+X# using only: iostat, awk
+X# 
+X# Copyright 2016 AppDynamics, Inc 
+X# 
+X# Licensed under the Apache License, Version 2.0 (the "License"); 
+X# you may not use this file except in compliance with the License. 
+X# You may obtain a copy of the License at 
+X# 
+X# http://www.apache.org/licenses/LICENSE-2.0 
+X# 
+X# Unless required by applicable law or agreed to in writing, software 
+X# distributed under the License is distributed on an "AS IS" BASIS, 
+X# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied. 
+X# See the License for the specific language governing permissions and 
+X# limitations under the License. 
 X#
-X# Monitors Disks on Linux
-X#
-X# version 1.3
-X#
-X# using only: date, awk, sleep
-X#
-X# Copyright 2016 AppDynamics, Inc
-X#
-X#   Licensed under the Apache License, Version 2.0 (the "License");
-X#   you may not use this file except in compliance with the License.
-X#   You may obtain a copy of the License at
-X#
-X#       http://www.apache.org/licenses/LICENSE-2.0
-X#
-X#   Unless required by applicable law or agreed to in writing, software
-X#   distributed under the License is distributed on an "AS IS" BASIS,
-X#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-X#   See the License for the specific language governing permissions and
-X#   limitations under the License.
-X#
-X
-XMOUNTS=
-X# uncomment the next line to enable custom metrics for mounted filesystems
-X#MOUNTS=`mount| awk '/^\/dev/ {sub("/dev/","",$1);printf("%s:%s;",$1, $3)}'`
-X# uncomment the next line to enable custom metrics for swap
-X#MOUNTS+=`awk '/\/dev/ {sub("/dev/","",$1);printf("%s:swap;",$1)}'< /proc/swaps`
-X
-X# interval between reads of network and disk numbers
-XSAMPLE=10
 X
 XPATH=$PATH:/bin:/usr/sbin:/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 X
-Xwhile [ 1 ]; do
-XNEXTSECONDS=`date +%s | awk '{print $1 + 60}'`
-Xiostat -x 2 2 | awk '
-X	/Device:/ { state ++; next }
-X	( NF == 12 && state == 2) { 
-X		agg="AVERAGE";
-X		dev = $1;
-X		printf("name=Hardware Resources|Disk|%s|avg req size,aggregator=%s,value=%d\n", dev, agg, $8);
-X		printf("name=Hardware Resources|Disk|%s|avg queue length,aggregator=%s,value=%d\n", dev, agg, $9);
-X		printf("name=Hardware Resources|Disk|%s|avg wait (us),aggregator=%s,value=%d\n", dev, agg, $10*1000);
-X		printf("name=Hardware Resources|Disk|%s|avg svctime (us),aggregator=%s,value=%d\n", dev, agg, $11*1000);
-X		printf("name=Hardware Resources|Disk|%s|utilization (us),aggregator=%s,value=%d\n", dev, agg, $12);
-X	}
-X'
-X
-XSLEEPTIME=`date +"$NEXTSECONDS %s" | awk '{if ($1 > $2) print $1 - $2; else print 0;}'`
-Xsleep $SLEEPTIME
-Xdone
+Xiostat -x 60 | awk ' 
+X/Device:/ { state ++; next }
+X( NF == 12 && state >= 2) { 
+X   state=2;
+X   agg="AVERAGE"; 
+X   dev = $1; 
+X   printf("name=Hardware Resources|Disk|%s|avg req size (s),aggregator=%s,value=%d\n", dev, agg, $8); 
+X   printf("name=Hardware Resources|Disk|%s|avg queue length,aggregator=%s,value=%d\n", dev, agg, $9); 
+X   printf("name=Hardware Resources|Disk|%s|avg wait (ms),aggregator=%s,value=%d\n", dev, agg, $10); 
+X   printf("name=Hardware Resources|Disk|%s|avg svctime (ms),aggregator=%s,value=%d\n", dev, agg, $11); 
+X   printf("name=Hardware Resources|Disk|%s|utilization (ms),aggregator=%s,value=%d\n", dev, agg, $12); 
+X   next
+X} 
+X( NF == 14 && state >= 2) { 
+X   state=2;
+X   agg="AVERAGE"; 
+X   dev = $1; 
+X   printf("name=Hardware Resources|Disk|%s|reads per sec,aggregator=%s,value=%d\n", dev, agg, $4); 
+X   printf("name=Hardware Resources|Disk|%s|writes per sec,aggregator=%s,value=%d\n", dev, agg, $5); 
+X   printf("name=Hardware Resources|Disk|%s|avg req size (s),aggregator=%s,value=%d\n", dev, agg, $8); 
+X   printf("name=Hardware Resources|Disk|%s|avg queue length,aggregator=%s,value=%d\n", dev, agg, $9); 
+X   printf("name=Hardware Resources|Disk|%s|avg wait (ms),aggregator=%s,value=%d\n", dev, agg, $10); 
+X   printf("name=Hardware Resources|Disk|%s|avg read await (ms),aggregator=%s,value=%d\n", dev, agg, $11); 
+X   printf("name=Hardware Resources|Disk|%s|avg write await (ms),aggregator=%s,value=%d\n", dev, agg, $12); 
+X   next
+X} '
 END-of-monitors/DiskMonitor/disk-stat.sh
 echo x - monitors/MysqlMonitor/monitor.xml
 sed 's/^X//' >monitors/MysqlMonitor/monitor.xml << 'END-of-monitors/MysqlMonitor/monitor.xml'
@@ -3852,7 +3895,7 @@ echo x - install-init.sh
 sed 's/^X//' >install-init.sh << 'END-of-install-init.sh'
 X#!/bin/bash
 X#
-X# $Id: install-init.sh 3.2 2016-09-08 14:52:22 cmayer $
+X# $Id: install-init.sh 3.4 2016-09-20 23:31:12 cmayer $
 X#
 X# install init scripts, including the machine agent.
 X#
@@ -3884,6 +3927,11 @@ X}
 X
 XAPPD_ROOT=`cd .. ; pwd -P`			# ignore sym links
 XPBRUN=`grep PBRUN= appdservice-pbrun.sh | awk -F= '{print $2}'`
+X
+Xif [ `id -un` != root ] ; then
+X	echo install-init.sh must be run as root
+X	exit 1
+Xfi
 X
 Xif ! [ -d $APPD_ROOT/bin ] ; then
 X	APPD_ROOT=/opt/AppDynamics/Controller
@@ -4035,7 +4083,7 @@ X	local start_pri=$2
 X	local stop_pri=$3
 X
 X	echo "installing /etc/init.d/$service"
-X	cp ./$service${EXTN}.sh /etc/init.d/$service
+X	cp ./$service.sh /etc/init.d/$service
 X	chmod 0755 /etc/init.d/$service
 X
 X	if [ -x "$CHKCONFIG" ] ; then
@@ -4051,13 +4099,18 @@ X		exit 1
 X	fi
 X
 X	echo "installing $SYS_CONFIG_DIR/$1"
-X	if [[ -f ./$service${EXTN}.sysconfig ]] ; then
-X		sed < ./$service${EXTN}.sysconfig > $SYS_CONFIG_DIR/$1 \
-X			-e "/^RUNUSER=/s,=.*,=$RUNUSER," \
-X			-e "/^APPD_ROOT=/s,=.*,=$APPD_ROOT," \
-X			-e "/^MACHINE_AGENT_HOME=/s,=.*,=$machine_agent,"
-X		chmod 644 $SYS_CONFIG_DIR/$service
+X	sysconfig_file=$service.sysconfig
+X	if [ ! -f $sysconfig_file ] ; then
+X		sysconfig_file=$service.sysconfig.template
+X	else
+X		echo using customized $service configuration file
 X	fi
+X
+X	sed < $sysconfig_file > $SYS_CONFIG_DIR/$1 \
+X		-e "/^RUNUSER=/s,=.*,=$RUNUSER," \
+X		-e "/^APPD_ROOT=/s,=.*,=$APPD_ROOT," \
+X		-e "/^MACHINE_AGENT_HOME=/s,=.*,=$machine_agent,"
+X	chmod 644 $SYS_CONFIG_DIR/$service
 X}
 X
 X#
@@ -4789,7 +4842,7 @@ echo x - appdynamics-machine-agent.sh
 sed 's/^X//' >appdynamics-machine-agent.sh << 'END-of-appdynamics-machine-agent.sh'
 X#!/bin/bash
 X#
-X# $Id: appdynamics-machine-agent.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: appdynamics-machine-agent.sh 3.4 2016-09-20 23:31:12 cmayer $
 X#
 X# /etc/init.d/appdynamics-machine-agent
 X#
@@ -4841,6 +4894,13 @@ X[ -f /etc/sysconfig/appdynamics-machine-agent ] && . /etc/sysconfig/appdynamics
 X[ -f /etc/default/appdynamics-machine-agent ] && . /etc/default/appdynamics-machine-agent
 X
 XJAVA=$APPD_ROOT/jre/bin/java
+XNAME=$(basename $(readlink -e $0))
+X
+Xif [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+X	exec 2> /tmp/$NAME.out
+X	set -x
+Xfi
+X
 X
 X# For security reasons, locally embed/include function library at HA.shar build time
 X
@@ -4958,7 +5018,12 @@ X
 X	if [ -f $pidfile ] ; then
 X		pid=`cat $pidfile`
 X		if [ -d /proc/$pid ] ; then
-X			kill -9 $pid
+X			process_group=`ps -o pgrp -h $pid`
+X			if [ -n "$process_group" ] ; then
+X				for i in $process_group ; do
+X					kill -9 -$i
+X				done
+X			fi
 X		fi
 X		rm -f $pidfile
 X	fi
@@ -4996,30 +5061,6 @@ X        exit 1
 Xesac
 Xexit 0
 END-of-appdynamics-machine-agent.sh
-echo x - appdynamics-machine-agent.sysconfig
-sed 's/^X//' >appdynamics-machine-agent.sysconfig << 'END-of-appdynamics-machine-agent.sysconfig'
-X#
-X# $Id: appdynamics-machine-agent.sysconfig 3.0.1 2016-08-08 13:40:17 cmayer $
-X#
-X# Copyright 2016 AppDynamics, Inc
-X#
-X#   Licensed under the Apache License, Version 2.0 (the "License");
-X#   you may not use this file except in compliance with the License.
-X#   You may obtain a copy of the License at
-X#
-X#       http://www.apache.org/licenses/LICENSE-2.0
-X#
-X#   Unless required by applicable law or agreed to in writing, software
-X#   distributed under the License is distributed on an "AS IS" BASIS,
-X#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-X#   See the License for the specific language governing permissions and
-X#   limitations under the License.
-X#
-XAPPD_ROOT=/opt/AppDynamics/Controller
-XMACHINE_AGENT_HOME=/opt/appdynamics/machine-agent
-XRUNUSER=root
-XJAVA_OPTS="-Xmx512m -Xms512m -Dappdynamics.agent.nodeName=`hostname`"
-END-of-appdynamics-machine-agent.sysconfig
 echo x - mysqlclient.sh
 sed 's/^X//' >mysqlclient.sh << 'END-of-mysqlclient.sh'
 X#!/bin/bash
@@ -5186,7 +5227,7 @@ X# Description:       This script starts and stops the AppDynamics Controller
 X#                    Database, appserver, and HA components.
 X### END INIT INFO
 X#
-X# $Id: appdcontroller.sh 3.0 2016-08-04 03:09:03 cmayer $
+X# $Id: appdcontroller.sh 3.4 2016-09-20 23:31:12 cmayer $
 X# 
 X# Copyright 2016 AppDynamics, Inc
 X#
@@ -5219,16 +5260,17 @@ XPATH=/bin:/usr/bin:/sbin:/usr/sbin
 X
 XNAME=$(basename $(readlink -e $0))
 X
-X# uncomment for debug logging
-X#exec 2> /tmp/$NAME.out
-X#set -x
-X
 XAPPD_ROOT=/opt/AppDynamics/Controller
 XRUNUSER=root
 X
 X# source script config
 X[ -f /etc/sysconfig/appdcontroller ] && . /etc/sysconfig/appdcontroller
 X[ -f /etc/default/appdcontroller ] && . /etc/default/appdcontroller
+X
+Xif [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+X    exec 2> /tmp/$NAME.out
+X    set -x
+Xfi
 X
 XOPEN_FD_LIMIT=65536
 X
@@ -6093,7 +6135,7 @@ X# Description:       This script starts and stops the AppDynamics Controller
 X#                    Database, appserver, and HA components.
 X### END INIT INFO
 X#
-X# $Id: appdcontroller-db.sh 3.2 2016-09-08 03:09:03 cmayer $
+X# $Id: appdcontroller-db.sh 3.4 2016-09-20 23:31:12 cmayer $
 X# 
 X# Copyright 2016 AppDynamics, Inc
 X#
@@ -6125,16 +6167,17 @@ XPATH=/bin:/usr/bin:/sbin:/usr/sbin
 X
 XNAME=$(basename $(readlink -e $0))
 X
-X# uncomment for debug logging
-X#exec 2> /tmp/$NAME.out
-X#set -x
-X
 XAPPD_ROOT=/opt/AppDynamics/Controller
 XRUNUSER=root
 X
 X# source script config
 X[ -f /etc/sysconfig/appdcontroller-db ] && . /etc/sysconfig/appdcontroller-db
 X[ -f /etc/default/appdcontroller-db ] && . /etc/default/appdcontroller-db
+X
+Xif [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+X	exec 2> /tmp/$NAME.out
+X	set -x
+Xfi
 X
 XAPPD_BIN="$APPD_ROOT/bin"
 XDOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
@@ -6815,8 +6858,7 @@ X	[ "$lockfile_age" -gt "$uptime" ]
 X}
 X
 Xfunction calculate_memory {
-X	# multiply by 1.05 and round to account for extra 2% allocation overhead +
-X	#  headroom
+X	# multiply by 1.05 and round to account for extra 2% headroom
 X	CONTROLLER_HEAP=`domain_get_jvm_option Xmx | scale 1.04`
 X		
 X	# Parse controller JVM OPTIONS to get MaxPermSize
@@ -6827,8 +6869,7 @@ X	# memory MySQL allocates arround the InnoDB buffer pool.
 X	INNODB_BUFFER_POOL=`dbcnf_get innodb_buffer_pool_size | scale 1.1`
 X	INNODB_ADDITIONAL_MEM=`dbcnf_get innodb_additional_mem_pool_size | scale`
 X	
-X	# multiply by 1.05 and round to account for extra 2% allocation overhead +
-X	#  headroom
+X	# multiply by 1.05 and round to account for extra 2% headroom
 X	EVENTS_HEAP=`runuser \
 X		awk -F= "'/^\s*EVENTS_HEAP_SETTINGS=/ { print \$2 }'" \
 X			$APPD_ROOT/bin/controller.sh | \
@@ -6838,7 +6879,6 @@ X	if [ -z "$EVENTS_HEAP" -a -f $EVENTS_VMOPTIONS_FILE ] ; then
 X		EVENTS_HEAP=`runuser cat $EVENTS_VMOPTIONS_FILE \
 X			| get_jvm_option Xmx | scale 1.05`
 X	fi
-X
 X	if [ -z "$EVENTS_HEAP" ] ; then
 X		EVENTS_HEAP=0
 X	fi
@@ -6850,7 +6890,7 @@ X		EVENTS_MAXPERMSIZE=`runuser cat $EVENTS_VMOPTIONS_FILE | \
 X			get_jvm_option MaxPermSize | scale 1.05`
 X	fi
 X	
-X	if [ -n "$EVENTS_MAXPERMSIZE" -a "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
+X	if [ -z "$EVENTS_MAXPERMSIZE" ] || [ "$EVENTS_MAXPERMSIZE" -lt 1 ] ; then
 X		# Java permsize defaults to 64MiB
 X		EVENTS_MAXPERMSIZE=67108864
 X	fi
@@ -7072,10 +7112,34 @@ X        exit 1
 Xesac
 Xexit 0 
 END-of-appdcontroller-db.sh
-echo x - appdcontroller.sysconfig
-sed 's/^X//' >appdcontroller.sysconfig << 'END-of-appdcontroller.sysconfig'
+echo x - appdynamics-machine-agent.sysconfig.template
+sed 's/^X//' >appdynamics-machine-agent.sysconfig.template << 'END-of-appdynamics-machine-agent.sysconfig.template'
 X#
-X# $Id: appdcontroller.sysconfig 3.0 2016-06-29 12:58:56 cmayer $
+X# $Id: appdynamics-machine-agent.sysconfig.template 3.4 2016-09-20 23:31:12 cmayer $
+X#
+X# Copyright 2016 AppDynamics, Inc
+X#
+X#   Licensed under the Apache License, Version 2.0 (the "License");
+X#   you may not use this file except in compliance with the License.
+X#   You may obtain a copy of the License at
+X#
+X#       http://www.apache.org/licenses/LICENSE-2.0
+X#
+X#   Unless required by applicable law or agreed to in writing, software
+X#   distributed under the License is distributed on an "AS IS" BASIS,
+X#   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+X#   See the License for the specific language governing permissions and
+X#   limitations under the License.
+X#
+XAPPD_ROOT=/opt/AppDynamics/Controller
+XMACHINE_AGENT_HOME=/opt/appdynamics/machine-agent
+XRUNUSER=root
+XJAVA_OPTS="-Xmx512m -Xms512m -Dappdynamics.agent.nodeName=`hostname` -Dappdynamics.agent.maxMetrics=500"
+END-of-appdynamics-machine-agent.sysconfig.template
+echo x - appdcontroller.sysconfig.template
+sed 's/^X//' >appdcontroller.sysconfig.template << 'END-of-appdcontroller.sysconfig.template'
+X#
+X# $Id: appdcontroller.sysconfig.template 3.4 2016-09-20 23:31:12 cmayer $
 X# 
 X# Copyright 2016 AppDynamics, Inc
 X#
@@ -7101,11 +7165,11 @@ X# the install-init.sh script edits these settings to reflect reality
 X#
 XAPPD_ROOT=/opt/AppDynamics/Controller
 XRUNUSER=root
-END-of-appdcontroller.sysconfig
-echo x - appdcontroller-db.sysconfig
-sed 's/^X//' >appdcontroller-db.sysconfig << 'END-of-appdcontroller-db.sysconfig'
+END-of-appdcontroller.sysconfig.template
+echo x - appdcontroller-db.sysconfig.template
+sed 's/^X//' >appdcontroller-db.sysconfig.template << 'END-of-appdcontroller-db.sysconfig.template'
 X#
-X# $Id: appdcontroller-db.sysconfig 3.0 2016-06-29 12:58:56 cmayer $
+X# $Id: appdcontroller-db.sysconfig.template 3.4 2016-09-20 23:31:12 cmayer $
 X# 
 X# Copyright 2016 AppDynamics, Inc
 X#
@@ -7131,7 +7195,7 @@ X# the install-init.sh script edits these settings to reflect reality
 X#
 XAPPD_ROOT=/opt/AppDynamics/Controller
 XRUNUSER=root
-END-of-appdcontroller-db.sysconfig
+END-of-appdcontroller-db.sysconfig.template
 echo x - numa.settings.template
 sed 's/^X//' >numa.settings.template << 'END-of-numa.settings.template'
 X#
@@ -7492,7 +7556,7 @@ echo x - lib/ha.sh
 sed 's/^X//' >lib/ha.sh << 'END-of-lib/ha.sh'
 X#!/bin/bash
 X#
-X# $Id: lib/ha.sh 3.3 2016-09-08 13:40:17 cmayer $
+X# $Id: ha.sh 3.4 2016-09-20 23:39:01 cmayer $
 X#
 X# ha.sh
 X# contains common code used by the HA toolkit
@@ -7582,7 +7646,6 @@ X	getpw __inpw1 || exit 1		# updates __inpw1 *ONLY* if global variable
 X	obf=$(obfuscate $__inpw1) || exit 1
 X	echo $obf > $rootpw_obf || err "$thisfn: failed to save obfuscated passwd to $rootpw_obf"
 X	chmod 600 $rootpw_obf || warn "$thisfn: failed to make $rootpw_obf readonly"
-X	chown $RUNUSER $rootpw_obf
 X}
 X
 X#

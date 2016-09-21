@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.2 2016-09-08 14:52:22 cmayer $
+# $Id: install-init.sh 3.4 2016-09-20 23:31:12 cmayer $
 #
 # install init scripts, including the machine agent.
 #
