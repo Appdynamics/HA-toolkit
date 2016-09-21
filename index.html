@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en-us">
+  <head>
+    <meta charset="UTF-8">
+    <title>Ha-toolkit by Appdynamics</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" type="text/css" href="stylesheets/normalize.css" media="screen">
+    <link href='https://fonts.googleapis.com/css?family=Open+Sans:400,700' rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" type="text/css" href="stylesheets/stylesheet.css" media="screen">
+    <link rel="stylesheet" type="text/css" href="stylesheets/github-light.css" media="screen">
+  </head>
+  <body>
+    <section class="page-header">
+      <h1 class="project-name">Ha-toolkit</h1>
+      <h2 class="project-tagline">AppDynamics Controller High Availability Toolkit</h2>
+      <a href="https://github.com/Appdynamics/HA-toolkit" class="btn">View on GitHub</a>
+      <a href="https://github.com/Appdynamics/HA-toolkit/zipball/master" class="btn">Download .zip</a>
+      <a href="https://github.com/Appdynamics/HA-toolkit/tarball/master" class="btn">Download .tar.gz</a>
+    </section>
+
+    <section class="main-content">
+      <h1>
+<a id="ha" class="anchor" href="#ha" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>HA</h1>
+
+<p>Appdynamics HA Controller provisioning subsystem</p>
+
+<h2>
+<a id="non-developer-installation--use" class="anchor" href="#non-developer-installation--use" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Non-developer installation &amp; use</h2>
+
+<ul>
+<li>HA Toolkit <em>must</em> be installed from <code>HA.shar</code>
+</li>
+<li>Download HA.shar only or clone this repository and then run <code>make</code> to build a fresh HA.shar</li>
+</ul>
+
+<h2>
+<a id="documentation" class="anchor" href="#documentation" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Documentation</h2>
+
+<p>See <a href="README.txt">README.txt</a> and <a href="https://docs.appdynamics.com/display/PRO42/Using+the+High+Availability+(HA)+Toolkit">https://docs.appdynamics.com/display/PRO42/Using+the+High+Availability+(HA)+Toolkit</a></p>
+
+<h2>
+<a id="contributing" class="anchor" href="#contributing" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Contributing</h2>
+
+<h3>
+<a id="use-hubflow-to-manage-development-branches-and-releases" class="anchor" href="#use-hubflow-to-manage-development-branches-and-releases" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Use HubFlow to manage development branches and releases</h3>
+
+<p>Git Flow automates <a href="http://nvie.com/posts/a-successful-git-branching-model/">a number of excellent conventions for managing branches, merges, and releases</a>.  HubFlow is a GitHub-aware fork of the original Git Flow project:</p>
+
+<ul>
+<li>Easily installed on Mac OS X via homebrew </li>
+<li>Documentation: <a href="http://datasift.github.io/gitflow/">http://datasift.github.io/gitflow/</a>
+</li>
+</ul>
+
+<p>The Git Flow / Hubflow workflow maintains a pair of branches: <code>develop</code> and <code>master</code>:</p>
+
+<ul>
+<li>
+<code>develop</code> contains every merged feature and bug fix.</li>
+<li>
+<code>master</code> only contains released, production-ready code.  Bug fixes or features are branched from develop and then merged back in.</li>
+</ul>
+
+<p><strong><em>Please note that only Curt Mayer, the project architect, has push privileges to the</em></strong> <code>develop</code> <strong><em>and</em></strong> <code>master</code> <strong><em>branches in this repository.</em></strong>  To get your features and fixes merged into <code>develop</code> and released into <code>master</code>, please follow the procedures below.</p>
+
+<h3>
+<a id="getting-started-with-ha-toolkit-development" class="anchor" href="#getting-started-with-ha-toolkit-development" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Getting started with HA toolkit development</h3>
+
+<p><strong>AppDynamics GitHub organization members:</strong></p>
+
+<ul>
+<li>Install hubflow (<code>brew install hubflow</code> on Macs with <a href="http://brew.sh">Homebrew</a> installed, follow the instructions <a href="https://github.com/datasift/gitflow">here</a> for other platforms.)</li>
+<li>Clone this repo from GitHub with SSH</li>
+<li>Change directories into your clone of the HA-toolkit repo and run <code>git hf init</code>
+</li>
+<li>Please see <a href="http://datasift.github.io/gitflow/GitFlowForGitHub.html">Datasift's excellent tutorial on HubFlow</a>
+</li>
+</ul>
+
+<p><strong>Others:</strong></p>
+
+<ul>
+<li>Fork this repository on GitHub</li>
+<li>Clone your forked repository to your development machine.</li>
+<li>Use your preferred version control workflow, push back to your forked repo, and open a pull request on GitHub.  We will evaluate your contributions as we have the bandwidth to do so.</li>
+</ul>
+
+<h3>
+<a id="common-hubflow--github-operations" class="anchor" href="#common-hubflow--github-operations" aria-hidden="true"><span aria-hidden="true" class="octicon octicon-link"></span></a>Common HubFlow / GitHub operations</h3>
+
+<p><strong>Starting a new feature (or bugfix) branch</strong></p>
+
+<p><code>git hf feature start &lt;feature-name&gt;</code></p>
+
+<p><strong>Returning to a feature branch from another branch</strong></p>
+
+<p><code>git hf feature checkout &lt;feature-name&gt;</code></p>
+
+<p>This command also works for checking out a feature started by a colleague.  Note that you will need to look <a href="https://github.com/Appdynamics/HA-toolkit/branches">here</a> for the correct <code>feature/&lt;feature name&gt;</code> branch.</p>
+
+<p><strong>Pulling a colleague's work down from GitHub to your feature branch.</strong></p>
+
+<p><code>git hf pull</code></p>
+
+<p><strong>Pulling down the latest <code>master</code> and <code>develop</code> branches from GitHub</strong></p>
+
+<p><code>git hf update</code></p>
+
+<p><strong>Merging changes onto your feature branch from develop</strong></p>
+
+<ul>
+<li><code>git hf feature checkout &lt;feature-name&gt;</code></li>
+<li><code>git merge develop</code></li>
+</ul>
+
+<p><strong>Getting your feature merged into the develop branch</strong></p>
+
+<ul>
+<li><code>git hf update</code></li>
+<li><code>git hf feature checkout &lt;feature-name&gt;</code></li>
+<li>
+<code>git merge develop</code> (and resolve any merge conflicts)</li>
+<li><code>git hf push</code></li>
+<li>Open a <a href="https://help.github.com/articles/using-pull-requests/">pull request</a> to pull changes from your feature branch to <code>develop</code> and assign to Curt Mayer (cmayer68)</li>
+<li>If any changes are required before your pull request gets merged, commit them to your feature request branch and <code>git hf push</code> them to github.  They will be added automatically to your pull request.</li>
+<li>Once your pull request has been merged, delete your feature branch from GitHub and run <code>git hf feature finish</code> to close your feature branch.  If this fails and you are certain that your feature has been merged, run <code>git hf feature finish -f &lt;feature name&gt;</code> to force the cleanup to complete.</li>
+</ul>
+
+<p><strong>Handling pull requests</strong></p>
+
+<ul>
+<li>Open the pull request and review the "Conversation," "Commits," and "Files changed" tabs.</li>
+<li>Make comments, as necessary, on the submitted code changes.  (Unfortunately, that GitHub's comment system isn't as slick as Gerrit's where you can highlight a section of code and attach a comment it to it.  You should place your comment <em>below</em> all of the code you are commenting on to improve readability in the "Conversation" tab)</li>
+<li>New commits based on your feedback will be reflected automatically in the pull request, though a browser refresh may be required.</li>
+<li>Once you are satisfied with all of the changes, scroll to the end of the conversation and click the "Merge pull request" button.</li>
+<li>Enter a commit message</li>
+<li>Decide whether to <a href="https://help.github.com/articles/about-pull-request-merge-squashing/">preserve all of the commits in the pull request, or squash them into a single commit.</a>
+</li>
+<li>Click the green button again to confirm your selection.</li>
+</ul>
+
+<p><strong>Publishing a new release</strong></p>
+
+<ul>
+<li>
+<code>git hf release start &lt;tag name&gt;</code> (Note that the <code>&lt;tag name&gt;</code> should be your version string, i.e. '1.2.3')</li>
+<li>Complete pre-release tests and bug fixes on the relese candidate branch</li>
+<li><code>git hf release finish &lt;tag name&gt;</code></li>
+</ul>
+
+      <footer class="site-footer">
+        <span class="site-footer-owner"><a href="https://github.com/Appdynamics/HA-toolkit">Ha-toolkit</a> is maintained by <a href="https://github.com/Appdynamics">Appdynamics</a>.</span>
+
+        <span class="site-footer-credits">This page was generated by <a href="https://pages.github.com">GitHub Pages</a> using the <a href="https://github.com/jasonlong/cayman-theme">Cayman theme</a> by <a href="https://twitter.com/jasonlong">Jason Long</a>.</span>
+      </footer>
+
+    </section>
+
+  
+  </body>
+</html>
