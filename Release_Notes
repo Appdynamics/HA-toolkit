@@ -208,3 +208,4 @@ Release notes for version 3.4
    preserved if a file exists of the form service.sysconfig
 
 8) an informative message is printed when non-root user runs install-init.sh.
+
