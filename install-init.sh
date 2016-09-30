@@ -279,6 +279,12 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 		if require cc gcc gcc advise "to build $APPDSERVICE privilege escalation wrapper" ; then
 			# Clean up sudo privilege escalation if it was previously installed
 			rm -f /etc/sudoers.d/appdynamics 2>/dev/null
+			# catch case where previous $APPDSERVICE cannot be overwritten by compiler
+			rm -f $APPDSERVICE 2> /dev/null
+			if [[ -f "$APPDSERVICE" ]]; then
+			   echo "Unable to remove previous $APPDSERVICE. Please remove manually and re-run."
+			   exit 1
+			fi
 			# compile wrapper, chown and chmod with setuid
 			cc -D_GNU_SOURCE -DAPPDUSER=`id -u $RUNUSER` -o $APPDSERVICE appdservice.c
 			if [ -x $APPDSERVICE ] ; then
