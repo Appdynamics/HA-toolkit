@@ -234,3 +234,8 @@ Release notes for version 3.5
 
 7) simplified logging by eliminating the seperate SQL_ERROR path.
 
+--------------------------------------
+Release notes for version 3.5.1
+
+1) Catch case when newly compiled /sbin/appdservice does not overwrite incumbent
+   by removing old version first.
