@@ -45,7 +45,7 @@ DELFILES=""
 function sqltimeout {
 	echo "sqltimeout $sqlpid"
 	if [ $sqlpid -ne 0 ] ; then
-		echo "sql timed out: killing pid $sqlpid" | sqlerr
+		echo "sql timed out: killing pid $sqlpid" | logonly
 		disown $sqlpid
 		kill -s SIGINT $sqlpid
 		sqlpid=0
@@ -108,7 +108,7 @@ function sql {
         else
 			echo "output: " >> $errfile
 			cat $tmpfile >> $errfile
-			cat $errfile | sqlerr
+			cat $errfile | logonly
         fi
 		return $retval
 	fi

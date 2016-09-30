@@ -82,7 +82,7 @@ function stop() {
 	if [ -f $pidfile ] ; then
 		pid=`cat $pidfile`
 		if [ -d /proc/$pid ] ; then
-			process_group=`ps -o pgrp -h $pid`
+			process_group=`ps -o pgrp= $pid`
 			if [ -n "$process_group" ] ; then
 				for i in $process_group ; do
 					kill -9 -$i

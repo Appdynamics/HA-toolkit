@@ -71,14 +71,6 @@ function message {
 	logmsg "$@"
 }
 
-function sqlerr {
-    if [ -z "$SQL_ERROR" ] ; then
-        pwmask >> $LOGFILE
-    else
-        pwmask >> $SQL_ERROR
-    fi
-}
-
 #
 # this indicates a coding error, so let's print a useful backtrace
 # as in guten abend

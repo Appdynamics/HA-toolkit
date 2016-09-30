@@ -209,3 +209,28 @@ Release notes for version 3.4
 
 8) an informative message is printed when non-root user runs install-init.sh.
 
+--------------------------------------
+Release notes for version 3.5
+
+1) the default log expiration time is changed from 8 days to 3 days.  the
+   amount of disk space saved is significant, and the use case for keeping
+   replication stopped for 8 days is questionable at the very least.
+
+2) the chkconfig and update_rc_d functions are not needed in the sudoers
+   file.  they are not invoked by the HA package as non-root.
+
+3) numa-patch-controller.sh gets run automatically when replicate -f is run.
+
+4) when the -m option is explicitly specified, it writes out the monitoring
+   definition to the file MONITOR.  Thenceforth, if this file exists, it sets 
+   the default monitoring information for the controller and machine agent.
+
+5) the DBOPLIMIT, which controlls the dbopfail test in the watchdog, is
+   set to disable the test by default.  it should be enabled for systems
+   with SAN attached disk.
+
+6) appdynamics-machine-agent.sh now works on older linuxes that don't support
+   ps -h.
+
+7) simplified logging by eliminating the seperate SQL_ERROR path.
+

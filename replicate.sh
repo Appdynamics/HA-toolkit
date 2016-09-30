@@ -279,7 +279,6 @@ function usage()
 	echo "usage: $0 <options>"
 	echo "    -s <secondary hostname>"
 #	echo "    [ -j ] Synchronize controller app server configurations and related binaries"
-#	echo "           if secondary database is running, leave it running."
 	echo "    [ -e [protocol://]<external vip>[:port] ]"
 	echo "    [ -i [protocol://]<internal vip>[:port] ]"
 	echo "    [ -m url=[protocol://]<controller_monitor>[:port],access_key=\"1-2-3-4\"[,app_name=\"ABC controller\"][,account_name=someaccount] ]"
@@ -331,6 +330,37 @@ function parse_vip()
 	'
 }
 
+declare -A cmargs
+
+#
+# parse a controller monitor definition.
+# this takes the form:
+# url=[protocol://]<controller_monitor>[:port],
+# access_key=\"1-2-3-4\"
+# [,app_name=\"ABC controller\"]
+# [,account_name=someaccount]
+#
+function parse_monitor_def() {
+
+	local controller_monitor_args=$1
+
+	declare -a vals A
+	# vals array gets comma delimited settings
+	IFS=, read -a vals <<< "$controller_monitor_args"
+	for i in ${!vals[*]} ; do 
+		# then, split the key, value pairs by equals sign
+		IFS="=" read -a A <<< "${vals[$i]}"
+		# remove any leading/trailing quotes
+		noquote=$(sed -e 's/^["'\'']//' -e 's/["'\'']$//' <<< "${A[1]}")
+		# assign associative array cmargs
+		cmargs[${A[0]}]=${noquote}
+	done
+}
+
+if [ -f MONITOR ] ; then
+	parse_monitor_def "`cat MONITOR`"
+fi
+
 log_rename
 
 #
@@ -361,26 +391,8 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS flag; do
 		internal_vip=$OPTARG
 		;;
 	m)
-		# parse a controller monitor definition.
-		# this takes the form:
-		# url=[protocol://]<controller_monitor>[:port],
-		# access_key=\"1-2-3-4\"
-		# [,app_name=\"ABC controller\"]
-		# [,account_name=someaccount]
-		#
-		controller_monitor_args=$OPTARG
-		declare -a vals A
-		declare -A cmargs
-		# vals array gets comma delimited settings
-		IFS=, read -a vals <<< "$controller_monitor_args"
-		for i in ${!vals[*]} ; do 
-			# then, split the key, value pairs by equals sign
-			IFS="=" read -a A <<< "${vals[$i]}"
-			# remove any leading/trailing quotes
-			noquote=$(sed -e 's/^["'\'']//' -e 's/["'\'']$//' <<< "${A[1]}")
-			# assign associative array cmargs
-			cmargs[${A[0]}]=${noquote}
-		done
+		parse_monitor_def $OPTARG
+		echo "$OPTARG" > MONITOR
 		;;
 	j)
 		appserver_only_sync=true
@@ -768,6 +780,11 @@ if $final ; then
 		fi
 	fi
 
+	if [ -x numa-patch-controller.sh ] ; then
+		message "patching controller.sh for numa"
+		./numa-patch-controller.sh
+	fi
+
 	message "stopping primary"
 	rsync_opts=$final_rsync_opts
 	rsync_throttle=""
@@ -803,7 +820,7 @@ else
 	replicate-same-server-id=0
 	auto_increment_increment=10
 	auto_increment_offset=1
-	expire_logs_days=8
+	expire_logs_days=3
 	binlog_format=MIXED
 	replicate_ignore_table=controller.ejb__timer__tbl
 	replicate_ignore_table=controller.connection_validation

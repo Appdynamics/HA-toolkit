@@ -252,18 +252,14 @@ if [[ `id -u $RUNUSER` != "0" ]] ; then
 			COMMA=
 			for s in ${APPDYNAMICS_SERVICE_LIST[@]} ; do
 				CMND_ALIAS_LIST="$CMND_ALIAS_LIST $COMMA \\
-				$SERVICE $s *, \\
-				$CHKCONFIG $s on, \\
-				$CHKCONFIG $s off"
+				$SERVICE $s *"
 				COMMA=","
 			done
 		elif [ -x "$UPDATE_RC_D" ] ; then
 			COMMA=
 			for s in ${APPDYNAMICS_SERVICE_LIST[@]} ; do
 				CMND_ALIAS_LIST="$CMND_ALIAS_LIST$COMMA \\
-				$SERVICE $s *, \\
-				$UPDATE_RC_D $s enable, \\
-				$UPDATE_RC_D $s disable"
+				$SERVICE $s *"
 				COMMA=","
 			done
 		fi

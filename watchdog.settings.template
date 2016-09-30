@@ -42,6 +42,8 @@ PINGLIMIT=300
 
 # The primary database cannot create a table: 5 Minutes
 DBOPLIMIT=300
+# disable this test for now, until we get more confidence in it
+DBOPLIMIT=2000000000
 
 #
 # the length of time to wait for a sql statememt to run
