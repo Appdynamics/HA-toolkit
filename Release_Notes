@@ -239,3 +239,10 @@ Release notes for version 3.5.1
 
 1) Catch case when newly compiled /sbin/appdservice does not overwrite incumbent
    by removing old version first.
+
+--------------------------------------
+Release notes for version 3.5.2
+
+1) the pesky messages about /root/.forever when trying to stop the appdcontroller
+   service is now gone.  it was a coding error.
+
