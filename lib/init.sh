@@ -43,10 +43,10 @@ if [ `id -un` == "$RUNUSER" ] ; then
 	}
 else
 	function bg_runuser {
-		su -m -s /bin/bash -c "nohup $* >/dev/null 2>&1 & echo \$!" $RUNUSER
+		su -s /bin/bash -c "nohup $* >/dev/null 2>&1 & echo \$!" $RUNUSER
 	}
 	function runuser {
-		su -m -s /bin/bash -c "$*" $RUNUSER
+		su -s /bin/bash -c "$*" $RUNUSER
 	}
 fi
 export -f runuser bg_runuser
