@@ -100,7 +100,8 @@ RISINGLIMIT=3600
 DBDOWNLIMIT=300
 
 # The primary database cannot create a table: 2 Minutes
-DBOPLIMIT=300
+# disabled by default
+DBOPLIMIT=2000000000
 
 # The active controller host is not responding to ICMP echo, (ping),
 # requests: 5 Minutes
