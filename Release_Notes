@@ -246,3 +246,9 @@ Release notes for version 3.5.2
 1) the pesky messages about /root/.forever when trying to stop the appdcontroller
    service is now gone.  it was a coding error.
 
+--------------------------------------
+Release notes for version 3.5.3
+
+1) the dbopfail watchdog test is suspect.  it is disabled by default both
+   in the watchdog.sh and watchdog.settings.template
+
