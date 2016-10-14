@@ -36,14 +36,14 @@ fi
 #
 if [ `id -un` == "$RUNUSER" ] ; then
 	function bg_runuser {
-		bash -c "nohup $* >/dev/null 2>&1 & echo \$!" &
+		bash -c "$* >/dev/null 2>&1 & echo \$! ; disown" &
 	}
 	function runuser {
 		"$@"
 	}
 else
 	function bg_runuser {
-		su -s /bin/bash -c "nohup $* >/dev/null 2>&1 & echo \$!" $RUNUSER
+		su -s /bin/bash -c "$* >/dev/null 2>&1 & echo \$!; disown" $RUNUSER
 	}
 	function runuser {
 		su -s /bin/bash -c "$*" $RUNUSER

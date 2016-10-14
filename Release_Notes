@@ -252,3 +252,9 @@ Release notes for version 3.5.3
 1) the dbopfail watchdog test is suspect.  it is disabled by default both
    in the watchdog.sh and watchdog.settings.template
 
+--------------------------------------
+Release notes for version 3.6
+
+1) the reporting service and events services on the local box were not being
+   properly started and stopped by the init script, especially if the script
+   in bin/controller.sh was also being used to manage these services.

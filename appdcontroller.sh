@@ -216,10 +216,14 @@ start)
 			fi
 		fi
 		if runuser [ -d "$APPD_ROOT/events_service" ] ; then
-			bg_runuser $APPD_BIN/controller.sh start-events-service >/dev/null
+			if ! events_running ; then
+				bg_runuser $APPD_BIN/controller.sh start-events-service >/dev/null
+			fi
 		fi
 		if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
-			bg_runuser $APPD_BIN/controller.sh start-reporting-service >/dev/null
+			if ! reporting_running ; then
+				bg_runuser HOME=~$RUNUSER $APPD_BIN/controller.sh start-reporting-service >/dev/null
+			fi
 		fi
 	else
 		if replication_disabled ; then
@@ -263,7 +267,7 @@ stop)
 		runuser $APPD_BIN/controller.sh stop-events-service
 	fi
 	if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
-		runuser $APPD_BIN/controller.sh stop-reporting-service
+		runuser HOME=~$RUNUSER $APPD_BIN/controller.sh stop-reporting-service
 	fi
 	# The default controller shutdown timeout is 45 minutes 
 	# That is a long time to be stuck with a hung appserver on the way down.
