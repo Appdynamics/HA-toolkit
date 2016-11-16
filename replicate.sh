@@ -1001,7 +1001,7 @@ if ! $final ; then
 			verify_privilege_escalation $secondary
 		fi
 	fi
-	message "incremental sync done"
+	message "incremental sync done $(date)"
 	exit 0
 fi
 
