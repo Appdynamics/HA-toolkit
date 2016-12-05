@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-pbrun.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: appdservice-pbrun.sh 3.1 2016-12-05 14:32:17 cmayer $
 #
 # shell wrapper around pbrun for appdynamics service changes
 #
@@ -18,7 +18,13 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-PBRUN=/usr/local/bin/pbrun
+PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
+PBRUN=
+for pbrun in $PBRUN_PLACES ; do
+	if -x $pbrun ; then
+		PBRUN=$pbrun
+	fi
+done
 
 function usage {
 	echo usage: "$0 [appdcontroller|appdcontroller-db|appdynamics-machine-agent start|stop|status]"
@@ -26,7 +32,7 @@ function usage {
 }
 
 if [ ! -x $PBRUN ] ; then
-	echo $0: pbrun not found at $PBRUN
+	echo $0: pbrun not found at $PBRUN_PLACES
 	exit 2
 fi
 

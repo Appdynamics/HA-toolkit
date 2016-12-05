@@ -2,7 +2,7 @@
 #
 # print out the status of the appdynamics controller on this node
 #
-# $Id: appdstatus.sh 3.0 2016-06-29 12:58:56 cmayer $
+# $Id: appdstatus.sh 3.1 2016-12-05 14:35:50 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -243,5 +243,9 @@ case $? in
 	echo "machine-agent service not running"
 	;;
 esac
+
+if [ -f $APPD_ROOT/HA/numa.settings ] ; then
+	numastat mysqld java
+fi
 
 exit 0 

@@ -282,4 +282,6 @@ Release notes for version 3.7
 
 7) a typo prevented explicit huge pages from being allocated
 
+8) numa status is reported by appdstatus.sh on numa machines
 
+9) a syntax change in replicate.sh makes the log slightly less noisy

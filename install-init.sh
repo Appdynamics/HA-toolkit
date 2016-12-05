@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.4 2016-09-20 23:31:12 cmayer $
+# $Id: install-init.sh 3.5 2016-12-05 14:35:50 cmayer $
 #
 # install init scripts, including the machine agent.
 #
@@ -31,7 +31,14 @@ function usage {
 }
 
 APPD_ROOT=`cd .. ; pwd -P`			# ignore sym links
-PBRUN=`grep PBRUN= appdservice-pbrun.sh | awk -F= '{print $2}'`
+
+PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
+PBRUN=
+for pbrun in $PBRUN_PLACES ; do
+    if -x $pbrun ; then
+        PBRUN=$pbrun
+    fi
+done
 
 if [ `id -un` != root ] ; then
 	echo install-init.sh must be run as root
@@ -73,7 +80,7 @@ while getopts ":csprxa:" flag; do
 		if [ -x $PBRUN ] ; then
 			use_pbrun=1
 		else
-			echo $PBRUN not found
+			echo pbrun not found in $PBRUN_PLACES
 			exit 1
 		fi
 		;;

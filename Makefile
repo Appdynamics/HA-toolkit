@@ -1,6 +1,6 @@
 #
 # makefile for HA script distro
-# $Id: Makefile 3.4 2016-09-20 23:31:12 cmayer $
+# $Id: Makefile 3.6 2016-12-05 14:35:50 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -90,6 +90,15 @@ clean:
 
 clobber: clean
 	rm -f HA.shar
+
+install: HA.shar
+	@if [ -f INSTALLTARGETS ] ; then \
+		for target in `cat INSTALLTARGETS` ; do \
+			echo copying to $$target ; \
+			scp -q HA.shar $$target & \
+		done ; \
+		wait ; \
+	fi
 
 #
 # not used normally, as the install-init.sh compiles it in an installation

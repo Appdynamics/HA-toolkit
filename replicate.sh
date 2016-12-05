@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.3 2016-09-08 13:40:17 cmayer $
+# $Id: replicate.sh 3.4 2016-12-05 14:37:00 cmayer $
 #
 # install HA to a controller pair
 #
@@ -78,7 +78,7 @@ wildcard=false
 unbreak=false
 rsync_throttle="--bwlimit=20000"
 rsync_compression=""
-rsync_opts="-PavpW --del --inplace --exclude=ibdata1 --exclude=ib_logfile\*"
+rsync_opts="-PavpW --del --inplace --exclude=ibdata1"
 final_rsync_opts="-PavpW --del --inplace"
 machine_agent=""
 ma_conf=""
@@ -961,6 +961,7 @@ else
 	logcmd rsync $rsync_opts \
 		$rsync_throttle $rsync_compression \
 		--exclude=lost+found \
+		--exclude=ib_logfile\* \
 	    --exclude=bin-log\* \
 	    --exclude=relay-log\* \
 	    --exclude=\*.log \

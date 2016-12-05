@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/log.sh 3.2 2016-09-08 03:09:03 cmayer $
+# $Id: log.sh 3.3 2016-12-05 14:36:20 cmayer $
 #
 # logging code for the HA toolkit - include this first
 #
@@ -30,7 +30,7 @@ fi
 # function to mask passwords
 #
 function pwmask {
-	sed -e 's/--password=[^ ]*/--password=/'
+	sed -u -e 's/--password=[^ ]*/--password=/'
 }
 
 LOGFILE=$APPD_ROOT/logs/$LOGNAME
