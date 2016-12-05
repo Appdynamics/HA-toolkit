@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-xuser.sh 3.3 2016-09-08 03:09:03 cmayer $
+# $Id: appdservice-noroot.sh 3.3 2016-09-08 03:09:03 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -24,7 +24,7 @@
 #
 
 cd $(dirname $0)
-APPD=`cd .. ; pwd -P`
+APPD_ROOT=`readlink -e ..`
 
 . lib/ha.sh
 . appdynamics-machine-agent.sysconfig
@@ -50,34 +50,34 @@ appdcontroller:status|appdcontroller-db:status|appdynamics-machine-agent:status)
 appdcontroller:start)
 	./appdservice-noroot.sh appdcontroller-db start
 	if echo 'select value from global_configuration_local where name = "appserver.mode"' | ./mysqlclient.sh | grep -q active ; then
-		nohup $APPD/bin/controller.sh start-appserver &
-		if [ -d "$APPD/events_service" ] ; then
-			nohup $APPD/bin/controller.sh start-events-service &
+		nohup $APPD_ROOT/bin/controller.sh start-appserver &
+		if [ -d "$APPD_ROOT/events_service" ] ; then
+			nohup $APPD_ROOT/bin/controller.sh start-events-service &
 		fi
-		if [ -d "$APPD/reporting_service" ] ; then
-			nohup $APPD/bin/controller.sh start-reporting-service &
+		if [ -d "$APPD_ROOT/reporting_service" ] ; then
+			nohup $APPD_ROOT/bin/controller.sh start-reporting-service &
 		fi
 	fi
 	;;
 
 appdcontroller:stop)
-	$APPD/bin/controller.sh stop-appserver
-	if [ -d "$APPD/events_service" ] ; then
-		$APPD/bin/controller.sh stop-events-service
+	$APPD_ROOT/bin/controller.sh stop-appserver
+	if [ -d "$APPD_ROOT/events_service" ] ; then
+		$APPD_ROOT/bin/controller.sh stop-events-service
 	fi
-	if [ -d "$APPD/reporting_service" ] ; then
-		$APPD/bin/controller.sh stop-reporting-service
+	if [ -d "$APPD_ROOT/reporting_service" ] ; then
+		$APPD_ROOT/bin/controller.sh stop-reporting-service
 	fi
 	;;
 
 appdcontroller-db:start)
-	$APPD/bin/controller.sh start-db
+	$APPD_ROOT/bin/controller.sh start-db
 	false
 	;;
 
 appdcontroller-db:stop)
 	./appdservice-noroot.sh appdcontroller stop
-	$APPD/bin/controller.sh stop-db
+	$APPD_ROOT/bin/controller.sh stop-db
 	;;
 
 appdynamics-machine-agent:start)
@@ -85,7 +85,7 @@ appdynamics-machine-agent:start)
 	if [ ! -d "$ma_dir" ] ; then
 		exit 0
 	fi
-	nohup $APPD/jre/bin/java $JAVA_OPTS -jar $ma_dir/machineagent.jar &
+	nohup $APPD_ROOT/jre/bin/java $JAVA_OPTS -jar $ma_dir/machineagent.jar &
 	;;
 
 appdynamics-machine-agent:stop)

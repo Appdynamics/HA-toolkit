@@ -23,7 +23,7 @@
 #
 if [ -z "$APPD_ROOT" ] ; then
 	# let's assume that whoever is calling us has cd'd to the HA directory
-	APPD_ROOT=$( cd .. ; pwd -P)
+	APPD_ROOT=`readlink -e ..`
 fi
 
 #

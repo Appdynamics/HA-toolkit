@@ -201,6 +201,9 @@ function host_crash {
 	[ "$lockfile_age" -gt "$uptime" ]
 }
 
+#
+# calculate a bunch of memory footprints and set global variables accordingly
+# 
 function calculate_memory {
 	# multiply by 1.05 and round to account for extra 2% headroom
 	CONTROLLER_HEAP=`domain_get_jvm_option Xmx | scale 1.04`

@@ -286,6 +286,24 @@ Release notes for version 3.7
 
 9) a syntax change in replicate.sh makes the log slightly less noisy
 
+10) install-init.sh had a syntax error that prevented pbrun from being properly
+    detected
+
+11) replicate.sh had a bug that prevented running as root
+
+12) the format for numa.settings.template allows better numa node handling
+    by explicitly creating a list of numa nodes that can be interrogated
+    in scripts.
+
+13) install-init and replicate.sh now complain when there is ambiguity in 
+    finding the correct machine agent.  specify -a to force a specific instance.
+
+14) several minor messages were eliminated or corrected.
+
+15) code to resolve absolute paths now use readlink -e
+
+16) appdservice-noroot.sh was updated to reflect common usage of APPD_ROOT
+
 --------------------------------------
 Release notes for version 3.7.1
 

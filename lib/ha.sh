@@ -165,11 +165,8 @@ function check_sanity {
 # locate a machine agent install directory and print out it's path
 #
 function find_machine_agent {
-	relpath=`find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print 2>/dev/null | head -1 | sed "s,/[^/]*$,,"`
-	if [ -n "$relpath" ] ; then
-		(cd $relpath ; pwd -P)
-	else
-		echo ""
-	fi
+	for ma_path in $(find ../.. .. -maxdepth 2 -type f -name machineagent.jar -print 2>/dev/null | sed "s,/[^/]*$,," | sort -u) ; do
+		readlink -e $ma_path
+	done
 }
 

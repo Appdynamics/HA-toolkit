@@ -435,7 +435,7 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS flag; do
 		rsync_compression="-z"
 		;;
 	a)
-		machine_agent="$OPTARG"
+		machine_agent=$(readlink -e "$OPTARG")
 		[[ -f "$machine_agent/machineagent.jar" ]] || fatal 1 "-a directory $machine_agent is not a machine agent install directory"
 		;;
 	F)
@@ -486,10 +486,16 @@ fi
 # search for a machine agent in a few likely places
 #
 if [ -z "$machine_agent" ] ; then
-	machine_agent=`find_machine_agent`
+	machine_agent=(`find_machine_agent`)
+	if [ ${#machine_agent[@]} != 1 ] ; then
+		echo too many machine agents: ${machine_agent[@]}
+		echo select one, and specify it using -a
+		usage
+		exit 1
+	fi
 fi
+
 if [ -n "$machine_agent" ] ; then
-	machine_agent=`cd "$machine_agent" ; pwd -P`
 	ma_conf="$machine_agent/conf"
 	message "found machine agent in $machine_agent"
 	message "copying monitors"
@@ -908,6 +914,8 @@ else
 		-exec sh -c 'echo -n "{} " ; od -N 150 -t x4 -A none {} | md5sum' \; | \
 		sort > $tmpdir/ibdlist.large.local
 
+	ssh $secondary mkdir -p $datadir/controller
+
 	ssh $secondary "find $datadir/controller \
 		-name \*.ibd \( -size -1M -o -size 1M \) \
 		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" | \
@@ -929,7 +937,7 @@ else
 		scp -q $tmpdir/worklist $secondary:/tmp/replicate-prune-worklist
 		ssh $secondary "cat /tmp/replicate-prune-worklist | xargs rm -f"
 	else
-		message "no discrepancies\n"
+		message "no discrepancies"
 	fi
 
 	#

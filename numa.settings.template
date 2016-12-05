@@ -19,5 +19,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-NUMA_MYSQL="numactl --cpunodebind 0 --preferred 0"
-NUMA_JAVA="numactl --cpunodebind 1 --preferred 1"
+NUMA_MYSQL_NODES=1
+NUMA_JAVA_NODES=0
+
+NUMA_MYSQL="numactl --cpunodebind $NUMA_MYSQL_NODES --preferred $NUMA_MYSQL_NODES"
+NUMA_JAVA="numactl --cpunodebind $NUMA_JAVA_NODES --preferred $NUMA_JAVA_NODES"

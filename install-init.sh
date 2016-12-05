@@ -30,12 +30,12 @@ function usage {
 	exit 1
 }
 
-APPD_ROOT=`cd .. ; pwd -P`			# ignore sym links
+APPD_ROOT=`readlink -e ..`
 
 PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
 PBRUN=
 for pbrun in $PBRUN_PLACES ; do
-    if -x $pbrun ; then
+    if [ -x $pbrun ] ; then
         PBRUN=$pbrun
     fi
 done
@@ -85,7 +85,7 @@ while getopts ":csprxa:" flag; do
 		fi
 		;;
 	a)	
-		machine_agent="$OPTARG"
+		machine_agent=$(readlink -e "$OPTARG")
 		if ! [ -f "$machine_agent/machineagent.jar" ] ; then
 			echo "$machine_agent is not a machine agent install directory"
 			exit 1
@@ -105,7 +105,13 @@ done
 # search for a machine agent in a few likely places
 #
 if [ -z "$machine_agent" ] ; then
-	machine_agent=`find_machine_agent`
+	machine_agent=(`find_machine_agent`)
+	if [ ${#machine_agent[@]} -gt 1 ] ; then
+		echo too many machine agents: ${machine_agent[@]}
+		echo select one, and specify it using -a
+		usage
+		exit 1
+	fi
 fi
 if [ -n "$machine_agent" ] ; then
 	machine_agent_service=appdynamics-machine-agent
@@ -114,7 +120,7 @@ fi
 
 if [ `id -u` != 0 ] ; then
 	echo $0 must be run as root
-	exit 0
+	exit 1
 fi
 
 export PATH=/sbin:/usr/sbin:$PATH
@@ -357,3 +363,5 @@ done
 if [ -d "$machine_agent" ] ; then
 	chown -R $RUNUSER "$machine_agent"
 fi
+
+exit 0

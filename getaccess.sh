@@ -19,7 +19,7 @@
 #
 cd $(dirname $0)
 
-APPD_ROOT=`cd .. ; pwd -P`
+APPD_ROOT=`readlink -e ..`
 account=system
 host=localhost
 dbpasswd=
