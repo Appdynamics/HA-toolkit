@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.4 2016-09-20 23:31:12 cmayer $
+# $Id: appdcontroller-db.sh 3.5 2016-12-05 14:04:12 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -321,7 +321,7 @@ function reserve_memory {
 		return
 	fi
 	
-	increment /proc/sys/vm/nf_hugepages $APPD_HUGE_PAGES
+	increment /proc/sys/vm/nr_hugepages $APPD_HUGE_PAGES
 
 	# Allow the AppDynamics user to access the huge pages we're allocating.
 	if ! id -G $RUNUSER | grep -wq /proc/sys/vm/hugetlb_shm_group ; then

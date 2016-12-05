@@ -258,3 +258,28 @@ Release notes for version 3.6
 1) the reporting service and events services on the local box were not being
    properly started and stopped by the init script, especially if the script
    in bin/controller.sh was also being used to manage these services.
+
+--------------------------------------
+Release notes for version 3.7
+
+1) the watchdog.settings.template has an extensive comment concerning the
+   reasons for when the dbop test should be enabled, and disables the test
+   by default
+
+2) lib/log.sh now does the password masking using unbuffered sed.  this makes
+   the output of replicate.sh in the log file more interactive.
+
+3) a typo in appdynamics-machine-agent.sh rarely would cause the machine agent
+   to not start.
+
+4) the machine agent service status now is properly factored out of 
+   appdcontroller.sh
+
+5) pbrun is now probed for in /usr/local/bin and /usr/bin
+
+6) if the events directory is renamed, the init script makes no attempt
+   to start or stop the events service.
+
+7) a typo prevented explicit huge pages from being allocated
+
+

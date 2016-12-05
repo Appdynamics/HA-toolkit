@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.4 2016-09-20 23:31:12 cmayer $
+# $Id: appdcontroller.sh 3.5 2016-12-05 14:04:12 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -182,14 +182,6 @@ function reporting_running {
 	return 1
 }
 
-function machine_agent_running {
-	if service appdynamics-machine-agent status &> /dev/null; then
-		return 0
-	else
-		return 1
-	fi
-}
-
 case "$1" in
 start)  
 	require_root
@@ -215,6 +207,8 @@ start)
 				bg_runuser "$APPD_ROOT/HA/assassin.sh"
 			fi
 		fi
+	# if the events service directory exists, do events stuff.
+	# an full scale HA should rename this directory
 		if runuser [ -d "$APPD_ROOT/events_service" ] ; then
 			if ! events_running ; then
 				bg_runuser $APPD_BIN/controller.sh start-events-service >/dev/null
@@ -260,9 +254,8 @@ stop)
 			>> $APPD_ROOT/logs/assassin.log" )		
 	fi
 	runuser rm -f $ASSASSIN
-	# TODO: stop automatically starting and stopping the local events service 
-	# since an HA controller pair should be talking to a separate events 
-	# service cluster.
+	# if the events service directory exists, do events stuff.
+	# an full scale HA should rename this directory
 	if runuser [ -d "$APPD_ROOT/events_service" ] ; then
 		runuser $APPD_BIN/controller.sh stop-events-service
 	fi
@@ -355,15 +348,7 @@ status)
 		echo "reporting service not running"
 		;;
 	esac
-	machine_agent_running
-	case $? in
-	0)
-		echo "machine-agent service running"
-		;;
-	*)
-		echo "machine-agent service not running"
-		;;
-	esac
+	service appdynamics-machine-agent status
 	exit $retcode
 ;;
 

@@ -1,4 +1,4 @@
-# $Id: watchdog.settings.template 3.0 2015-12-23 00:36:28 cmayer $
+# $Id: watchdog.settings.template 3.1 2016-12-05 14:04:12 cmayer $
 #
 # watchdog.settings
 #
@@ -40,9 +40,17 @@ DBDOWNLIMIT=300
 # if ICMP is disabled, PING can be disabled by setting PINGLIMIT to 0
 PINGLIMIT=300
 
+#
 # The primary database cannot create a table: 5 Minutes
-DBOPLIMIT=300
-# disable this test for now, until we get more confidence in it
+#
+# the dbop test is specifically used to detect a class of failure that
+# occurs on SAN storage where the devices become unresponsive and the i/o
+# operations hang in undetected timeouts.
+# for SAN or network attached storage, it should be set to a timeout
+# of a few minutes. for example:
+# DBOPLIMIT=300
+# the test should be disabled with a very high value on locally attached
+# disks, since this class of failure is unlikely.
 DBOPLIMIT=2000000000
 
 #

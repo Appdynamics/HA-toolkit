@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.4 2016-09-20 23:31:12 cmayer $
+# $Id: appdynamics-machine-agent.sh 3.5 2016-12-05 14:04:12 cmayer $
 #
 # /etc/init.d/appdynamics-machine-agent
 #
@@ -42,7 +42,7 @@ lockfile="/var/lock/subsys/$prog"
 
 # Defaults. Do not edit these. They will be overwritten in updates.
 # Override in /etc/sysconfig/appdynamics-machine-agent
-APPD_ROOT=/opt/AppDybnamics/Controller
+APPD_ROOT=/opt/AppDynamics/Controller
 MACHINE_AGENT_HOME=/opt/appdynamics/machine-agent
 RUNUSER=root
 JAVA_OPTS=""
@@ -113,10 +113,12 @@ case "$1" in
 		if [ -f $pidfile ] ; then
 			pid=`cat $pidfile`
 			if [ -d /proc/$pid ] ; then
+				echo "machine-agent service running"
 				exit 0
 			fi
 			rm -f $pidfile
 		fi
+		echo "machine-agent service not running"
 		exit 1
         ;;
     *)  
