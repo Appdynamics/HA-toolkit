@@ -88,8 +88,8 @@ ma_conf=""
 # if this is root, then we don't need a privilege escalation method
 #
 if [ `id -u` -eq 0 ] ; then
-	if [ $db_user != root ] ; then
-		fatal 1 "replicate must run as $db_user"
+	if [ $dbuser != root ] ; then
+		fatal 1 "replicate must run as $dbuser"
 	fi
 	running_as_root=true
 else
