@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.4 2016-12-05 14:37:00 cmayer $
+# $Id: replicate.sh 3.5 2017-01-06 14:24:23 rob.navarro $
 #
 # install HA to a controller pair
 #

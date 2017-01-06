@@ -285,3 +285,10 @@ Release notes for version 3.7
 8) numa status is reported by appdstatus.sh on numa machines
 
 9) a syntax change in replicate.sh makes the log slightly less noisy
+
+--------------------------------------
+Release notes for version 3.7.1
+
+1) fixed small bug preventing replicate.sh from starting when controller run as root
+
+2) added datetime to end of incremental replicate to simplify determining time taken
