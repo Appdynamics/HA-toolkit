@@ -51,6 +51,7 @@ RUNUSER=root
 [ -f /etc/default/appdcontroller ] && . /etc/default/appdcontroller
 
 if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+	rm -f /tmp/$NAME.out
     exec 2> /tmp/$NAME.out
     set -x
 fi

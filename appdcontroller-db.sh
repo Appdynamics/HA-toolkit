@@ -52,6 +52,7 @@ RUNUSER=root
 [ -f /etc/default/appdcontroller-db ] && . /etc/default/appdcontroller-db
 
 if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+	rm -f /tmp/$NAME.out
 	exec 2> /tmp/$NAME.out
 	set -x
 fi
@@ -217,9 +218,8 @@ function calculate_memory {
 	INNODB_ADDITIONAL_MEM=`dbcnf_get innodb_additional_mem_pool_size | scale`
 	
 	# multiply by 1.05 and round to account for extra 2% headroom
-	EVENTS_HEAP=`runuser \
-		awk -F= "'/^\s*EVENTS_HEAP_SETTINGS=/ { print \$2 }'" \
-			$APPD_ROOT/bin/controller.sh | \
+	EVENTS_HEAP=`runuser cat $APPD_ROOT/bin/controller.sh | \
+		awk -F= '/^\s*EVENTS_HEAP_SETTINGS=/ { print \$2 }' | \
 		sed -e 's/ /\n/g' | get_jvm_option Xmx | scale 1.05`
 	
 	if [ -z "$EVENTS_HEAP" -a -f $EVENTS_VMOPTIONS_FILE ] ; then

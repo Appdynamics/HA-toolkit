@@ -39,7 +39,7 @@ if [ `id -un` == "$RUNUSER" ] ; then
 		bash -c "$* >/dev/null 2>&1 & echo \$! ; disown" &
 	}
 	function runuser {
-		"$@"
+		bash -c "$*"
 	}
 else
 	function bg_runuser {
