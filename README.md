@@ -3,7 +3,7 @@ Appdynamics HA Controller provisioning subsystem
 
 ## Non-developer installation & use
 * HA Toolkit *must* be installed from `HA.shar`
-* Download HA.shar only or clone this repository and then run `make` to build a fresh HA.shar
+* Download HA.shar from https://github.com/Appdynamics/HA-toolkit/releases/latest or clone this repository and then run `make` to build a fresh HA.shar
 
 ## Documentation
 See [README.txt](README.txt) and https://docs.appdynamics.com/display/PRO42/Using+the+High+Availability+(HA)+Toolkit
