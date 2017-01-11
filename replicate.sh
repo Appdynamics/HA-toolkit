@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.5 2017-01-06 14:24:23 rob.navarro $
+# $Id: replicate.sh 3.8 2017-01-11 03:27:13 cmayer $
 #
 # install HA to a controller pair
 #
@@ -330,37 +330,6 @@ function parse_vip()
 	'
 }
 
-declare -A cmargs
-
-#
-# parse a controller monitor definition.
-# this takes the form:
-# url=[protocol://]<controller_monitor>[:port],
-# access_key=\"1-2-3-4\"
-# [,app_name=\"ABC controller\"]
-# [,account_name=someaccount]
-#
-function parse_monitor_def() {
-
-	local controller_monitor_args=$1
-
-	declare -a vals A
-	# vals array gets comma delimited settings
-	IFS=, read -a vals <<< "$controller_monitor_args"
-	for i in ${!vals[*]} ; do 
-		# then, split the key, value pairs by equals sign
-		IFS="=" read -a A <<< "${vals[$i]}"
-		# remove any leading/trailing quotes
-		noquote=$(sed -e 's/^["'\'']//' -e 's/["'\'']$//' <<< "${A[1]}")
-		# assign associative array cmargs
-		cmargs[${A[0]}]=${noquote}
-	done
-}
-
-if [ -f MONITOR ] ; then
-	parse_monitor_def "`cat MONITOR`"
-fi
-
 log_rename
 
 #
@@ -391,8 +360,7 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS flag; do
 		internal_vip=$OPTARG
 		;;
 	m)
-		parse_monitor_def $OPTARG
-		echo "$OPTARG" > MONITOR
+		monitor_def="-m $OPTARG"
 		;;
 	j)
 		appserver_only_sync=true
@@ -487,7 +455,7 @@ fi
 #
 if [ -z "$machine_agent" ] ; then
 	machine_agent=(`find_machine_agent`)
-	if [ ${#machine_agent[@]} != 1 ] ; then
+	if [ ${#machine_agent[@]} -gt 1 ] ; then
 		echo too many machine agents: ${machine_agent[@]}
 		echo select one, and specify it using -a
 		usage
@@ -507,39 +475,8 @@ if [ -z "$internal_vip" ] ; then
 	internal_vip=$external_vip
 fi
 
-monitor="${cmargs['url']}"
-if [ -z "$monitor" ] ; then
-	monitor=$internal_vip
-fi
-
 eval `parse_vip external_vip $external_vip`
 eval `parse_vip internal_vip $internal_vip`
-eval `parse_vip monitor $monitor`
-
-#
-# set the monitoring up to reasonable defaults if any portion is not set
-#
-monitor_access_key=${cmargs['access_key']}
-monitor_account=${cmargs['account_name']}
-monitor_application=${cmargs['app_name']}
-monitor_tier="App Server"
-
-if [ -z "$monitor_account" ] ; then
-	if [ "$monitor" = "$internal_vip" ] ; then
-		monitor_account=system
-	else
-		monitor_account=customer1
-	fi
-fi
-if [ -z "$monitor_application" ] ; then
-	pair=`echo -e "$primary\n$secondary" | sort | tr '\n' '-' | sed 's/-$//'`
-	monitor_application="HA pair $pair"
-fi
-if [ -z "$monitor_access_key" ] ; then
-	if [ "$monitor" != "$internal_vip" ] ; then
-		fatal 10 "monitoring access key must be specified for external host"
-	fi
-fi
 
 # sanity check - verify that the appd_user and the directory owner are the same
 if [ `ls -ld .. | awk '{print $3}'` != `id -un` ] ; then
@@ -1023,28 +960,6 @@ if ! service appdcontroller-db start | logonly 2>&1 ; then
 	fatal 1 "failed to start primary database.  Exiting..."
 fi
 
-if [ -z "$monitor_access_key" ] ; then
-	monitor_access_key=`sql localhost "select access_key from account where name = '$monitor_account'" | get access_key`
-	if [ -z "$monitor_access_key" ] ; then
-		fatal 11 "could not fetch access key for $monitor_account"
-	fi
-fi
-
-#
-# worst case defaults
-#
-monitor_host=${monitor_host:-localhost}
-monitor_protocol=${monitor_protocol:-http}
-monitor_port=${monitor_port:-8090}
-
-message "monitoring host: $monitor_host"
-message "monitoring protocol: $monitor_protocol"
-message "monitoring port: $monitor_port"
-message "monitoring account: $monitor_account"
-message "monitoring access key: $monitor_access_key"
-message "monitoring application: $monitor_application"
-message "monitoring tier: $monitor_tier"
-
 #
 # plug the various communications endpoints into domain.xml
 #
@@ -1054,59 +969,11 @@ if [ -n "$external_vip" ] ; then
 		"$external_vip_protocol://$external_vip_host:$external_vip_port"
 fi
 
-if [ -n "$monitor_host" ] ; then
-	message "edit domain.xml controller monitoring"
-	domain_set_jvm_option appdynamics.controller.hostName $monitor_host
-	domain_set_jvm_option appdynamics.controller.port $monitor_port
-fi
-
-if [ "$monitor_protocol" == "https" ] ; then
-	message "set controller monitoring ssl"
-	domain_set_jvm_option appdynamics.controller.ssl.enabled true
-fi
-
 if [ -n "$internal_vip_host" ] ; then
 	message "set services host and port"
 	domain_set_jvm_option appdynamics.controller.services.hostName $internal_vip_host
 	domain_set_jvm_option appdynamics.controller.services.port $internal_vip_port
 fi
-
-if [ -n "$monitor_account" ] ; then
-	message "set controller monitoring account"
-	domain_set_jvm_option appdynamics.agent.accountName "$monitor_account"
-fi
-
-if [ -n "$monitor_access_key" ] ; then
-	message "set controller monitoring account key"
-	domain_set_jvm_option appdynamics.agent.accountAccessKey "$monitor_access_key"
-fi
-
-if [ -n "$monitor_application" ] ; then
-	message "set controller monitoring app name"
-	domain_set_jvm_option appdynamics.agent.applicationName "$monitor_application"
-fi
-
-#
-# make sure all controller-info.xml's are set up properly
-# this means the machine agent as well as the appagent
-#
-controller_infos=(`find $ma_conf \
-	$APPD_ROOT/appserver/glassfish/domains/domain1/appagent -name controller-info.xml -print`)
-
-for info in ${controller_infos[*]} ; do
-	if [ -f $info ] ; then
-		ex -s $info <<- SETMACHINE
-			%s/\(<controller-host>\)[^<]*/\1$monitor_host/
-			%s/\(<controller-port>\)[^<]*/\1$monitor_port/
-			%s/\(<application-name>\)[^<]*/\1$monitor_application/
-			%s/\(<tier-name>\)[^<]*/\1$monitor_tier/
-			%s/\(<account-name>\)[^<]*/\1$monitor_account/
-			%s/\(<account-access-key>\)[^<]*/\1$monitor_access_key/
-			wq
-		SETMACHINE
-	fi
-	scp -q $info $secondary:$info
-done
 
 #
 # send the edited domain.xml
@@ -1137,6 +1004,14 @@ for ci in $APPD_ROOT/appserver/glassfish/domains/domain1/appagent/conf/controlle
 		wq
 	SETNODE2
 done
+
+#
+# call the setmonitor script to set the monitoring host and params
+#
+if [ -n "$machine_agent" ] ; then
+	ma_def="-a $machine_agent"
+fi
+./setmonitor.sh -s $secondary $monitor_def $ma_def -i $internal_vip
 
 if $debug ; then
 	message "building file lists"

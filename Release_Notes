@@ -310,3 +310,24 @@ Release notes for version 3.7.1
 1) fixed small bug preventing replicate.sh from starting when controller run as root
 
 2) added datetime to end of incremental replicate to simplify determining time taken
+
+--------------------------------------
+Release notes for version 3.8
+
+1) refactor of setting the monitoring controller to better support upgrades and
+   appdynamics version 4.3.   the code to was pulled out into a new program,
+   setmonitor.sh, which is invoked by replicate.sh at final replicate time.
+
+2) appdynamics 4.3 removes network access to the mysql root user.  replicate
+   now connects to the mysql instance on the secondary via ssh.
+
+3) the numa.settings template now has defaults to membind instead of preferred.
+
+4) the machine agent init script now removes the log in /tmp before appending
+   to it when HA/INITDEBUG exists.
+
+5) if a installation must activate a custom proxy or some other action after
+   failover, creating an executable file named failover_hook.sh in the HA
+   directory will cause that file to be run after each failover on the new
+   primary.
+

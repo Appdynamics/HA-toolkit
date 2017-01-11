@@ -45,6 +45,9 @@ Contents:
 	getaccess.sh:  a script to extract the access key from a database to set
 			up monitoring
 
+	setmonitor.sh:  a script to patch various files to set up controller
+			monitoring
+
 	appdstatus.sh: a script to replace 'service appdcontroller status' on 
 		systemd machines
 
@@ -321,7 +324,7 @@ is the place to add code.
 
 Version and Copyright
 ---------------------
-$Id: README.txt 3.4 2016-09-20 23:32:12 cmayer Exp $
+$Id: README.txt 3.8 2017-01-11 03:36:03 cmayer Exp $
 
  Copyright 2016 AppDynamics, Inc
 

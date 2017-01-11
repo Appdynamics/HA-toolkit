@@ -55,6 +55,7 @@ JAVA=$APPD_ROOT/jre/bin/java
 NAME=$(basename $(readlink -e $0))
 
 if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+	rm -f /tmp/$NAME.out
 	exec 2> /tmp/$NAME.out
 	set -x
 fi

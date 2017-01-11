@@ -1,6 +1,6 @@
 #
 # this file contains the NUMA node assignments for the java processes and mysqld
-# $Id: numa.settings.template 3.0 2016-06-21 01:41:14 cmayer $
+# $Id: numa.settings.template 3.8 2017-01-11 03:30:18 cmayer $
 #
 # copy this file to numa.settings if on a numa machine and we want to statically
 # bind java and mysql to different nodes
@@ -22,5 +22,5 @@
 NUMA_MYSQL_NODES=1
 NUMA_JAVA_NODES=0
 
-NUMA_MYSQL="numactl --cpunodebind $NUMA_MYSQL_NODES --preferred $NUMA_MYSQL_NODES"
-NUMA_JAVA="numactl --cpunodebind $NUMA_JAVA_NODES --preferred $NUMA_JAVA_NODES"
+NUMA_MYSQL="numactl --cpunodebind $NUMA_MYSQL_NODES --membind $NUMA_MYSQL_NODES"
+NUMA_JAVA="numactl --cpunodebind $NUMA_JAVA_NODES --membind $NUMA_JAVA_NODES"

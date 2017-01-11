@@ -335,6 +335,14 @@ MESSAGE
 
 fi
 
+#
+# call the user hook if one exists - this is a good place to revector a proxy
+# or call an API to change DNS, if we want to do that kind of thing
+#
+if [ -x ./failover_hook.sh ] ; then
+	./failover_hook.sh
+fi
+
 message "Failover complete at " `date`
 
 exit 0

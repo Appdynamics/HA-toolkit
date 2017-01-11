@@ -1,5 +1,5 @@
 #
-# $Id: lib/sql.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+# $Id: lib/sql.sh 3.8 2017-01-11 03:33:33 cmayer $
 #
 # run sql statements
 # potentially logging, potentially with timeouts,
@@ -74,7 +74,11 @@ function sql {
 	rm -f $DELFILES
 
 	if [ $# -lt 3 ] ; then
-		echo "$2" | $MYSQL -BE --host=$1 "${CONNECT[@]}" controller > $tmpfile
+		if [ "$1" == localhost ] ; then
+			echo "$2" | $MYSQL -BE --host=localhost "${CONNECT[@]}" controller > $tmpfile
+		else
+			echo "$2" | ssh $1 $MYSQL -BE --host=localhost "${CONNECT[@]}" controller > $tmpfile
+		fi
 		if [ -f $APPD_ROOT/HA/LOG_SQL ] ; then
 			echo "$MYSQL -BE --host=$1 "${CONNECT[@]}" controller" | logonly
 			echo "$2" | logonly
