@@ -25,9 +25,28 @@
 
 cd $(dirname $0)
 APPD_ROOT=`readlink -e ..`
+NAME=appdservice-noroot
+
+#
+# turn on debugging if indicated
+#
+if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
+        rm -f /tmp/$NAME.out
+    exec 2> /tmp/$NAME.out
+    set -x
+fi
 
 . lib/ha.sh
-. appdynamics-machine-agent.sysconfig
+
+#
+# load in customized sysconfig files if present
+#
+if [ -f appdynamics-machine-agent.sysconfig
+	. appdynamics-machine-agent.sysconfig
+fi
+if [ -f appdcontroller.sysconfig
+	. appdcontroller.sysconfig
+fi
 
 function usage {
 	echo usage: "$0 [appdcontroller appdcontroller-db appdynamics-machine-agent] [start stop status]"

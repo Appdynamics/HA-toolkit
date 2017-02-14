@@ -281,7 +281,7 @@ function usage()
 #	echo "    [ -j ] Synchronize controller app server configurations and related binaries"
 	echo "    [ -e [protocol://]<external vip>[:port] ]"
 	echo "    [ -i [protocol://]<internal vip>[:port] ]"
-	echo "    [ -m url=[protocol://]<controller_monitor>[:port],access_key=\"1-2-3-4\"[,app_name=\"ABC controller\"][,account_name=someaccount] ]"
+	echo "    [ -m <monitoring descriptor> see setmonitor.sh -h"
 	echo "    [ -a <machine agent install directory> ]"
 	echo "    [ -f ]       do final install and activation"
 	echo "    [ -t [rsync speed limit]]" if unspecified or 0, unlimited
@@ -473,6 +473,9 @@ fi
 
 if [ -z "$internal_vip" ] ; then
 	internal_vip=$external_vip
+	if [ -z "$internal_vip" ] ; then
+		internal_vip=localhost
+	fi
 fi
 
 eval `parse_vip external_vip $external_vip`

@@ -66,6 +66,7 @@ function sql {
 	local errfile
 	local mypid
 	local retval
+	local use_ssh
 
 	mypid=$$
 	tmpfile=/tmp/sql_result.$mypid
@@ -73,14 +74,16 @@ function sql {
 	DELFILES="$tmpfile $errfile"
 	rm -f $DELFILES
 
+	if [ "$1" == localhost ] ; then
+		use_ssh=
+	else
+		use_ssh="ssh $1"
+	fi
+
 	if [ $# -lt 3 ] ; then
-		if [ "$1" == localhost ] ; then
-			echo "$2" | $MYSQL -BE --host=localhost "${CONNECT[@]}" controller > $tmpfile
-		else
-			echo "$2" | ssh $1 $MYSQL -BE --host=localhost "${CONNECT[@]}" controller > $tmpfile
-		fi
+		echo "$2" | $use_ssh $MYSQL -BE --host=localhost "${CONNECT[@]}" controller > $tmpfile
 		if [ -f $APPD_ROOT/HA/LOG_SQL ] ; then
-			echo "$MYSQL -BE --host=$1 "${CONNECT[@]}" controller" | logonly
+			echo "$use_ssh $MYSQL -BE --host=localhost "${CONNECT[@]}" controller" | logonly
 			echo "$2" | logonly
 			echo "result:" | logonly
 			cat $tmpfile | logonly
@@ -95,7 +98,7 @@ function sql {
 
 		# issue sql
 		echo `date` "sql text: $2" >$errfile
-		echo "$2" | $MYSQL -BE --host=$1 "${CONNECT[@]}" controller >$tmpfile 2>>$errfile &
+		echo "$2" | $use_ssh $MYSQL -BE --host=localhost "${CONNECT[@]}" controller >$tmpfile 2>>$errfile &
 		sqlpid=$!
 		wait $sqlpid
 		retval=$?

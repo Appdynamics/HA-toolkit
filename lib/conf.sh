@@ -26,6 +26,44 @@
 #
 DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 DB_CONF=$APPD_ROOT/db/db.cnf
+XMLBASE=/domain/configs/config[1]/java-config/jvm-options
+
+#
+# lose trailing and leading white space
+#
+function strip_white() {
+	sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//'
+}
+
+#
+# get a property from a controller_info file
+#
+function controller_info_get() {
+	local xml=$1
+	local property=$2
+	local root="/controller-info"
+	local xpath="$root/$property"
+
+	runuser xmlstarlet sel -T -t -v "$xpath" $xml | strip_white
+}
+
+#
+# set a property into a controller_info file
+#
+function controller_info_set() {
+	local xml=$1
+	local property=$2
+	local value=$3
+	local root="/controller-info"
+	local xpath="$root/$property"
+
+	if runuser xmlstarlet sel -T -t -v "count($xpath)" $xml |
+		grep -s -w 0 -q ; then
+		xmlstarlet ed -L -s "$root" -t elem -n $property -v "$value" $xml
+	else
+		xmlstarlet ed -L -u "$xpath" -v "$value" $xml
+	fi
+}
 
 #
 # simplifies processing jvm options from domain.xml
@@ -36,49 +74,6 @@ DB_CONF=$APPD_ROOT/db/db.cnf
 # -XX:+foo	prefix character +|-	we can ask for either sense
 # -XX:-foo
 # -Dfoo		no prefix
-
-#
-# domain_set_jvm_option <property> [<value>]
-#
-function domain_set_jvm_option {
-	local property=$1
-	local value="$2"
-	local valueset=""
-
-	case $property in
-	X*)
-		if [ -n "$value" ] ; then
-			valueset="$value"
-		fi
-		selector="-X$property"
-		setter="/appdynamics.controller.port.*\$/a<jvm-options>-$property$valueset</jvm-options>"
-		changer="s,\($property\)[=]*[^<]*,\1$valueset,"
-		;;
-	+*|-*)
-		base=${property:1}
-		selector="XX:[+-]$base"
-		setter="/appdynamics.controller.port.*\$/a<jvm-options>-XX:$property</jvm-options>"
-		changer="s,-XX:$base,-XX:$property,"
-		;;
-	*)
-		if [ -n "$value" ] ; then
-			valueset="=$value"
-		fi
-		selector=-D$property
-		setter="/appdynamics.controller.port.*\$/a<jvm-options>-D$property$valueset</jvm-options>"
-		changer="s,\(-D$property\)[=]*[^<]*,\1$valueset,"
-		;;
-	esac
-
-	if echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
-		grep -q -e "$selector" ; then
-		# if property already present
-		runuser sed -i "$changer" $DOMAIN_XML
-	else
-		# property needs to be added
-		runuser sed -i "$setter" $DOMAIN_XML
-	fi
-} 
 
 #
 # extract a specific jvm option value from a stream
@@ -97,15 +92,46 @@ function get_jvm_option
 }
 
 #
-# read a jvm_option from the domain.xml
+# domain_get_jvm_option <property>
 #
-# domain_get_jvm_option
 function domain_get_jvm_option {
 	local property=$1
+	local selector
+	local xpath
+	local base
+	local stripper
 
-	echo 'cat /domain/configs/config[1]/java-config/*' | runuser xmllint --shell $DOMAIN_XML | \
-		sed -e 's/<[^>]*>/\n/g' -e 's/\n\n/\n/g' | \
-		get_jvm_option $property
+	case $property in
+
+	# like -Xmx34g
+	X*)
+		selector="starts-with(.,'-$property')"
+		stripper=(-e s/-$property//)
+		;;
+
+	# like -XX:+foo or -XX:-foo
+	+*|-*) 
+		base=${property:1}
+		selector="string(.)='-XX:-$base' or string(.)='-XX:+$base'"
+		stripper=(-e "s/-XX:\([+-]\)$base/\1/")
+		;;
+
+	# like -Dfoo and -Dfoo=77
+	*)
+		selector="starts-with(.,'-D$property=') or (string(.)='-D$property')"
+		stripper=(-e s/-D$property$/true/ -e s/-D$property=//)
+		;;
+	esac
+
+	xpath="$XMLBASE[$selector]"
+
+	val=$(runuser xmlstarlet sel -T -t -v "$xpath" $DOMAIN_XML | 
+		strip_white | sed ${stripper[@]})
+	if [ -z $val ] ; then
+		echo "unset"
+	else
+		echo $val
+	fi
 }
 
 #
@@ -113,22 +139,79 @@ function domain_get_jvm_option {
 #
 function domain_unset_jvm_option {
 	local property=$1
+	local selector
+	local base
+	local xpath
 
 	case $property in
+
+	# like -Xmx34g
 	X*)
-		selector="-$property"
+		selector="starts-with(.,'-$property')"
 		;;
+
+	# like -XX:+foo or -XX:-foo
 	+*|-*)
 		base=${property:1}
-		selector="XX:[+-]$base"
+		selector="string(.)='-XX:-$base' or string(.)='-XX:+$base'"
 		;;
+
+	# like -Dfoo and -Dfoo=77
 	*)
-		selector=-D$property
+		selector="starts-with(.,'-D$property=') or (string(.)='-D$property')"
 		;;
 	esac
 
-	runuser sed -i "/$selector/d" $DOMAIN_XML
+	xpath=$XMLBASE[$selector]
+
+	runuser xmlstarlet ed -L -d "$xpath" $DOMAIN_XML
 }
+
+#
+# domain_set_jvm_option <property> [<value>]
+# 
+function domain_set_jvm_option {
+	local property=$1
+	local value="$2"
+	local base
+	local selector
+	local xpath
+
+	case $property in
+
+	# like -Xmx34g
+	X*)
+		selector="starts-with(.,'-$property')"
+		setter="-$property$value"
+		;;
+
+	# like -XX:+foo or -XX:-foo
+	+*|-*)
+		base=${property:1}
+		selector="string(.)='-XX:-$base' or string(.)='-XX:+$base'"
+		setter="-XX:$property"
+		;;
+
+	# like -Dfoo and -Dfoo=77
+	*)
+		selector="starts-with(.,'-D$property=') or (string(.)='-D$property')"
+		if [ -n "$value" ] ; then
+			value="=$value"
+		fi
+		setter="-D$property$value"
+		;;
+	esac
+
+	xpath="$XMLBASE[$selector]"
+
+	if runuser xmlstarlet sel -T -t -v "count($xpath)" $DOMAIN_XML |
+		grep -s -w 0 -q ; then
+		xpath="$XMLBASE/.."
+		xmlstarlet ed -L -s "$xpath" -t elem -n jvm-options -v "$setter" $DOMAIN_XML
+	else
+		xmlstarlet ed -L -u "$xpath" -v "$setter" $DOMAIN_XML
+	fi
+} 
 
 # set a property into the db.cnf file
 # if the property is already there, edit it, else append it
@@ -211,7 +294,7 @@ function dbcnf_get {
 	elif runuser grep -q "^[[:space:]]*\b$property\b" $DB_CONF ; then
 		echo $property
 	else
-		echo ""
+		echo unset
 	fi
 }
 

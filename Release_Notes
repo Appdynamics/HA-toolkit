@@ -331,3 +331,22 @@ Release notes for version 3.8
    directory will cause that file to be run after each failover on the new
    primary.
 
+--------------------------------------
+Release notes for version 3.9
+
+1) added a bit more flesh to the NOROOT option: INITDEBUG works, sysconfig
+   files are read.
+
+2) replace xmllint with xmlstarlet throughout.  much more flexible, as it
+   abstracts out both edit and extract of xml documents.
+
+3) cleaner implementation in lib/sql.sh to support controller 4.3; the
+   remote sql connection is no longer supported.  now we use ssh.
+
+4) fixes to the abstraction for setmonitor.sh and replicate.
+
+5) watchdog.sh now does a mysql ping using ssh for 4.3.
+
+6) watchdog.sh is more verbose when getting curl errors
+   also, connection resets are treated as down.
+

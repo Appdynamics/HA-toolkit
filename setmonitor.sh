@@ -247,44 +247,33 @@ fi
 monitor_host=${monitor_host:-localhost}
 monitor_protocol=${monitor_protocol:-http}
 monitor_port=${monitor_port:-8090}
+if [ "$monitor_protocol" == "https" ] ; then
+	monitor_ssl=true
+else
+	monitor_ssl=false
+fi
 
 message "monitoring host: $monitor_host"
 message "monitoring protocol: $monitor_protocol"
 message "monitoring port: $monitor_port"
 message "monitoring account: $monitor_account"
-message "monitoring access key: $monitor_access_key"
 message "monitoring application: $monitor_application"
 message "monitoring tier: $monitor_tier"
+message "monitoring access key: $monitor_access_key"
+
+if echo $monitor_access_key | grep -q -s "^-001" ; then
+	message "key appears to require decryption"
+fi
 
 #
 # plug the various communications endpoints into domain.xml
 #
-
-if [ -n "$monitor_host" ] ; then
-	message "edit domain.xml controller monitoring"
-	domain_set_jvm_option appdynamics.controller.hostName $monitor_host
-	domain_set_jvm_option appdynamics.controller.port $monitor_port
-fi
-
-if [ "$monitor_protocol" == "https" ] ; then
-	message "set controller monitoring ssl"
-	domain_set_jvm_option appdynamics.controller.ssl.enabled true
-fi
-
-if [ -n "$monitor_account" ] ; then
-	message "set controller monitoring account"
-	domain_set_jvm_option appdynamics.agent.accountName "$monitor_account"
-fi
-
-if [ -n "$monitor_access_key" ] ; then
-	message "set controller monitoring account key"
-	domain_set_jvm_option appdynamics.agent.accountAccessKey "$monitor_access_key"
-fi
-
-if [ -n "$monitor_application" ] ; then
-	message "set controller monitoring app name"
-	domain_set_jvm_option appdynamics.agent.applicationName "$monitor_application"
-fi
+domain_set_jvm_option appdynamics.controller.hostName $monitor_host
+domain_set_jvm_option appdynamics.controller.port $monitor_port
+domain_set_jvm_option appdynamics.controller.ssl.enabled $monitor_ssl
+domain_set_jvm_option appdynamics.agent.accountName "$monitor_account"
+domain_set_jvm_option appdynamics.agent.accountAccessKey "$monitor_access_key"
+domain_set_jvm_option appdynamics.agent.applicationName "$monitor_application"
 
 #
 # make sure all controller-info.xml's are set up properly
@@ -296,6 +285,25 @@ controller_infos=(`find $ma_conf \
 for info in ${controller_infos[*]} ; do
 	if [ -f $info ] ; then
 		message "modify $info"
+
+		controller_info_set $info controller-host $monitor_host
+		controller_info_set $info controller-port $monitor_port
+		controller_info_set $info application-name "$monitor_application"
+		controller_info_set $info tier-name "$monitor_tier"
+		controller_info_set $info account-name "$monitor_account"
+		controller_info_set $info account-access-key "$monitor_access_key"
+		controller_info_set $info controller-ssl-enabled "$monitor_ssl"
+
+	# todo: gracefully handle
+	# 
+    # use-encrypted-credentials
+    # credential-store-filename
+    # credential-store-password
+    # use-ssl-client-auth
+    # asymmetric-keystore-filename
+    # asymmetric-keystore-password
+    # asymmetric-key-password
+
 		ex -s $info <<- SETMACHINE
 			%s/\(<controller-host>\)[^<]*/\1$monitor_host/
 			%s/\(<controller-port>\)[^<]*/\1$monitor_port/

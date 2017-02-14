@@ -211,7 +211,7 @@ function serverstatus {
 		;;
 	7)
 		echo "down"
-		logmsg "curl error 7"
+		logmsg "curl error 7: connection failed"
 		;;
 	22)
 		eval `awk '/(22)/ {printf("http_code=%d\n", $8);}' < $wd_tmp`
@@ -238,12 +238,17 @@ function serverstatus {
 		;;
 	35)
 		echo "down"
-		logmsg "curl error 35"
+		logmsg "curl error 35: SSL handshake failed"
 		;;
 	52)
-		echo "no data"
-		logmsg "curl error 52"
+		echo "down"
+		logmsg "curl error 52: no data"
 		;;
+	56)
+		echo "down"
+		logmsg "curl error 56: receive failed"
+		;;
+
 	*)
 		echo "other"
 		logmsg "curl error $curlstat"
@@ -321,7 +326,7 @@ function poll {
 		#
 		# then, is the primary database up listening
 		#
-		if $MYSQLADMIN --host=$primary "${CONNECT[@]}" ping >/dev/null 2>&1 ; then
+		if ssh $primary $MYSQLADMIN --host=localhost "${CONNECT[@]}" ping >/dev/null 2>&1 ; then
 			dbfail=0
 		else
 			dbopfail=0
