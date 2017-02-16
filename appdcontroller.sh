@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.5 2016-12-05 14:04:12 cmayer $
+# $Id: appdcontroller.sh 3.10 2017-02-15 18:00:41 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -58,130 +58,17 @@ fi
 
 OPEN_FD_LIMIT=65536
 
-APPD_BIN="$APPD_ROOT/bin"
-lockfile=/var/lock/subsys/$NAME
-WATCHDOG="$APPD_ROOT/HA/appd_watchdog.pid"
-ASSASSIN="$APPD_ROOT/HA/appd_assassin.pid"
-WATCHDOG_ENABLE="$APPD_ROOT/HA/WATCHDOG_ENABLE"
-WATCHDOG_STATUS="$APPD_ROOT/logs/watchdog.status"
-APPSERVER_DISABLE="$APPD_ROOT/HA/APPSERVER_DISABLE"
-SHUTDOWN_FAILOVER="$APPD_ROOT/HA/SHUTDOWN_FAILOVER"
-
 # For security reasons, locally embed/include function library at HA.shar build time
 embed lib/password.sh
 embed lib/init.sh
 embed lib/conf.sh
+embed lib/status.sh
 
 check_sanity
-
-DB_PID_FILE=`dbcnf_get pid-file`
-DB_DATA_DIR=`dbcnf_get datadir`
-DB_SKIP_SLAVE_START=`dbcnf_get skip-slave-start`
-
-MYSQLCLIENT="$APPD_ROOT/HA/mysqlclient.sh"
 
 if [ -f "$APPD_ROOT/HA/LARGE_PAGES_ENABLE" ] ; then
 	ENABLE_HUGE_PAGES="true"
 fi
-
-function watchdog_running {
-	if runuser [ -f "$WATCHDOG" ] ; then
-		WATCHPID=`runuser cat $WATCHDOG`
-		if [ ! -z "$WATCHPID" ] ; then
-			if [ -d /proc/$WATCHPID ] ; then
-				return 0
-			fi
-		fi
-	fi
-	return 1
-}
-
-function assassin_running {
-	if runuser [ -f "$ASSASSIN" ] ; then
-		ASSASSINPID=`runuser cat $ASSASSIN`
-		if [ ! -z "$ASSASSINPID" ] ; then
-			if [ -d /proc/$ASSASSINPID ] ; then
-				return 0
-			fi
-		fi
-	fi
-	return 1
-}
-
-function db_running {
-	local DB_PID=
-
-	if [ -z "$DB_PID_FILE" ] ; then
-		DB_PID_FILE="$DB_DATA_DIR/$(hostname).pid"
-	fi
-	if [ -z "$DB_PID_FILE" ] ; then
-		return 1
-	fi
-	if runuser [ -f $DB_PID_FILE ] ; then
-		DB_PID=`runuser cat $DB_PID_FILE`
-	fi
-	if [ -z "$DB_PID" ] ; then
-		return 1
-	fi
-	if [ -d /proc/$DB_PID ] ; then
-		return 0;
-	fi
-	return 1	
-}
-
-function replication_disabled {
-
-	if [ -n "$DB_SKIP_SLAVE_START" ] ; then
-		return 0
-	else
-		return 1
-	fi
-}
-
-function get {
-	local key
-	awk "/$key:/ {print \$2}"
-}
-
-function controller_mode {
-	echo "select value from global_configuration_local \
-		where name='appserver.mode'" | runuser $MYSQLCLIENT | get value
-}
-
-#
-# this is a check for the controller running
-# 0: controller running
-# 1: controller started
-# 2: controller process around, but domain doesn't report up
-# 3: nothing visible
-# 
-function controllerrunning {
-	if pgrep -f -u $RUNUSER "$APPD_ROOT/jre/bin/java -jar ./../modules/admin-cli.jar" >/dev/null ; then
-		return 1
-	fi
-	if runuser "$APPD_ROOT/appserver/glassfish/bin/asadmin" list-domains | \
-		grep -q "domain1 running" ; then
-		return 0
-	fi
-	if pgrep -f -u $RUNUSER "$APPD_ROOT/appserver/glassfish/domains/domain1" >/dev/null ; then
-		return 2
-	fi
-	return 3
-}
-
-function events_running {
-	if ps -f -u $RUNUSER | grep "$APPD_ROOT/jre/bin/java" | grep "$APPD_ROOT/events_service" >/dev/null ; then
-		return 0
-	fi
-	return 1
-}
-
-function reporting_running {
-	if pgrep -f -u $RUNUSER "$APPD_ROOT/reporting_service/nodejs/bin/node" >/dev/null ; then
-		return 0
-	fi
-	return 1
-}
 
 case "$1" in
 start)  
@@ -199,7 +86,7 @@ start)
 		ldconfig            
 	fi
 	if [ "`controller_mode`" == "active" ] ; then
-		bg_runuser $APPD_BIN/controller.sh start-appserver >/dev/null
+		bg_runuser $CONTROLLER_SH start-appserver >/dev/null
 		if replication_disabled ; then
 			if assassin_running ; then
 				echo assassin already running
@@ -212,12 +99,12 @@ start)
 	# an full scale HA should rename this directory
 		if runuser [ -d "$APPD_ROOT/events_service" ] ; then
 			if ! events_running ; then
-				bg_runuser $APPD_BIN/controller.sh start-events-service >/dev/null
+				bg_runuser $CONTROLLER_SH start-events-service >/dev/null
 			fi
 		fi
 		if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
 			if ! reporting_running ; then
-				bg_runuser HOME=~$RUNUSER $APPD_BIN/controller.sh start-reporting-service >/dev/null
+				bg_runuser HOME=~$RUNUSER $CONTROLLER_SH start-reporting-service >/dev/null
 			fi
 		fi
 	else
@@ -248,26 +135,26 @@ stop)
 			runuser "echo `date` appd watchdog killed \ 
 				>> $APPD_ROOT/logs/watchdog.log" )
 	fi
-	runuser rm -f $WATCHDOG
+	runuser rm -f $WATCHDOG_PIDFILE
 	if assassin_running ; then
 		kill -9 $ASSASSINPID && ( echo appd assassin killed; \
 		runuser "echo `date` appd assassin killed \
 			>> $APPD_ROOT/logs/assassin.log" )		
 	fi
-	runuser rm -f $ASSASSIN
+	runuser rm -f $ASSASSIN_PIDFILE
 	# if the events service directory exists, do events stuff.
 	# an full scale HA should rename this directory
 	if runuser [ -d "$APPD_ROOT/events_service" ] ; then
-		runuser $APPD_BIN/controller.sh stop-events-service
+		runuser $CONTROLLER_SH stop-events-service
 	fi
 	if runuser [ -d "$APPD_ROOT/reporting_service" ] ; then
-		runuser HOME=~$RUNUSER $APPD_BIN/controller.sh stop-reporting-service
+		runuser HOME=~$RUNUSER $CONTROLLER_SH stop-reporting-service
 	fi
 	# The default controller shutdown timeout is 45 minutes 
 	# That is a long time to be stuck with a hung appserver on the way down.
 	# Thankfully, we can set an environment variable to override that:
 	export AD_SHUTDOWN_TIMEOUT_IN_MIN=10
-    runuser $APPD_BIN/controller.sh stop-appserver
+    runuser $CONTROLLER_SH stop-appserver
 	controllerrunning
 	if [ $? -lt 3 ] ; then
 		echo "forcibly killing appserver"

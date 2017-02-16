@@ -1,6 +1,6 @@
 #
 # makefile for HA script distro
-# $Id: Makefile 3.8 2016-12-05 14:35:50 cmayer $
+# $Id: Makefile 3.10 2017-02-15 18:00:41 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -32,7 +32,7 @@ BASH_SRC= assassin.sh failover.sh watchdog.sh \
 	numa.settings.template numa-patch-controller.sh \
 	save_mysql_passwd.sh rsyncd.conf \
 	lib/password.sh lib/ha.sh lib/sql.sh lib/log.sh lib/conf.sh \
-	lib/runuser.sh lib/init.sh
+	lib/runuser.sh lib/init.sh lib/status.sh
 
 C_SRC= appdservice.c
 

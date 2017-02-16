@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.8 2017-01-11 03:27:13 cmayer $
+# $Id: replicate.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # install HA to a controller pair
 #
@@ -88,8 +88,8 @@ ma_conf=""
 # if this is root, then we don't need a privilege escalation method
 #
 if [ `id -u` -eq 0 ] ; then
-	if [ $dbuser != root ] ; then
-		fatal 1 "replicate must run as $dbuser"
+	if [ $RUNUSER != root ] ; then
+		fatal 1 "replicate must run as $RUNUSER"
 	fi
 	running_as_root=true
 else
@@ -244,7 +244,7 @@ function verify_privilege_escalation(){
 	local_priv_escalation=$(get_privilege_escalation)
 	if [ $? -gt 0 ] ; then
 		echo "\
-User $dbuser is unable to start and stop appdynamics services
+User $RUNUSER is unable to start and stop appdynamics services
 Please ensure that $APPD_ROOT/HA/install-init.sh has been run."
 		((errors++))
 	fi
@@ -252,7 +252,7 @@ Please ensure that $APPD_ROOT/HA/install-init.sh has been run."
 	remote_priv_escalation=$(get_privilege_escalation $host)
 	if [ $? -gt 0 ] ; then
 		echo "\
-User $dbuser is unable to start and stop appdynamics services on $host.
+User $RUNUSER is unable to start and stop appdynamics services on $host.
 Please ensure that $APPD_ROOT/HA/install-init.sh has been run on $host."
 		((errors++))
 	fi
@@ -340,7 +340,7 @@ message "version: " `grep '$Id' $0 | head -1`
 message "command line options: " "$@"
 message "hostname: " `hostname`
 message "appd root: $APPD_ROOT"
-message "appdynamics run user: $dbuser"
+message "appdynamics run user: $RUNUSER"
 
 while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS flag; do
 	case $flag in
@@ -360,7 +360,8 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS flag; do
 		internal_vip=$OPTARG
 		;;
 	m)
-		monitor_def="-m $OPTARG"
+		monitor_def="$OPTARG"
+		monitor_def_flag="-m"
 		;;
 	j)
 		appserver_only_sync=true
@@ -495,6 +496,7 @@ fi
 
 require "ex" "vim-minimal" "vim-tiny" || exit 1
 require "rsync" "rsync" "rsync" || exit 1
+require "xmlstarlet" "xmlstarlet" "xmlstarlet" || exit 1
 
 if $debug ; then
 	require "parallel" "moreutils-parallel" "parallel" || exit 1
@@ -552,7 +554,7 @@ trap handle_interrupt INT
 #
 # make sure we are running as the right user
 #
-if [ -z "$dbuser" ] ; then
+if [ -z "$RUNUSER" ] ; then
 	fatal 1 user not set in $APPD_ROOT/db/db.cnf
 fi
 
@@ -985,36 +987,39 @@ message "copy domain.xml to secondary"
 runcmd scp -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 
 #
+# get the list of controller-info files
+#
+controller_infos=($(find $APPD_ROOT/appserver/glassfish/domains/domain1/appagent -name controller-info.xml -print))
+
+#
 # write the primary hostname into the node-name property
 #
 echo "setting up controller agent on primary"
-for ci in $APPD_ROOT/appserver/glassfish/domains/domain1/appagent/conf/controller-info.xml \
-	$APPD_ROOT/appserver/glassfish/domains/domain1/appagent/ver*/conf/controller-info.xml ; do
-	ex -s $ci <<- SETNODE1
-		%s/\(<node-name>\)[^<]*/\1$primary/
-		wq
-	SETNODE1
+for ci in ${controller_infos[*]} ; do
+	controller_info_set $ci node-name $primary
 done
 
 #
 # write the secondary hostname into the node-name property
 #
+ci_tmp=/tmp/ci-$$.xml
+rm -f $ci_tmp
 message "setting up controller agent on secondary"
-for ci in $APPD_ROOT/appserver/glassfish/domains/domain1/appagent/conf/controller-info.xml \
-	$APPD_ROOT/appserver/glassfish/domains/domain1/appagent/ver*/conf/controller-info.xml ; do
-	ssh $secondary ex -s $ci <<- SETNODE2
-		%s/\(<node-name>\)[^<]*/\1$secondary/
-		wq
-	SETNODE2
+for ci in ${controller_infos[*]} ; do
+	scp $secondary:$ci $ci_tmp
+	controller_info_set $ci_tmp node-name $secondary
+	scp $ci_tmp $secondary:$ci
 done
+rm -f $ci_tmp
 
 #
 # call the setmonitor script to set the monitoring host and params
 #
 if [ -n "$machine_agent" ] ; then
-	ma_def="-a $machine_agent"
+	ma_def_flag="-a"
+	ma_def="$machine_agent"
 fi
-./setmonitor.sh -s $secondary $monitor_def $ma_def -i $internal_vip
+./setmonitor.sh -s $secondary "$monitor_def_flag" "$monitor_def" "$ma_def_flag" "$ma_def" -i $internal_vip
 
 if $debug ; then
 	message "building file lists"

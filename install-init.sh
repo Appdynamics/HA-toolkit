@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.5 2016-12-05 14:35:50 cmayer $
+# $Id: install-init.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # install init scripts, including the machine agent.
 #
@@ -49,8 +49,6 @@ if ! [ -d $APPD_ROOT/bin ] ; then
 	APPD_ROOT=/opt/AppDynamics/Controller
 	echo using default path $APPD_ROOT
 fi
-DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
-RUNUSER=`su -s /bin/bash -c "awk -F= '/^[\t ]*user=/ {print \\$2}' $APPD_ROOT/db/db.cnf" $ROOTOWNER`
 
 # source function library
 . $APPD_ROOT/HA/lib/ha.sh

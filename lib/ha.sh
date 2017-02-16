@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: ha.sh 3.4 2016-09-20 23:39:01 cmayer $
+# $Id: lib/ha.sh 3.10 2017-02-15 17:38:25 cmayer $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -19,19 +19,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 # 
-# filenames
-#
-DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
-WATCHDOG_ENABLE=$APPD_ROOT/HA/WATCHDOG_ENABLE
-WATCHDOG_SETTINGS=$APPD_ROOT/HA/watchdog.settings
-WATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status
-WATCHDOG_ERROR=$APPD_ROOT/logs/watchdog.error
-
-#
-# pidfiles
-#
-ASSASSIN_PID=$APPD_ROOT/HA/appd_assassin.pid
-WATCHDOG_PID=$APPD_ROOT/HA/appd_watchdog.pid
 
 # with help from:
 # http://stackoverflow.com/questions/1923435/how-do-i-echo-stars-when-reading-password-with-read
@@ -156,8 +143,8 @@ function check_sanity {
 	if [ ! -x "$MYSQL" ] ; then
 		fatal 3 "controller root $MYSQL is not executable"
 	fi
-	if [ `id -un` != $dbuser ] ; then
-		fatal 4 "$0 must run as $dbuser"
+	if [ `id -un` != $RUNUSER ] ; then
+		fatal 4 "$0 must run as $RUNUSER"
 	fi
 }
 

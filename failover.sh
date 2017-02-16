@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.2 2016-09-08 13:40:17 cmayer $
+# $Id: failover.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # run on the passive node, activate this HA node.
 # 
@@ -35,8 +35,6 @@ LOGNAME=failover.log
 . lib/sql.sh
 
 NOTFAILED=3600
-
-WATCHDOG=$APPD_ROOT/HA/appd_watchdog.pid
 
 function slave_status {
 	bounce_slave
@@ -170,9 +168,9 @@ fi
 # kill the local watchdog if it is up
 #
 kc=0
-while [ -f $WATCHDOG ] ; do
+while [ -f $WATCHDOG_PIDFILE ] ; do
 	if [ $(($kc % 10)) -eq 0 ] ; then
-		kill `cat $WATCHDOG` >/dev/null 2>&1
+		kill `cat $WATCHDOG_PIDFILE` >/dev/null 2>&1
 		message "Kill Watchdog"
 	fi
 	let kc++

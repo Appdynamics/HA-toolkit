@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 3.0.1 2016-08-08 13:40:17 cmayer $
+# $Id: watchdog.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -66,12 +66,6 @@ for n in $( echo "cat /domain/configs/config[@name='server-config']/network-conf
 done
 IFS=\ 
 
-
-#
-# these are derived, but should not need editing
-#
-WATCHDOG_ERROR=$APPD_ROOT/logs/watchdog.error
-SQL_ERROR=$WATCHDOG_ERROR
 
 #
 # hack to supppress password
@@ -145,7 +139,7 @@ last_db_create=0
 #
 function cleanup {
 	logmsg "watchdog exit" `date`
-	rm -f $WATCHDOG_PID $wd_tmp $DELFILES
+	rm -f $WATCHDOG_PIDFILE $wd_tmp $DELFILES
 }
 
 #
@@ -433,8 +427,8 @@ function poll {
 #
 # only run one watchdog
 #
-if [ -f "$WATCHDOG_PID" ] ; then
-	WATCHPID=`cat $WATCHDOG_PID`
+if [ -f "$WATCHDOG_PIDFILE" ] ; then
+	WATCHPID=`cat $WATCHDOG_PIDFILE`
 	if [ ! -z "$WATCHPID" ] ; then
 		if kill -0 $WATCHPID 2>/dev/null ; then
 			message "watchdog already running"
@@ -447,8 +441,8 @@ fi
 # we are starting to run. register
 #
 trap cleanup EXIT
-rm -f $WATCHDOG_PID
-echo $$ > $WATCHDOG_PID
+rm -f $WATCHDOG_PIDFILE
+echo $$ > $WATCHDOG_PIDFILE
 
 #
 # force first report

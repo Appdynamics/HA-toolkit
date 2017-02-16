@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: setmonitor.sh 3.8 2017-01-11 03:27:50 cmayer $
+# $Id: setmonitor.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # instrument controller and machine agents to a monitoring host
 #
@@ -23,6 +23,7 @@
 cd $(dirname $0)
 
 LOGNAME=setmonitor.log
+need_encryption=false
 
 # source function libraries
 . lib/log.sh
@@ -35,7 +36,7 @@ LOGNAME=setmonitor.log
 #
 # make sure we are running as the right user
 #
-if [ -z "$dbuser" ] ; then
+if [ -z "$RUNUSER" ] ; then
 	fatal 1 user not set in $APPD_ROOT/db/db.cnf
 fi
 
@@ -111,18 +112,18 @@ declare -A cmargs
 #
 function parse_monitor_def() {
 
-	local controller_monitor_args=$1
+	local controller_monitor_args="$1"
 
 	declare -a vals A
 	# vals array gets comma delimited settings
 	IFS=, read -a vals <<< "$controller_monitor_args"
 	for i in ${!vals[*]} ; do 
 		# then, split the key, value pairs by equals sign
-		IFS="=" read -a A <<< "${vals[$i]}"
+		key="${vals[$i]%%=*}" ; value="${vals[$i]#*=}"
 		# remove any leading/trailing quotes
-		noquote=$(sed -e 's/^["'\'']//' -e 's/["'\'']$//' <<< "${A[1]}")
+		noquote=$(sed -e 's/^["'\'']//' -e 's/["'\'']$//' <<< "$value")
 		# assign associative array cmargs
-		cmargs[${A[0]}]=${noquote}
+		cmargs[$key]="${noquote}"
 	done
 }
 
@@ -140,7 +141,7 @@ message "version: " `grep '$Id' $0 | head -1`
 message "command line options: " "$@"
 message "hostname: " `hostname`
 message "appd root: $APPD_ROOT"
-message "appdynamics run user: $dbuser"
+message "appdynamics run user: $RUNUSER"
 
 while getopts s:m:a:i:h flag; do
 	case $flag in
@@ -151,8 +152,13 @@ while getopts s:m:a:i:h flag; do
 		secondary=$(ssh $OPTARG hostname)
 		;;
 	m)
-		parse_monitor_def $OPTARG
-		echo "$OPTARG" > MONITOR
+		parse_monitor_def "$OPTARG"
+		comma= ; cmlist=
+		for key in ${!cmargs[*]} ; do
+			cmlist=$cmlist$comma$key=\""${cmargs[$key]}"\"
+			comma=','
+		done
+		echo "$cmlist" > MONITOR
 		;;
 	i)
 		internal_vip=$OPTARG
@@ -208,9 +214,9 @@ eval `parse_vip monitor $monitor`
 #
 # set the monitoring up to reasonable defaults if any portion is not set
 #
-monitor_access_key=${cmargs['access_key']}
-monitor_account=${cmargs['account_name']}
-monitor_application=${cmargs['app_name']}
+monitor_access_key="${cmargs['access_key']}"
+monitor_account="${cmargs['account_name']}"
+monitor_application="${cmargs['app_name']}"
 monitor_tier="App Server"
 
 if [ -z "$monitor_account" ] ; then
@@ -222,7 +228,7 @@ if [ -z "$monitor_account" ] ; then
 fi
 if [ -z "$monitor_application" ] ; then
 	if [ -n "$secondary" ] ; then
-		pair=`echo -e "$pri_short\n$sec_short" | sort | tr '\n' ':' | sed 's/-$//'`
+		pair=`echo -e "$pri_short\n$sec_short" | sort | tr '\n' ':' | sed 's/:$//'`
 		monitor_application="HA pair $pair"
 	else
 		monitor_application="$pri_short controller"
@@ -261,8 +267,29 @@ message "monitoring application: $monitor_application"
 message "monitoring tier: $monitor_tier"
 message "monitoring access key: $monitor_access_key"
 
+controller_infos=(`find $ma_conf \
+	$APPD_ROOT/appserver/glassfish/domains/domain1/appagent -name controller-info.xml -print`)
+
+credfile=
+credpass=
+
 if echo $monitor_access_key | grep -q -s "^-001" ; then
 	message "key appears to require decryption"
+	need_encryption=true
+
+	# let's load up the credential store params from the first nonblank
+	for info in ${controller_infos[*]} ; do
+		if [ -f "$info" ] ; then
+			xcredfile=$(controller_info_get $info credential-store-filename)
+			if [ -z "$credfile" -a "$xcredfile" != unset ] ; then
+				credfile=$xcredfile
+			fi
+			xcredpass=$(controller_info_get $info credential-store-password)
+			if [ -z "$credpass" -a $xcredpass != unset ] ; then
+				credpass=$xcredpass
+			fi
+		fi
+	done
 fi
 
 #
@@ -279,9 +306,6 @@ domain_set_jvm_option appdynamics.agent.applicationName "$monitor_application"
 # make sure all controller-info.xml's are set up properly
 # this means the machine agent as well as the appagent
 #
-controller_infos=(`find $ma_conf \
-	$APPD_ROOT/appserver/glassfish/domains/domain1/appagent -name controller-info.xml -print`)
-
 for info in ${controller_infos[*]} ; do
 	if [ -f $info ] ; then
 		message "modify $info"
@@ -294,11 +318,17 @@ for info in ${controller_infos[*]} ; do
 		controller_info_set $info account-access-key "$monitor_access_key"
 		controller_info_set $info controller-ssl-enabled "$monitor_ssl"
 
+		if $need_encryption ; then
+			controller_info_set $info use-encrypted-credentials true
+    		controller_info_set $info credential-store-filename $credfile
+    		controller_info_set $info credential-store-password $credpass
+		else
+			controller_info_set $info use-encrypted-credentials false
+    		controller_info_unset $info credential-store-filename
+    		controller_info_unset $info credential-store-password
+		fi
+
 	# todo: gracefully handle
-	# 
-    # use-encrypted-credentials
-    # credential-store-filename
-    # credential-store-password
     # use-ssl-client-auth
     # asymmetric-keystore-filename
     # asymmetric-keystore-password
@@ -315,8 +345,13 @@ for info in ${controller_infos[*]} ; do
 		SETMACHINE
 	fi
 	if [ -n "$secondary" ] ; then
+		ci_tmp=/tmp/ci.$$.xml
+		rm -f $ci_tmp
 		message "copy $info to secondary"
-		scp -q $info $secondary:$info
+		cp $info $ci_tmp
+		controller_info_set $ci_tmp node-name $secondary
+		scp -q $ci_tmp $secondary:$info
+		rm -f $ci_tmp
 	fi
 done
 

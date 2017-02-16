@@ -2,7 +2,7 @@
 #
 # print out the status of the appdynamics controller on this node
 #
-# $Id: appdstatus.sh 3.1 2016-12-05 14:35:50 cmayer $
+# $Id: appdstatus.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -28,113 +28,7 @@ LOGNAME=status.log
 . lib/password.sh
 . lib/conf.sh
 . lib/sql.sh
-
-ASSASSIN=$APPD_ROOT/HA/appd_assassin.pid
-
-WATCHDOG_ENABLE="$APPD_ROOT/HA/WATCHDOG_ENABLE"
-WATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status
-WATCHDOG=$APPD_ROOT/HA/appd_watchdog.pid
-APPSERVER_DISABLE="$APPD_ROOT/HA/APPSERVER_DISABLE"
-
-DB_PID_FILE=`dbcnf_get pid-file`
-DB_DATA_DIR=`dbcnf_get datadir`
-DB_SKIP_SLAVE_START=`dbcnf_get skip-slave-start`
-
-function watchdog_running {
-	if [ -f "$WATCHDOG" ] ; then
-		WATCHPID=`cat $WATCHDOG`
-		if [ ! -z "$WATCHPID" ] ; then
-			if [ -d /proc/$WATCHPID ] ; then
-				return 0
-			fi
-		fi
-	fi
-	return 1
-}
-
-function assassin_running {
-	if [ -f "$ASSASSIN" ] ; then
-		ASSASSINPID=`cat $ASSASSIN`
-		if [ ! -z "$ASSASSINPID" ] ; then
-			if [ -d /proc/$ASSASSINPID ] ; then
-				return 0
-			fi
-		fi
-	fi
-	return 1
-}
-
-function db_running {
-	local DB_PID=
-
-	if [ -z "$DB_PID_FILE" ] ; then
-		DB_PID_FILE="$DB_DATA_DIR/$(hostname).pid"
-	fi
-	if [ -z "$DB_PID_FILE" ] ; then
-		return 1
-	fi
-	if [ -f $DB_PID_FILE ] ; then
-		DB_PID=`cat $DB_PID_FILE`
-	fi
-	if [ -z "$DB_PID" ] ; then
-		return 1
-	fi
-	if [ -d /proc/$DB_PID ] ; then
-		return 0;
-	fi
-	return 1	
-}
-
-function replication_disabled {
-	if [ -n "$DB_SKIP_SLAVE_START" ] ; then
-		return 0
-	else
-		return 1
-	fi
-}
-
-#
-# this is a check for the controller running
-# 0: controller running
-# 1: controller started
-# 2: controller process around, but domain doesn't report up
-# 3: nothing visible
-# 
-function controllerrunning {
-        if pgrep -f -u $dbuser "$APPD_ROOT/jre/bin/java -jar ./../modules/admin-cli.jar" >/dev/null ; then
-                return 1
-        fi
-        if $APPD_ROOT/appserver/glassfish/bin/asadmin list-domains | \
-                grep -q "domain1 running" ; then
-                return 0
-        fi
-        if pgrep -f -u $dbuser "$APPD_ROOT/appserver/glassfish/domains/domain1" >/dev/null ; then
-                return 2
-        fi
-        return 3
-}
-
-function events_running {
-	if ps -f -u $dbuser | grep "$APPD_ROOT/jre/bin/java" | grep "$APPD_ROOT/events_service" >/dev/null ; then
-		return 0
-	fi
-	return 1
-}
-
-function reporting_running {
-	if pgrep -f -u $dbuser "$APPD_ROOT/reporting_service/nodejs/bin/node" >/dev/null ; then
-		return 0
-	fi
-	return 1
-}
-
-function machine_agent_running {
-	if pgrep -f -u $dbuser machineagent.jar > /dev/null; then
-		return 0
-	else
-		return 1
-	fi
-}
+. lib/status.sh
 
 if [ ! -f $APPD_ROOT/db/db.cnf ] ; then
 	echo appd controller not installed in $APPD_ROOT
@@ -146,7 +40,7 @@ if db_running ; then
 	if [ ! -z "$controllerversion" ] ; then
 		echo version: $controllerversion
 	fi
-	echo -n "db running as $dbuser - "
+	echo -n "db running as $RUNUSER - "
 	if [ "`get_replication_mode localhost`" == "active" ] ; then
 		echo "active"
 	else
@@ -179,7 +73,7 @@ else
 	echo "db not running"
 fi
 
-if [ -n "`dbcnf_get skip-slave-start`" ] ; then
+if [ $(dbcnf_get skip-slave-start) != unset ] ; then
 	echo "replication persistently broken"
 fi
 

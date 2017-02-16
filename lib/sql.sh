@@ -1,5 +1,5 @@
 #
-# $Id: lib/sql.sh 3.8 2017-01-11 03:33:33 cmayer $
+# $Id: lib/sql.sh 3.10 2017-02-15 17:38:25 cmayer $
 #
 # run sql statements
 # potentially logging, potentially with timeouts,
@@ -22,7 +22,6 @@
 
 dbpasswd=${dbpasswd:-`get_mysql_passwd`}
 dbport=${dbport:-`dbcnf_get port`}
-dbuser=${dbuser:-`dbcnf_get user`}
 
 #
 # these are derived, but should not need editing

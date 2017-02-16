@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: assassin.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -33,6 +33,7 @@ LOGNAME=assassin.log
 . lib/ha.sh
 . lib/password.sh
 . lib/sql.sh
+. lib/status.sh
 
 message "assassin log" `date`
 check_sanity
@@ -54,11 +55,7 @@ if [ "$type" == "primary" ] ; then
 	exit 0
 fi
 
-#
-# replication must be not be enabled.  there are several markers for this:  
-# skip-slave start is set in out db.cnf
-# the slave is not running
-if [ -z "`dbcnf_get skip-slave-start`" ] ; then
+if ! replication_disabled ; then
 	fatal 5 "slave not disabled"
 fi
 primary=unset
@@ -115,7 +112,7 @@ while true ; do
 	# this is to prevent log reads from the real primary if the db is restarted
 	#
 	dbcnf_set skip-slave-start true $primary
-	if [ -z "`dbcnf_get skip-slave-start $primary`" ] ; then
+	if [ $(dbcnf_get skip-slave-start $primary) = unset ] ; then
 		gripe "skip-slave-start insert failed"
 		continue;
 	fi

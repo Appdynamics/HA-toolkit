@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: getaccess.sh 3.0 2016-08-03 19:23:30 cmayer $
+# $Id: getaccess.sh 3.10 2017-02-15 18:00:41 cmayer $
 # helper script to get the access key from an account table
 #
 # Copyright 2016 AppDynamics, Inc
@@ -22,9 +22,12 @@ cd $(dirname $0)
 APPD_ROOT=`readlink -e ..`
 account=system
 host=localhost
-dbpasswd=
-dbport=3388
-dbuser=root
+
+. lib/log.sh
+. lib/runuser.sh
+. lib/conf.sh
+. lib/password.sh
+. lib/sql.sh
 
 function usage {
 	echo "$0 [options]"
@@ -58,11 +61,5 @@ while getopts :c:a:p:h: flag; do
 		;;	
 	esac
 done
-
-. lib/log.sh
-. lib/runuser.sh
-. lib/conf.sh
-. lib/password.sh
-. lib/sql.sh
 
 sql $host "select access_key from account where name = '$account'" | get access_key

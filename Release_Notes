@@ -350,3 +350,28 @@ Release notes for version 3.9
 6) watchdog.sh is more verbose when getting curl errors
    also, connection resets are treated as down.
 
+--------------------------------------
+Release notes for version 3.10
+
+1) a tremendous amount of code movement to lib from places where there was duplication.
+   essentially, anywhere where a function was defined twice or a variable was defined
+   was pulled out into a single place.   this will make maintenance easier.  this is
+   mostly visible in the creation of lib/status.sh
+
+2) some variable name rationalization has been carried out.  pidfiles are suffixed _PIDFILE
+   consistently, etc.
+
+3) appdservice-noroot.sh had a serious bug in version 3.9 that prevented it from reading 
+   the sysconfig files.
+
+4) the package now uses lib/conf.sh to perform almost all config file editing.
+
+5) setmonitor.sh had a real problem with arguments (app_name, etc) that contained spaces 
+   or equal signs.
+
+6) we now require the installation of xmlstarlet.
+
+7) the generated application name had a spurious trailing colon.
+
+8) HA now works with the secure credential store in 4.3.
+

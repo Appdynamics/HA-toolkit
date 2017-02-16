@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.3 2016-09-08 03:09:03 cmayer $
+# $Id: appdservice-noroot.sh 3.10 2017-02-15 18:00:41 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -25,7 +25,7 @@
 
 cd $(dirname $0)
 APPD_ROOT=`readlink -e ..`
-NAME=appdservice-noroot
+NAME=$(basename $(readlink -e $0))
 
 #
 # turn on debugging if indicated
@@ -41,10 +41,10 @@ fi
 #
 # load in customized sysconfig files if present
 #
-if [ -f appdynamics-machine-agent.sysconfig
+if [ -f appdynamics-machine-agent.sysconfig ] ; then
 	. appdynamics-machine-agent.sysconfig
 fi
-if [ -f appdcontroller.sysconfig
+if [ -f appdcontroller.sysconfig ] ; then
 	. appdcontroller.sysconfig
 fi
 

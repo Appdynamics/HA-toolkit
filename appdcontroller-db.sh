@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.5 2016-12-05 14:04:12 cmayer $
+# $Id: appdcontroller-db.sh 3.10 2017-02-15 18:00:41 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -57,8 +57,6 @@ if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
 	set -x
 fi
 
-APPD_BIN="$APPD_ROOT/bin"
-DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 EVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/conf/events-service.vmoptions
 if [ ! -f $EVENTS_VMOPTIONS_FILE ] ; then
 	EVENTS_VMOPTIONS_FILE=$APPD_ROOT/events_service/analytics-processor/conf/analytics-processor.vmoptions
@@ -69,14 +67,9 @@ LIMITS=/etc/security/limits.d/appdynamics.conf
 embed lib/password.sh
 embed lib/init.sh
 embed lib/conf.sh
+embed lib/status.sh
 
 check_sanity
-
-DB_PID_FILE=`dbcnf_get pid-file`
-DB_DATA_DIR=`dbcnf_get datadir`
-DB_SKIP_SLAVE_START=`dbcnf_get skip-slave-start`
-
-MYSQLCLIENT="$APPD_ROOT/HA/mysqlclient.sh"
 
 if runuser [ ! -f $APPD_ROOT/db/db.cnf ] ; then
 	echo appd controller not installed in $APPD_ROOT
@@ -164,33 +157,6 @@ function set_limits {
 			break
 		fi
 	done
-}
-
-function db_running {
-	if [ -z "$DB_PID_FILE" ] ; then
-		DB_PID_FILE="$DB_DATA_DIR/$(hostname).pid"
-	fi
-	if [ -z "$DB_PID_FILE" ] ; then
-		return 1
-	fi
-	DB_PID=`runuser cat $DB_PID_FILE 2>/dev/null`
-	if [ -z "$DB_PID" ] ; then
-		return 1
-	fi
-	if [ -d /proc/$DB_PID ] ; then
-		return 0;
-	fi
-	return 1	
-}
-
-function get {
-	local key=$1
-	awk "/$key:/ {print \$2}"
-}
-
-function controller_mode {
-	echo select value from global_configuration_local \
-			where "name='appserver.mode'" | runuser $MYSQLCLIENT | get value
 }
 
 #
@@ -382,7 +348,7 @@ start)
 		if ! [ -f $lockfile ] || host_crash ; then
 			reserve_memory
 		fi
-		runuser $APPD_BIN/controller.sh start-db
+		runuser $CONTROLLER_SH start-db
 	fi
 	rm -f $lockfile	
 	touch $lockfile	
@@ -397,7 +363,7 @@ stop)
 	export AD_SHUTDOWN_TIMEOUT_IN_MIN=10
 	# call separately because if _stopControllerAppServer can "exit 1"
 	# which will leave the database still running
-	runuser $APPD_BIN/controller.sh stop-db
+	runuser $CONTROLLER_SH stop-db
 	unreserve_memory
 	rm -f $lockfile
 ;;  
@@ -418,7 +384,7 @@ controllerversion=`echo "select value from global_configuration_cluster where na
 			echo "active"
 		else
 			echo "passive"
-			if [ -n "$DB_SKIP_SLAVE_START" ] ; then
+			if replication_disabled ; then
 				echo replication disabled
 			fi
 		fi
@@ -448,7 +414,7 @@ controllerversion=`echo "select value from global_configuration_cluster where na
 	else
 		echo "db not running"
 	fi
-	if [ -n "`dbcnf_get skip-slave-start`" ] ; then
+	if replication_disabled ; then
 		echo "replication persistently broken"
 	fi
 ;;

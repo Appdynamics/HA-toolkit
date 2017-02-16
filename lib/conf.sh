@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: lib/conf.sh 3.10 2017-02-15 17:38:25 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -22,10 +22,22 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 # 
-# filenames
+# all the configuration file names and locations
 #
-DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
+lockfile=/var/lock/subsys/$NAME
+
 DB_CONF=$APPD_ROOT/db/db.cnf
+APPSERVER_DISABLE=$APPD_ROOT/HA/APPSERVER_DISABLE
+SHUTDOWN_FAILOVER=$APPD_ROOT/HA/SHUTDOWN_FAILOVER
+WATCHDOG_ENABLE=$APPD_ROOT/HA/WATCHDOG_ENABLE
+ASSASSIN_PIDFILE=$APPD_ROOT/HA/appd_assassin.pid
+WATCHDOG_PIDFILE=$APPD_ROOT/HA/appd_watchdog.pid
+WATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status
+WATCHDOG_ERROR=$APPD_ROOT/logs/watchdog.error
+DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
+CONTROLLER_SH=$APPD_ROOT/bin/controller.sh
+MYSQLCLIENT=$APPD_ROOT/HA/mysqlclient.sh
+
 XMLBASE=/domain/configs/config[1]/java-config/jvm-options
 
 #
@@ -332,3 +344,21 @@ function scale {
 		exit;
 	}"
 }
+
+#
+# read some things from the db.cnf
+#
+DB_PID_FILE=`dbcnf_get pid-file`
+DB_DATA_DIR=`dbcnf_get datadir`
+FILE_RUNUSER=$(dbcnf_get user)
+
+#
+# a trivial sanity check - if runuser is defined, it better be what is in
+# the database config file
+#
+if [ -n "$RUNUSER" ] ; then
+	if [ $FILE_RUNUSER != $RUNUSER ] ; then
+		echo "runuser inconsistent: sysconfig: $RUNUSER db.cnf: $FILE_RUNUSER"
+	fi
+fi
+RUNUSER=$FILE_RUNUSER
