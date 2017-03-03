@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: replicate.sh 3.11 2017-03-03 00:28:47 cmayer $
 #
 # install HA to a controller pair
 #
@@ -82,6 +82,7 @@ rsync_opts="-PavpW --del --inplace --exclude=ibdata1"
 final_rsync_opts="-PavpW --del --inplace"
 machine_agent=""
 ma_conf=""
+mysql_57=false
 
 #
 # make sure that we are running as the appdynamics user in db.cnf
@@ -293,6 +294,7 @@ function usage()
 	echo "    [ -S ] enable SSL for replication traffic"
 	echo "    [ -w ] enable watchdog on secondary"
 	echo "    [ -W ] use wildcard host in grant"
+	echo "    [ -7 ] enable parallel replication for mysql 5.7"
 	echo "    [ -h ] print help"
 	exit 1
 }
@@ -342,8 +344,11 @@ message "hostname: " `hostname`
 message "appd root: $APPD_ROOT"
 message "appdynamics run user: $RUNUSER"
 
-while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS flag; do
+while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS7 flag; do
 	case $flag in
+	7)
+		mysql_57=true
+		;;
 	d)
 		debug=true
 		;;
@@ -779,6 +784,13 @@ else
 	# added to speed up startup
 	innodb_stats_sample_pages=1
 	ADDITIONS
+	if $mysql_57 ; then
+	cat <<- 'ADDITIONS_FOR_57' >> $APPD_ROOT/db/db.cnf
+	slave_parallel_type=LOGICAL_CLOCK
+	slave_parallel_workers=10
+	slave_preserve_commit_order=0
+	ADDITIONS_FOR_57
+	fi
 fi
 
 #
@@ -917,6 +929,7 @@ else
 	    --exclude=\*.log \
 	    --exclude=master.info \
 	    --exclude=\*.pid \
+		--exclude=auto.cnf \
 	    $datadir/ $DATADEST
 	message "Rsyncs complete"
 fi

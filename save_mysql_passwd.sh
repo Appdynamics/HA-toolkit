@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: save_mysql_passwd.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: save_mysql_passwd.sh 3.11 2017-03-03 00:28:47 cmayer $
 #
 # a simple wrapper around the obfuscated password saver function
 #
@@ -24,4 +24,9 @@ cd $(dirname $0)
 . lib/ha.sh
 . lib/password.sh
 
-save_mysql_passwd $APPD_ROOT
+if [ -x $APPD_ROOT/db/bin/mysql_config_editor ] ; then
+	$APPD_ROOT/db/bin/mysql_config_editor reset
+	$APPD_ROOT/db/bin/mysql_config_editor set --user=root -p
+else
+	save_mysql_passwd $APPD_ROOT
+fi

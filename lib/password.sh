@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/password.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: lib/password.sh 3.11 2017-03-03 00:28:47 cmayer $
 #
 # passwordfunctions.sh
 # contains common code used by the HA toolkit
@@ -180,3 +180,6 @@ function get_mysql_passwd {
 	fi
 }
 export -f get_mysql_passwd
+
+export MYSQL_TEST_LOGIN_FILE=$APPD_ROOT/db/.mylogin.cnf
+

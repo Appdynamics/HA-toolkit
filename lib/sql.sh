@@ -1,5 +1,5 @@
 #
-# $Id: lib/sql.sh 3.10 2017-02-15 17:38:25 cmayer $
+# $Id: lib/sql.sh 3.11 2017-03-03 00:28:47 cmayer $
 #
 # run sql statements
 # potentially logging, potentially with timeouts,
@@ -20,7 +20,6 @@
 #   limitations under the License.
 #
 
-dbpasswd=${dbpasswd:-`get_mysql_passwd`}
 dbport=${dbport:-`dbcnf_get port`}
 
 #
@@ -28,7 +27,12 @@ dbport=${dbport:-`dbcnf_get port`}
 #
 MYSQL="$APPD_ROOT/db/bin/mysql"
 MYSQLADMIN="$APPD_ROOT/db/bin/mysqladmin"
-CONNECT=(--protocol=TCP --user=root --password="$dbpasswd" --port=$dbport)
+CONNECT=(--protocol=TCP --user=root --port=$dbport)
+
+if [ ! -f $APPD_ROOT/db/.mylogin.cnf ] ; then
+	dbpasswd=${dbpasswd:-`get_mysql_passwd`}
+	CONNECT+=("--password=$dbpasswd")
+fi
 
 #
 # bunch of state variables
@@ -65,7 +69,6 @@ function sql {
 	local errfile
 	local mypid
 	local retval
-	local use_ssh
 
 	mypid=$$
 	tmpfile=/tmp/sql_result.$mypid
@@ -74,15 +77,15 @@ function sql {
 	rm -f $DELFILES
 
 	if [ "$1" == localhost ] ; then
-		use_ssh=
+		COMMAND=($MYSQL -BE --host=localhost ${CONNECT[@]} controller)
 	else
-		use_ssh="ssh $1"
+		COMMAND=(ssh $1 $APPD_ROOT/HA/mysqlclient.sh)
 	fi
 
 	if [ $# -lt 3 ] ; then
-		echo "$2" | $use_ssh $MYSQL -BE --host=localhost "${CONNECT[@]}" controller > $tmpfile
+		echo "$2" | "${COMMAND[@]}" > $tmpfile
 		if [ -f $APPD_ROOT/HA/LOG_SQL ] ; then
-			echo "$use_ssh $MYSQL -BE --host=localhost "${CONNECT[@]}" controller" | logonly
+			echo "${COMMAND[@]}" | logonly
 			echo "$2" | logonly
 			echo "result:" | logonly
 			cat $tmpfile | logonly
@@ -97,7 +100,7 @@ function sql {
 
 		# issue sql
 		echo `date` "sql text: $2" >$errfile
-		echo "$2" | $use_ssh $MYSQL -BE --host=localhost "${CONNECT[@]}" controller >$tmpfile 2>>$errfile &
+		echo "$2" | "${COMMAND[@]}" >$tmpfile 2>>$errfile &
 		sqlpid=$!
 		wait $sqlpid
 		retval=$?

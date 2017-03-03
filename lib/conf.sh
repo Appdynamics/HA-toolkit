@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.10 2017-02-15 17:38:25 cmayer $
+# $Id: lib/conf.sh 3.11 2017-03-03 00:28:47 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -75,6 +75,17 @@ function controller_info_set() {
 	else
 		xmlstarlet ed -L -u "$xpath" -v "$value" $xml
 	fi
+}
+#
+# unset a property in a controller_info file
+#
+function controller_info_unset() {
+	local xml=$1
+	local property=$2
+	local root="/controller-info"
+	local xpath="$root/$property"
+
+	runuser xmlstarlet ed -L -d "$xpath" $xml
 }
 
 #

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/status.sh 3.9 2017-02-14 14:34:15 cmayer $
+# $Id: lib/status.sh 3.11 2017-03-03 00:28:47 cmayer $
 #
 # common code to interrogate the status of various functions
 #
@@ -22,9 +22,9 @@
 
 function watchdog_running {
 	if runuser [ -f "$WATCHDOG_PIDFILE" ] ; then
-		WATCHPID=`runuser cat $WATCHDOG_PIDFILE`
-		if [ ! -z "$WATCHPID" ] ; then
-			if [ -d /proc/$WATCHPID ] ; then
+		watchdog_pid=`runuser cat $WATCHDOG_PIDFILE`
+		if [ ! -z "$watchdog_pid" ] ; then
+			if [ -d /proc/$watchdog_pid ] ; then
 				return 0
 			fi
 		fi
@@ -34,9 +34,9 @@ function watchdog_running {
 
 function assassin_running {
 	if runuser [ -f "$ASSASSIN_PIDFILE" ] ; then
-		ASSASSINPID=`runuser cat $ASSASSIN_PIDFILE`
-		if [ ! -z "$ASSASSINPID" ] ; then
-			if [ -d /proc/$ASSASSINPID ] ; then
+		assassin_pid=`runuser cat $ASSASSIN_PIDFILE`
+		if [ ! -z "$assassin_pid" ] ; then
+			if [ -d /proc/$assassin_pid ] ; then
 				return 0
 			fi
 		fi

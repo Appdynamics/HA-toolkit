@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: appdcontroller.sh 3.11 2017-03-03 00:28:47 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -92,7 +92,7 @@ start)
 				echo assassin already running
 			else
 				echo starting assassin 
-				bg_runuser "$APPD_ROOT/HA/assassin.sh"
+				bg_runuser "$APPD_ROOT/HA/assassin.sh" >/dev/null
 			fi
 		fi
 	# if the events service directory exists, do events stuff.

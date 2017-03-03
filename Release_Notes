@@ -375,3 +375,17 @@ Release notes for version 3.10
 
 8) HA now works with the secure credential store in 4.3.
 
+--------------------------------------
+Release notes for version 3.11
+
+1) the assassin pid file was not being handled correctly due to a name
+   confusion.  to prevent this, pidfiles are now named consistently
+
+2) the controller_info_unset function was missing.
+
+3) support for parallel replication using mysql 5.7
+   this is enabled with the -7 option.  a future version will automatically
+   detect mysql 5.7.
+
+4) support for mysql 5.7's password obfuscator, which uses mysql_config_editor.
+

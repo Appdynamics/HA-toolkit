@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: assassin.sh 3.11 2017-03-03 00:28:47 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -75,7 +75,7 @@ fi
 
 message "assassin committed"
 
-echo $$ >$ASSASSIN_PID
+echo $$ >$ASSASSIN_PIDFILE
 
 loops=0
 while true ; do
@@ -138,7 +138,7 @@ while true ; do
 	sql localhost "update global_configuration_local set value='primary' \
 		where name = 'ha.controller.type';"
 	message "assassin exiting - old primary killed"
-	rm -f $ASSASSIN_PID
+	rm -f $ASSASSIN_PIDFILE
 	exit 0
 
 done
