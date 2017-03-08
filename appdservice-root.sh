@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-root.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: appdservice-root.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # shell wrapper around service for service changes - designed to run as root
 #
@@ -18,6 +18,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 function usage {
 	echo usage: "$0 [appdcontroller|appdcontroller-db|appdynamics-machine-agent start|stop|status]"
 	exit 1

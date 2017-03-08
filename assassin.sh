@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: assassin.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -21,6 +21,7 @@
 # from showing up at the load balancer - we won't have any data integrity
 # problems, since replication is off
 # 
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 
@@ -67,6 +68,11 @@ if [ "$primary" == "unset" ] ; then
 	fatal 9 "replication not set up - primary unset"
 fi
 	
+if assassin_running ; then
+	echo "assassin already running"
+	exit 1
+fi
+
 #
 # ok, now we know that we are a failed-over primary, and there may be an
 # old primary that may re-appear.  if it does, shoot it, and kick it hard 

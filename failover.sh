@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: failover.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # run on the passive node, activate this HA node.
 # 
@@ -22,6 +22,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 LOGNAME=failover.log

@@ -2,7 +2,7 @@
 #
 # print out the status of the appdynamics controller on this node
 #
-# $Id: appdstatus.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: appdstatus.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -18,6 +18,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 

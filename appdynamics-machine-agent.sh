@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.5 2016-12-05 14:04:12 cmayer $
+# $Id: appdynamics-machine-agent.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # /etc/init.d/appdynamics-machine-agent
 #
@@ -34,7 +34,7 @@
 ### END INIT INFO
 
 # Setting PATH to just a few trusted directories is an **important security** requirement
-PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 prog="appdynamics-machine-agent"
 pidfile="/var/run/appdynamics/$prog"

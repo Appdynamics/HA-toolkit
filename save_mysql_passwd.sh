@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: save_mysql_passwd.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: save_mysql_passwd.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # a simple wrapper around the obfuscated password saver function
 #
@@ -18,6 +18,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 . lib/log.sh

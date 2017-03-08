@@ -29,6 +29,7 @@ function watchdog_running {
 			fi
 		fi
 	fi
+	rm -f $WATCHDOG_PIDFILE
 	return 1
 }
 
@@ -41,6 +42,7 @@ function assassin_running {
 			fi
 		fi
 	fi
+	rm -f $ASSASSIN_PIDFILE
 	return 1
 }
 

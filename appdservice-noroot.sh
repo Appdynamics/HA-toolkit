@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: appdservice-noroot.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -23,6 +23,8 @@
 #   limitations under the License.
 #
 
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 APPD_ROOT=`readlink -e ..`
 NAME=$(basename $(readlink -e $0))
@@ -31,12 +33,17 @@ NAME=$(basename $(readlink -e $0))
 # turn on debugging if indicated
 #
 if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
-        rm -f /tmp/$NAME.out
-    exec 2> /tmp/$NAME.out
+        rm -f /tmp/$NAME-$1.out
+    exec 2> /tmp/$NAME-$1.out
     set -x
 fi
 
+. lib/log.sh
+. lib/runuser.sh
+. lib/password.sh
 . lib/ha.sh
+. lib/conf.sh
+. lib/status.sh
 
 #
 # load in customized sysconfig files if present
@@ -68,14 +75,46 @@ appdcontroller:status|appdcontroller-db:status|appdynamics-machine-agent:status)
 	
 appdcontroller:start)
 	./appdservice-noroot.sh appdcontroller-db start
-	if echo 'select value from global_configuration_local where name = "appserver.mode"' | ./mysqlclient.sh | grep -q active ; then
-		nohup $APPD_ROOT/bin/controller.sh start-appserver &
+	if [ $(controller_mode) == 'active' ] ; then
+		nohup $APPD_ROOT/bin/controller.sh start-appserver >/dev/null 2>&1 &
 		if [ -d "$APPD_ROOT/events_service" ] ; then
-			nohup $APPD_ROOT/bin/controller.sh start-events-service &
+			nohup $APPD_ROOT/bin/controller.sh start-events-service >/dev/null 2>&1 &
 		fi
 		if [ -d "$APPD_ROOT/reporting_service" ] ; then
-			nohup $APPD_ROOT/bin/controller.sh start-reporting-service &
+			nohup $APPD_ROOT/bin/controller.sh start-reporting-service >/dev/null 2>&1 &
 		fi
+		if replication_disabled ; then
+			if assassin_running ; then
+				echo assassin already running
+			else
+				nohup $APPD_ROOT/HA/assassin.sh >/dev/null
+				pid=$!
+				# wait for the process to die or sign on
+				while [ -d /proc/$pid ] ; do
+					if [ -f $ASSASSIN_PIDFILE ] ; then
+						break
+					fi
+					sleep 1
+				done
+			fi
+		fi
+	;;
+	fi	
+	else
+		if [ -f $WATCHDOG_ENABLE ] ; then
+			if ! watchdog_running ; then
+				nohup "$APPD_ROOT/HA/watchdog.sh" >/dev/null 2>&1 &
+				pid=$!
+				# wait for the process to die or sign on
+				while [ -d /proc/$pid ] ; do
+					if [ -f $WATCHDOG_PIDFILE ] ; then
+						break
+					fi
+					sleep 1
+				done
+			fi
+		fi	
+		
 	fi
 	;;
 
@@ -87,6 +126,16 @@ appdcontroller:stop)
 	if [ -d "$APPD_ROOT/reporting_service" ] ; then
 		$APPD_ROOT/bin/controller.sh stop-reporting-service
 	fi
+	if watchdog_running ; then
+		kill -9 $watchdog_pid && ( echo appd watchdog killed; \
+		echo `date` appd watchdog killed >> $APPD_ROOT/logs/watchdog.log )
+	fi
+	rm -f $WATCHDOG_PIDFILE
+	if assassin_running ; then
+		kill -9 $assassin_pid && ( echo appd assassin killed; \
+			echo `date` appd assassin killed >> $APPD_ROOT/logs/assassin.log )
+		fi
+		runuser rm -f $ASSASSIN_PIDFILE
 	;;
 
 appdcontroller-db:start)
@@ -104,7 +153,7 @@ appdynamics-machine-agent:start)
 	if [ ! -d "$ma_dir" ] ; then
 		exit 0
 	fi
-	nohup $APPD_ROOT/jre/bin/java $JAVA_OPTS -jar $ma_dir/machineagent.jar &
+	nohup $APPD_ROOT/jre/bin/java $JAVA_OPTS -jar $ma_dir/machineagent.jar >/dev/null 2>&1 &
 	;;
 
 appdynamics-machine-agent:stop)

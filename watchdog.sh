@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: watchdog.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -20,6 +20,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 LOGNAME=watchdog.log
@@ -128,8 +130,8 @@ DB_CREATE_DELAY=10
 #
 # overrides, so we don't have to edit this file
 #
-if [ -f $WATCHDOG_SETTINGS ] ; then
-	source $WATCHDOG_SETTINGS
+if [ -f "$WATCHDOG_SETTINGS" ] ; then
+	. $WATCHDOG_SETTINGS
 fi
 
 last_db_create=0
@@ -197,7 +199,7 @@ function serverstatus {
 	local app_proto=$1
 	local app_port=$2
 	STATUS="$app_proto://$primary:$app_port/controller/rest/serverstatus"
-	curl -m $CURL_MAXTIME -fsS $CERT_VALIDATION_MODE $STATUS > $wd_tmp 2>&1
+	curl --noproxy "$primary" -m $CURL_MAXTIME -fsS $CERT_VALIDATION_MODE $STATUS > $wd_tmp 2>&1
 	curlstat=$?
 	case "$curlstat" in
 	0)
@@ -427,14 +429,9 @@ function poll {
 #
 # only run one watchdog
 #
-if [ -f "$WATCHDOG_PIDFILE" ] ; then
-	WATCHPID=`cat $WATCHDOG_PIDFILE`
-	if [ ! -z "$WATCHPID" ] ; then
-		if kill -0 $WATCHPID 2>/dev/null ; then
-			message "watchdog already running"
-			exit 1
-		fi
-	fi
+if watchdog_running ; then
+	message "watchdog already running"
+	exit 1
 fi
 
 #

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: uninstall-init.sh 3.2 2016-09-08 03:09:03 cmayer $
+# $Id: uninstall-init.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # uninstall init script
 #
@@ -18,9 +18,9 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-cd $(dirname $0)
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
-export PATH=/sbin:/usr/sbin:$PATH
+cd $(dirname $0)
 
 function remove {
 	if rpm -qi --quiet $1 2>/dev/null; then return; fi	# skip if rpm package installed

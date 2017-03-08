@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-xuser.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: appdservice-xuser.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # user defined shell wrapper for appdynamics service changes
 #
@@ -18,6 +18,7 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 function usage {
 	echo usage: "$0 [appdcontroller appdcontroller-db] [start stop status]"

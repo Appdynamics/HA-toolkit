@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: check-controller-installation.sh 3.0 2016-08-03 19:23:30 cmayer $
+# $Id: check_controller_installation.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -19,6 +19,7 @@
 # validate that the controller installation meets some minimum requirements
 # set by the large installation guide
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 SWAP=10
 NOFILES=8192

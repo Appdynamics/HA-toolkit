@@ -389,3 +389,24 @@ Release notes for version 3.11
 
 4) support for mysql 5.7's password obfuscator, which uses mysql_config_editor.
 
+--------------------------------------
+Release notes for version 3.12
+
+1) pervasively added setting of PATH to ever user-invoked script to prevent
+   running the wrong utility.   a number of sites had customer installations
+   of variant, non-linux utilites that broke the HA package.
+
+2) http_proxy environment variables can badly break the watchdog.  we suppress
+   this functionality for curl.
+
+3) the watchdog was not started by appdservice-noroot.sh.
+
+4) install-init.sh now produces a log file.
+
+5) the numa.settings.template now has the '=' character in the numactl syntax.
+
+6) a subtle timing bug caused the watchdog to not always start: the parent
+   ssh dying before the child could run nohup sends a sighup, which killed
+   the watchdog.  this race is inherent in the way ssh and nohup work.
+
+7) duplicate assassins and watchdogs were possible.  this is now prevented.

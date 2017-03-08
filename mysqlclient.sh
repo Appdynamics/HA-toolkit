@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: mysqlclient.sh 3.2 2016-09-08 13:40:17 cmayer $
+# $Id: mysqlclient.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # trivial command that executes sql for us.  this is intended
 # to be invoked from an init script via runuser, so we can log
@@ -20,6 +20,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 LOGNAME=mysqlclient.log

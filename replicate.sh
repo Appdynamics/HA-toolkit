@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: replicate.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # install HA to a controller pair
 #
@@ -26,6 +26,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 LOGNAME=replicate.log

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-pbrun.sh 3.1 2016-12-05 14:32:17 cmayer $
+# $Id: appdservice-pbrun.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # shell wrapper around pbrun for appdynamics service changes
 #
@@ -18,6 +18,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
 PBRUN=
 for pbrun in $PBRUN_PLACES ; do

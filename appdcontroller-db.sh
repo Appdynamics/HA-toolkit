@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: appdcontroller-db.sh 3.12 2017-03-07 17:04:25 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -40,7 +40,7 @@
 # script
 #
 # Setting PATH to just a few trusted directories is an **important security** requirement
-PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 NAME=$(basename $(readlink -e $0))
 

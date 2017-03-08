@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: getaccess.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: getaccess.sh 3.12 2017-03-07 17:04:25 cmayer $
 # helper script to get the access key from an account table
 #
 # Copyright 2016 AppDynamics, Inc
@@ -17,6 +17,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 APPD_ROOT=`readlink -e ..`

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: make_ssh_keys.sh 3.0 2016-08-03 19:23:30 cmayer $
+# $Id: make_ssh_keys.sh 3.12 2017-03-07 17:04:25 cmayer $
 # ha setup requires ssh keys on both nodes for the appdynamics user
 #
 # this script creates the keys and plugs them in to both nodes.
@@ -19,6 +19,7 @@
 #   WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 #
 # make 2 keypairs

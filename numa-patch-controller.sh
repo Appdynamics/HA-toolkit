@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: numa-patch-controller.sh 3.0 2016-08-04 03:09:03 cmayer $
+# $Id: numa-patch-controller.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # patch the controller.sh script to enable numa support
 #
@@ -18,6 +18,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 CONTR_SH=../bin/controller.sh

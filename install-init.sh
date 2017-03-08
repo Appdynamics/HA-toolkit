@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: install-init.sh 3.12 2017-03-07 17:04:25 cmayer $
 #
 # install init scripts, including the machine agent.
 #
@@ -18,6 +18,8 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
 cd $(dirname $0)
 
 function usage {
@@ -31,6 +33,8 @@ function usage {
 }
 
 APPD_ROOT=`readlink -e ..`
+
+LOGFILE=$APPD_ROOT/logs/install-init.log
 
 PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
 PBRUN=
@@ -99,6 +103,11 @@ while getopts ":csprxa:" flag; do
 	esac
 done
 
+echo "install-init.sh command line options" "$*" > $LOGFILE
+echo "runuser $RUNUSER" >> $LOGFILE
+date >> $LOGFILE
+chown $RUNUSER $LOGFILE
+
 #
 # search for a machine agent in a few likely places
 #
@@ -120,8 +129,6 @@ if [ `id -u` != 0 ] ; then
 	echo $0 must be run as root
 	exit 1
 fi
-
-export PATH=/sbin:/usr/sbin:$PATH
 
 # list of AppDynamics services in start order
 APPDYNAMICS_SERVICE_LIST=( appdcontroller-db appdcontroller $machine_agent_service)

@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: appdcontroller.sh 3.12 2017-03-07 17:04:25 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -39,7 +39,7 @@
 #
 
 # Setting PATH to just a few trusted directories is an **important security** requirement
-PATH=/bin:/usr/bin:/sbin:/usr/sbin
+export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 NAME=$(basename $(readlink -e $0))
 
@@ -119,6 +119,14 @@ start)
 			else
 				echo starting appd watchdog
 				bg_runuser "$APPD_ROOT/HA/watchdog.sh" >/dev/null
+				pid=$!
+				# wait for the pidfile to be created or the process to die
+				while [ -d /proc/$pid ] ; do
+					if [ -f $WATCHDOG_PIDFILE ] ; then
+						break
+					fi
+					sleep 1
+				done
 			fi
 		else
 			echo watchdog disabled
@@ -131,13 +139,13 @@ start)
 stop)
 	require_root
 	if watchdog_running ; then
-		kill -9 $WATCHPID && ( echo appd watchdog killed; \
+		kill -9 $watchdog_pid && ( echo appd watchdog killed; \
 			runuser "echo `date` appd watchdog killed \ 
 				>> $APPD_ROOT/logs/watchdog.log" )
 	fi
 	runuser rm -f $WATCHDOG_PIDFILE
 	if assassin_running ; then
-		kill -9 $ASSASSINPID && ( echo appd assassin killed; \
+		kill -9 $assassin_pid && ( echo appd assassin killed; \
 		runuser "echo `date` appd assassin killed \
 			>> $APPD_ROOT/logs/assassin.log" )		
 	fi
