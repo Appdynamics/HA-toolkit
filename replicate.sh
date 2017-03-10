@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: replicate.sh 3.13 2017-03-09 16:26:33 cmayer $
 #
 # install HA to a controller pair
 #
@@ -503,7 +503,6 @@ fi
 
 require "ex" "vim-minimal" "vim-tiny" || exit 1
 require "rsync" "rsync" "rsync" || exit 1
-require "xmlstarlet" "xmlstarlet" "xmlstarlet" || exit 1
 
 if $debug ; then
 	require "parallel" "moreutils-parallel" "parallel" || exit 1

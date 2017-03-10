@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: testconf.sh 3.4 2016-09-20 23:39:28 cmayer $
+# $Id: tests/testconf.sh 3.13 2017-03-09 16:26:33 cmayer $
 # maybe want to redo using shunit2
 
 set -e -E
@@ -18,14 +18,15 @@ fi
 
 tmpdir=/tmp
 
+function runuser {
+	"$@"
+}
+
+export APPD_ROOT=.
 . ../lib/log.sh
 . ../lib/conf.sh
 
 DELFILES=
-
-function runuser {
-	"$@"
-}
 
 function fail {
 	echo fail "$@"
@@ -94,7 +95,7 @@ check_cinfo_val narf "" 51
 cat > testfile1.xml << FIN1
 <domain>
 	<configs port="1024">
-		<config>
+		<config name="server-config">
 			<java-config>
 				<jvm-options>-Ddefined</jvm-options>
 				<jvm-options>-DFroo=99</jvm-options>
@@ -105,6 +106,19 @@ cat > testfile1.xml << FIN1
 				<jvm-options>-XX:-LoseLose</jvm-options>
 				<jvm-options>-Xmx1024m</jvm-options>
 				<jvm-options>-XX:MaxPermSize=256m</jvm-options>
+			</java-config>
+		</config>
+		<config name="default-config">
+			<java-config>
+				<jvm-options>-Ddefined</jvm-options>
+				<jvm-options>-DFroo=199</jvm-options>
+				<jvm-options>-Dfoo.bar.baz=199</jvm-options>
+				<jvm-options>-Dappdynamics.controller.port=18090</jvm-options>
+				<jvm-options>-Dfoobie.bar.baz=188</jvm-options>
+				<jvm-options>-XX:-LogVMOutput</jvm-options>
+				<jvm-options>-XX:+LoseLose</jvm-options>
+				<jvm-options>-Xmx11024m</jvm-options>
+				<jvm-options>-XX:MaxPermSize=1256m</jvm-options>
 			</java-config>
 		</config>
 	</configs>
@@ -166,8 +180,13 @@ check_domain_jvm Xms 1024 17
 domain_unset_jvm_option Xms
 check_domain_jvm Xms unset 18
 
-echo test 20
-if use_privileged_ports ; then fail 20 ; fi
+domain_unset_jvm_option defined
+check_domain_jvm defined unset 19
+xml_context="/<config name=\"default-config\">/,/<\/config>/"
+check_domain_jvm defined true 20
+
+echo test 21
+if use_privileged_ports ; then fail 21 ; fi
 
 DOMAIN_XML=testfile2.xml
 DELFILES+=" testfile2.xml"
@@ -178,8 +197,8 @@ cat > testfile2.xml << FIN
 </domain>
 FIN
 
-echo test 21
-if ! use_privileged_ports ; then fail 21 ; fi
+echo test 22
+if ! use_privileged_ports ; then fail 22 ; fi
 
 echo test 30
 if [ "`echo '-Xmx512m -Xms512m' | 

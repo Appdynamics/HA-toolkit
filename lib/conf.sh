@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: lib/conf.sh 3.13 2017-03-09 16:26:33 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -38,7 +38,14 @@ DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 CONTROLLER_SH=$APPD_ROOT/bin/controller.sh
 MYSQLCLIENT=$APPD_ROOT/HA/mysqlclient.sh
 
-XMLBASE=/domain/configs/config[1]/java-config/jvm-options
+# requires gnu sed
+if ! sed --version >/dev/null 2>&1 ; then
+	echo gnu sed required
+	exit 1
+fi
+
+# the context for xml manipulation
+xml_context="/<config name=\"server-config\">/,/<\/config>/"
 
 #
 # lose trailing and leading white space
@@ -53,10 +60,9 @@ function strip_white() {
 function controller_info_get() {
 	local xml=$1
 	local property=$2
-	local root="/controller-info"
-	local xpath="$root/$property"
 
-	runuser xmlstarlet sel -T -t -v "$xpath" $xml | strip_white
+	runuser cat $xml | tr -d '\n' | grep "<$property>" | \
+		sed -e "s/^.*<$property>//" -e "s,</$property>.*$,," | strip_white
 }
 
 #
@@ -66,14 +72,12 @@ function controller_info_set() {
 	local xml=$1
 	local property=$2
 	local value=$3
-	local root="/controller-info"
-	local xpath="$root/$property"
 
-	if runuser xmlstarlet sel -T -t -v "count($xpath)" $xml |
-		grep -s -w 0 -q ; then
-		xmlstarlet ed -L -s "$root" -t elem -n $property -v "$value" $xml
+	if [ -z "$(controller_info_get $xml $property)" ] ; then
+		runuser sed -i -e "/<\/controller-info>/i \
+			<$property>$value</$property>" $xml
 	else
-		xmlstarlet ed -L -u "$xpath" -v "$value" $xml
+		runuser sed -i -e "s,\(<$property>\).*\(</$property>\),\1$value\2," $xml
 	fi
 }
 #
@@ -82,10 +86,8 @@ function controller_info_set() {
 function controller_info_unset() {
 	local xml=$1
 	local property=$2
-	local root="/controller-info"
-	local xpath="$root/$property"
 
-	runuser xmlstarlet ed -L -d "$xpath" $xml
+	runuser sed -i -e "/<$property>/,/{\/$property>/d" $xml
 }
 
 #
@@ -128,28 +130,26 @@ function domain_get_jvm_option {
 
 	# like -Xmx34g
 	X*)
-		selector="starts-with(.,'-$property')"
+		selector="<jvm-options>-$property"
 		stripper=(-e s/-$property//)
 		;;
 
 	# like -XX:+foo or -XX:-foo
 	+*|-*) 
 		base=${property:1}
-		selector="string(.)='-XX:-$base' or string(.)='-XX:+$base'"
 		stripper=(-e "s/-XX:\([+-]\)$base/\1/")
+		selector="<jvm-options>-XX:[+-]$base"
 		;;
 
 	# like -Dfoo and -Dfoo=77
 	*)
-		selector="starts-with(.,'-D$property=') or (string(.)='-D$property')"
+		selector="<jvm-options>-D$property"
 		stripper=(-e s/-D$property$/true/ -e s/-D$property=//)
 		;;
 	esac
 
-	xpath="$XMLBASE[$selector]"
-
-	val=$(runuser xmlstarlet sel -T -t -v "$xpath" $DOMAIN_XML | 
-		strip_white | sed ${stripper[@]})
+	val=$(runuser cat $DOMAIN_XML | sed -e "$xml_context!d" | \
+		grep $selector | sed -e 's,</*jvm-options>,,g' ${stripper[@]} | strip_white)
 	if [ -z $val ] ; then
 		echo "unset"
 	else
@@ -170,24 +170,25 @@ function domain_unset_jvm_option {
 
 	# like -Xmx34g
 	X*)
-		selector="starts-with(.,'-$property')"
+		selector="-$property"
+		# selector="starts-with(.,'-$property')"
 		;;
 
 	# like -XX:+foo or -XX:-foo
 	+*|-*)
 		base=${property:1}
-		selector="string(.)='-XX:-$base' or string(.)='-XX:+$base'"
+		# selector="string(.)='-XX:-$base' or string(.)='-XX:+$base'"
+		selector="-XX:[+-]$base"
 		;;
 
 	# like -Dfoo and -Dfoo=77
 	*)
-		selector="starts-with(.,'-D$property=') or (string(.)='-D$property')"
+		# selector="starts-with(.,'-D$property=') or (string(.)='-D$property')"
+		selector="-D$property[=]*"
 		;;
 	esac
 
-	xpath=$XMLBASE[$selector]
-
-	runuser xmlstarlet ed -L -d "$xpath" $DOMAIN_XML
+	runuser sed -i -e "$xml_context{/$selector/d}" $DOMAIN_XML
 }
 
 #
@@ -204,36 +205,33 @@ function domain_set_jvm_option {
 
 	# like -Xmx34g
 	X*)
-		selector="starts-with(.,'-$property')"
-		setter="-$property$value"
+		valueset="-$property$value"
+		propmatch="-$property.*"
 		;;
 
 	# like -XX:+foo or -XX:-foo
 	+*|-*)
-		base=${property:1}
-		selector="string(.)='-XX:-$base' or string(.)='-XX:+$base'"
-		setter="-XX:$property"
+		valueset="-XX:$property"
+		propmatch="-XX:[+-]${property:1}"
 		;;
 
 	# like -Dfoo and -Dfoo=77
 	*)
-		selector="starts-with(.,'-D$property=') or (string(.)='-D$property')"
 		if [ -n "$value" ] ; then
 			value="=$value"
 		fi
-		setter="-D$property$value"
+		valueset="-D$property$value"
+		propmatch="-D$property=*.*"
 		;;
 	esac
 
-	xpath="$XMLBASE[$selector]"
+	setter="/<\/java-config>/s,</java-config>,<jvm-options>$valueset</jvm-options>\n&,"
+	changer="s,\(<jvm-options>\)$propmatch\(</jvm-options>\),\1$valueset\2,"
 
-	if runuser xmlstarlet sel -T -t -v "count($xpath)" $DOMAIN_XML |
-		grep -s -w 0 -q ; then
-		xpath="$XMLBASE/.."
-		xmlstarlet ed -L -s "$xpath" -t elem -n jvm-options -v "$setter" $DOMAIN_XML
-	else
-		xmlstarlet ed -L -u "$xpath" -v "$setter" $DOMAIN_XML
+	if [ $(domain_get_jvm_option $property) != "unset" ] ; then
+		setter="$changer"
 	fi
+	sed -i -e "$xml_context{$setter}" $DOMAIN_XML
 } 
 
 # set a property into the db.cnf file

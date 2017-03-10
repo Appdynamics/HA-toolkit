@@ -410,3 +410,10 @@ Release notes for version 3.12
    the watchdog.  this race is inherent in the way ssh and nohup work.
 
 7) duplicate assassins and watchdogs were possible.  this is now prevented.
+
+--------------------------------------
+Release notes for version 3.13
+
+1) removed dependency on xmlstarlet, as it has incompatible versions in the
+   field and cannot be relied on to work.
+
