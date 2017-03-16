@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.14 2017-03-15 19:41:17 cmayer $
+# $Id: replicate.sh 3.14.1 2017-03-16 16:04:25 cmayer $
 #
 # install HA to a controller pair
 #
@@ -1043,6 +1043,9 @@ if $debug ; then
 fi
 
 if $wildcard ; then
+	grant_primary='%'
+	grant_secondary='%'
+else
 	#
 	# let's probe the canonical hostnames from the local database
 	#
@@ -1072,13 +1075,10 @@ if $wildcard ; then
 	[[ $secondary1 != localhost ]] && secondary=$secondary1	# avoid issues with 127.0.0.1 having been set to hostname in /etc/hosts
 	grant_primary=$primary
 	grant_secondary=$secondary
-else
-	grant_primary='%'
-	grant_secondary='%'
 fi
 
-message "primary: $primary"
-message "secondary: $secondary"
+message "primary: $primary grant to: $grant_primary"
+message "secondary: $secondary grant to: $grant_secondary"
 
 #
 # do all the setup needed for ssl; db.cnf and cert creation
