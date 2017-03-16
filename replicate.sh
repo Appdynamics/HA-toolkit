@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.13 2017-03-09 16:26:33 cmayer $
+# $Id: replicate.sh 3.14 2017-03-15 19:41:17 cmayer $
 #
 # install HA to a controller pair
 #
@@ -1042,7 +1042,7 @@ if $debug ; then
 	wait
 fi
 
-if [ -z $wildcard ] ; then
+if $wildcard ; then
 	#
 	# let's probe the canonical hostnames from the local database
 	#
@@ -1180,7 +1180,7 @@ RESET SLAVE ALL;
 RESET MASTER;
 DELETE FROM mysql.user where user='controller_repl';
 FLUSH PRIVILEGES;
-GRANT ALL ON *.* TO 'controller_repl'@'$grant_secondary' IDENTIFIED BY 'controller_repl' $USE_SSL;
+GRANT REPLICATION SLAVE ON *.* TO 'controller_repl'@'$grant_secondary' IDENTIFIED BY 'controller_repl' $USE_SSL;
 CHANGE MASTER TO MASTER_HOST='$secondary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=$dbport $PRIMARY_SSL;
 update global_configuration_local set value = 'active' where name = 'appserver.mode';
 update global_configuration_local set value = 'primary' where name = 'ha.controller.type';
@@ -1193,7 +1193,7 @@ RESET SLAVE ALL;
 RESET MASTER;
 DELETE FROM mysql.user where user='controller_repl';
 FLUSH PRIVILEGES;
-GRANT ALL ON *.* TO 'controller_repl'@'$grant_primary' IDENTIFIED BY 'controller_repl' $USE_SSL;
+GRANT REPLICATION SLAVE ON *.* TO 'controller_repl'@'$grant_primary' IDENTIFIED BY 'controller_repl' $USE_SSL;
 CHANGE MASTER TO MASTER_HOST='$primary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=$dbport $SECONDARY_SSL;
 update global_configuration_local set value = 'passive' where name = 'appserver.mode';
 update global_configuration_local set value = 'secondary' where name = 'ha.controller.type';

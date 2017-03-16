@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: appdcontroller-db.sh 3.14 2017-03-15 13:03:13 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -52,8 +52,10 @@ RUNUSER=root
 [ -f /etc/default/appdcontroller-db ] && . /etc/default/appdcontroller-db
 
 if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
-	rm -f /tmp/$NAME.out
-	exec 2> /tmp/$NAME.out
+	logfile=/tmp/$NAME.out
+	rm -f $logfile
+	exec 2> $logfile
+	chown $RUNUSER $logfile
 	set -x
 fi
 

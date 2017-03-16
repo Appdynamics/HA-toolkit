@@ -417,3 +417,16 @@ Release notes for version 3.13
 1) removed dependency on xmlstarlet, as it has incompatible versions in the
    field and cannot be relied on to work.
 
+--------------------------------------
+Release notes for version 3.14 (pi)
+
+1) install-init.sh now fails if HA/NOROOT exists.
+
+2) a bug in appdservice-noroot.sh prevented it from running
+
+3) the INITDEBUG option now creates log files owned by runuser.
+
+4) the replication slave user now has least privilege.
+
+5) the wildcard option in replicate.sh now works again.
+

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: install-init.sh 3.14 2017-03-13 11:43:40 cmayer $
 #
 # install init scripts, including the machine agent.
 #
@@ -35,6 +35,11 @@ function usage {
 APPD_ROOT=`readlink -e ..`
 
 LOGFILE=$APPD_ROOT/logs/install-init.log
+
+if [ -f $APPD_ROOT/HA/NOROOT ] ; then
+	echo "$APPD_ROOT/HA/NOROOT exists - install-init.sh meaningless" | tee $LOGFILE
+	exit 1
+fi
 
 PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
 PBRUN=

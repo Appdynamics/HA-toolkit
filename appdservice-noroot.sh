@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: appdservice-noroot.sh 3.13 2017-03-12 22:26:39 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -98,8 +98,6 @@ appdcontroller:start)
 				done
 			fi
 		fi
-	;;
-	fi	
 	else
 		if [ -f $WATCHDOG_ENABLE ] ; then
 			if ! watchdog_running ; then
@@ -114,7 +112,6 @@ appdcontroller:start)
 				done
 			fi
 		fi	
-		
 	fi
 	;;
 
@@ -134,8 +131,8 @@ appdcontroller:stop)
 	if assassin_running ; then
 		kill -9 $assassin_pid && ( echo appd assassin killed; \
 			echo `date` appd assassin killed >> $APPD_ROOT/logs/assassin.log )
-		fi
-		runuser rm -f $ASSASSIN_PIDFILE
+	fi
+	runuser rm -f $ASSASSIN_PIDFILE
 	;;
 
 appdcontroller-db:start)

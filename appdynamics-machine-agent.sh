@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: appdynamics-machine-agent.sh 3.14 2017-03-15 13:03:13 cmayer $
 #
 # /etc/init.d/appdynamics-machine-agent
 #
@@ -51,15 +51,17 @@ JAVA_OPTS=""
 [ -f /etc/sysconfig/appdynamics-machine-agent ] && . /etc/sysconfig/appdynamics-machine-agent
 [ -f /etc/default/appdynamics-machine-agent ] && . /etc/default/appdynamics-machine-agent
 
-JAVA=$APPD_ROOT/jre/bin/java
 NAME=$(basename $(readlink -e $0))
 
 if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
-	rm -f /tmp/$NAME.out
-	exec 2> /tmp/$NAME.out
+	logfile=/tmp/$NAME.out
+	rm -f $logfile
+	exec 2> $logfile
+	chown $RUNUSER $logfile
 	set -x
 fi
 
+JAVA=$APPD_ROOT/jre/bin/java
 
 # For security reasons, locally embed/include function library at HA.shar build time
 embed lib/init.sh
