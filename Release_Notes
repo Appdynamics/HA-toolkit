@@ -430,3 +430,7 @@ Release notes for version 3.14 (pi)
 
 5) the wildcard option in replicate.sh now works again.
 
+--------------------------------------
+Release notes for version 3.14.1 (more pi)
+
+1) wildcard really working now.
