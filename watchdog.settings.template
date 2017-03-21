@@ -1,4 +1,4 @@
-# $Id: watchdog.settings.template 3.1 2016-12-05 14:04:12 cmayer $
+# $Id: watchdog.settings.template 3.15 2017-03-20 20:57:38 cmayer $
 #
 # watchdog.settings
 #
@@ -52,6 +52,7 @@ PINGLIMIT=300
 # the test should be disabled with a very high value on locally attached
 # disks, since this class of failure is unlikely.
 DBOPLIMIT=2000000000
+DBOP_ENABLE=false
 
 #
 # the length of time to wait for a sql statememt to run

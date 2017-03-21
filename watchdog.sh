@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: watchdog.sh 3.15 2017-03-20 20:57:38 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -98,6 +98,12 @@ DBDOWNLIMIT=300
 # The primary database cannot create a table: 2 Minutes
 # disabled by default
 DBOPLIMIT=2000000000
+
+#
+# disable the dbop test
+#
+DBOP_ENABLE=false
+
 
 # The active controller host is not responding to ICMP echo, (ping),
 # requests: 5 Minutes
@@ -338,6 +344,7 @@ function poll {
 			continue
 		fi
 
+		if $DBOP_ENABLE ; then
 		#
 		# then, is the database capable of doing some real work for us
 		# only do this every DB_CREATE_DELAY
@@ -364,6 +371,7 @@ function poll {
 				sleep $LOOPTIME
 				continue
 			fi
+		fi
 		fi
 
 		#

@@ -434,3 +434,8 @@ Release notes for version 3.14 (pi)
 Release notes for version 3.14.1 (more pi)
 
 1) wildcard really working now.
+
+--------------------------------------
+Release notes for version 3.15
+
+1) complete disable of dbop test in watchdog.sh
