@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/init.sh 3.10 2017-02-15 17:38:25 cmayer $
+# $Id: lib/init.sh 3.16 2017-04-17 17:12:18 cmayer $
 #
 # init.sh
 # contains functions to change user and run processes
@@ -29,17 +29,17 @@
 #
 if [ `id -un` == "$RUNUSER" ] ; then
 	function bg_runuser {
-		bash -c "$* >/dev/null 2>&1 & echo \$! ; disown" &
+		echo "$* >/dev/null 2>&1 & echo \$! ; disown" | bash &
 	}
 	function runuser {
-		bash -c "$*"
+		echo "$*" | bash
 	}
 else
 	function bg_runuser {
-		su -s /bin/bash -c "$* >/dev/null 2>&1 & echo \$!; disown" $RUNUSER
+		echo "$* >/dev/null & echo \$! ; disown" | su -s /bin/bash $RUNUSER
 	}
 	function runuser {
-		su -s /bin/bash -c "$*" $RUNUSER
+		echo "$*" | su -s /bin/bash $RUNUSER
 	}
 fi
 export -f runuser bg_runuser

@@ -19,7 +19,7 @@ fi
 tmpdir=/tmp
 
 function runuser {
-	"$@"
+	echo "$*" | bash
 }
 
 export APPD_ROOT=.
@@ -51,7 +51,7 @@ DELFILES+=" testfile0.xml"
 function logtest() {
 	echo "test $1"
 	if [ -n "$testid" ] ; then
-		if [ $testid = $1 ] ; then
+		if [ "$testid" = "$1" ] ; then
 			set -x
 		fi
 	fi

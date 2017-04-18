@@ -439,3 +439,25 @@ Release notes for version 3.14.1 (more pi)
 Release notes for version 3.15
 
 1) complete disable of dbop test in watchdog.sh
+
+
+--------------------------------------
+Release notes for version 3.16
+
+1) a number of hard to diagnose HA failures were traced to a setting in the
+   db.cnf.  sync_binlog=1 prevents the replication log and the innodb logs
+   from being seen as inconsistent should the database crash.
+
+2) the slave_pending_jobs_size_max setting needs to be there to allow the
+   replication slave to run in parallel.
+
+3) machine agent status is now reported by the controller init script
+
+4) added options supporting mysql 5.7 parallel replication.
+
+5) setmonitor.sh had an error if there was no crededential password
+
+6) quoting problems arose in lib/conf.sh under certain conditions
+   this required a modification in the fundamental runuser functions
+   in lib/init.sh and lib/runuser.sh.
+

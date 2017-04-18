@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.14 2017-03-15 13:03:13 cmayer $
+# $Id: appdcontroller.sh 3.16 2017-04-17 17:12:18 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -246,7 +246,9 @@ status)
 		echo "reporting service not running"
 		;;
 	esac
-	service appdynamics-machine-agent status
+	if [ -f /etc/init.d/appdynamics-machine-agent ] ; then
+		service appdynamics-machine-agent status
+	fi
 	exit $retcode
 ;;
 

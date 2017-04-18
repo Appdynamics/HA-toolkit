@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: setmonitor.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: setmonitor.sh 3.16 2017-04-17 17:12:18 cmayer $
 #
 # instrument controller and machine agents to a monitoring host
 #
@@ -287,7 +287,7 @@ if echo $monitor_access_key | grep -q -s "^-001" ; then
 				credfile=$xcredfile
 			fi
 			xcredpass=$(controller_info_get $info credential-store-password)
-			if [ -z "$credpass" -a $xcredpass != unset ] ; then
+			if [ -z "$credpass" -a "$xcredpass" != unset ] ; then
 				credpass=$xcredpass
 			fi
 		fi

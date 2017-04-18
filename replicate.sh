@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.14.1 2017-03-16 16:04:25 cmayer $
+# $Id: replicate.sh 3.16 2017-04-17 17:12:18 cmayer $
 #
 # install HA to a controller pair
 #
@@ -764,7 +764,7 @@ else
 	relay_log=relay-log
 	relay_log_index=relay-log.index
 	innodb_support_xa=1
-	sync_binlog=0
+	sync_binlog=1
 	log-slow-slave-statements
 	# avoid bin-log writes on secondary
 	log_slave_updates=0
@@ -790,6 +790,7 @@ else
 	slave_parallel_type=LOGICAL_CLOCK
 	slave_parallel_workers=10
 	slave_preserve_commit_order=0
+	slave_pending_jobs_size_max=1g
 	ADDITIONS_FOR_57
 	fi
 fi

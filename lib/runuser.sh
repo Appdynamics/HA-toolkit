@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/runuser.sh 3.10 2017-02-15 17:38:25 cmayer $
+# $Id: lib/runuser.sh 3.16 2017-04-17 17:12:18 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -27,9 +27,9 @@
 #
 
 function bg_runuser {
-	exec nohup "$@" >/dev/null 2>&1 &
+	echo "$*" | exec nohup bash >/dev/null 2>&1 &
 }
 function runuser {
-	"$@"
+	echo "$*" | bash
 }
 export -f runuser bg_runuser

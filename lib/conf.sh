@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.13 2017-03-09 16:26:33 cmayer $
+# $Id: lib/conf.sh 3.16 2017-04-17 17:12:18 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -45,7 +45,7 @@ if ! sed --version >/dev/null 2>&1 ; then
 fi
 
 # the context for xml manipulation
-xml_context="/<config name=\"server-config\">/,/<\/config>/"
+xml_context="/<config name=\\\"server-config\\\">/,/<\/config>/"
 
 #
 # lose trailing and leading white space
@@ -74,10 +74,13 @@ function controller_info_set() {
 	local value=$3
 
 	if [ -z "$(controller_info_get $xml $property)" ] ; then
-		runuser sed -i -e "/<\/controller-info>/i \
-			<$property>$value</$property>" $xml
+		tmpfile=/tmp/cinfo_set.$$ ; rm -f $tmpfile
+		echo "<$property>$value</$property>" > $tmpfile
+		chmod 755 $tmpfile
+		runuser sed -i -e "\"/<\/controller-info>/r $tmpfile\"" $xml
+		rm -f $tmpfile
 	else
-		runuser sed -i -e "s,\(<$property>\).*\(</$property>\),\1$value\2," $xml
+		runuser sed -i -e "\"s,\(<$property>\).*\(</$property>\),\1$value\2,\"" $xml
 	fi
 }
 #
@@ -87,7 +90,7 @@ function controller_info_unset() {
 	local xml=$1
 	local property=$2
 
-	runuser sed -i -e "/<$property>/,/{\/$property>/d" $xml
+	runuser sed -i -e "\"/<$property>/,/{\/$property>/d\"" $xml
 }
 
 #
@@ -150,10 +153,10 @@ function domain_get_jvm_option {
 
 	val=$(runuser cat $DOMAIN_XML | sed -e "$xml_context!d" | \
 		grep $selector | sed -e 's,</*jvm-options>,,g' ${stripper[@]} | strip_white)
-	if [ -z $val ] ; then
+	if [ -z "$val" ] ; then
 		echo "unset"
 	else
-		echo $val
+		echo "$val"
 	fi
 }
 
@@ -188,7 +191,7 @@ function domain_unset_jvm_option {
 		;;
 	esac
 
-	runuser sed -i -e "$xml_context{/$selector/d}" $DOMAIN_XML
+	runuser sed -i -e "\"$xml_context{/$selector/d}\"" $DOMAIN_XML
 }
 
 #
@@ -228,7 +231,7 @@ function domain_set_jvm_option {
 	setter="/<\/java-config>/s,</java-config>,<jvm-options>$valueset</jvm-options>\n&,"
 	changer="s,\(<jvm-options>\)$propmatch\(</jvm-options>\),\1$valueset\2,"
 
-	if [ $(domain_get_jvm_option $property) != "unset" ] ; then
+	if [ "$(domain_get_jvm_option $property)" != "unset" ] ; then
 		setter="$changer"
 	fi
 	sed -i -e "$xml_context{$setter}" $DOMAIN_XML
@@ -309,10 +312,10 @@ function dbcnf_unset {
 function dbcnf_get {
 	local property=$1
 
-	val=`runuser grep "^[[:space:]]*$property=" $DB_CONF | awk -F= '{print $2}'`
+	val=`runuser grep "\"^[[:space:]]*$property=\"" $DB_CONF | awk -F= '{print $2}'`
 	if [ -n "$val" ] ; then
 		echo $val
-	elif runuser grep -q "^[[:space:]]*\b$property\b" $DB_CONF ; then
+	elif runuser grep -q "\"^[[:space:]]*\b$property\b\"" $DB_CONF ; then
 		echo $property
 	else
 		echo unset
@@ -324,7 +327,7 @@ function dbcnf_get {
 # return success if they are
 #
 function use_privileged_ports {
-	echo 'cat //*[@port<1024]' | runuser xmllint --shell $DOMAIN_XML | grep -q port
+	runuser xmllint --xpath "\"//*[@port<1024]\"" $DOMAIN_XML 2>/dev/null | grep -q -s port
 }
 
 #
