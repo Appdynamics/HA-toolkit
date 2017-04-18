@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.14 2017-03-15 13:03:13 cmayer $
+# $Id: appdcontroller-db.sh 3.17 2017-04-18 14:48:02 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -377,7 +377,7 @@ restart)
   
 status)  
 	if db_running ; then
-controllerversion=`echo "select value from global_configuration_cluster where name='schema.version'" | runuser $MYSQLCLIENT | get value`
+controllerversion=`echo "select value from global_configuration_cluster where name='schema.version'" | run_mysql | get value`
 	if [ ! -z "$controllerversion" ] ; then
 		echo version: $controllerversion
 	fi
@@ -390,7 +390,7 @@ controllerversion=`echo "select value from global_configuration_cluster where na
 				echo replication disabled
 			fi
 		fi
-		case `echo "select value from global_configuration_local where name='ha.controller.type'" | runuser $MYSQLCLIENT | get value` in
+		case `echo "select value from global_configuration_local where name='ha.controller.type'" | run_mysql | get value` in
 		primary) 
 			echo primary
 			;;
@@ -406,12 +406,12 @@ controllerversion=`echo "select value from global_configuration_cluster where na
 		esac
 		
 		echo "SHOW SLAVE STATUS" | \
-			( runuser $MYSQLCLIENT ) | awk \
+			( run_mysql ) | awk \
 			'/Slave_IO_State/ {print}
 			/Seconds_Behind_Master/ {print} 
 			/Master_Server_Id/ {print}
 			/Master_Host/ {print}'
-		echo "SHOW SLAVE STATUS" | ( runuser $MYSQLCLIENT ) | awk '
+		echo "SHOW SLAVE STATUS" | ( run_mysql ) | awk '
 			/Master_SSL_Allowed/ { if ($2 == "Yes") {print "Using SSL Replication" }}'
 	else
 		echo "db not running"

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/runuser.sh 3.16 2017-04-17 17:12:18 cmayer $
+# $Id: lib/runuser.sh 3.17 2017-04-18 14:48:02 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -31,5 +31,8 @@ function bg_runuser {
 }
 function runuser {
 	echo "$*" | bash
+}
+function run_mysql {
+	$MYSQLCLIENT
 }
 export -f runuser bg_runuser

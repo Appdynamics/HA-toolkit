@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/status.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: lib/status.sh 3.17 2017-04-18 14:48:02 cmayer $
 #
 # common code to interrogate the status of various functions
 #
@@ -77,7 +77,7 @@ function get {
 
 function controller_mode {
 	echo "select value from global_configuration_local \
-		where name='appserver.mode'" | runuser $MYSQLCLIENT | get value
+		where name='appserver.mode'" | run_mysql | get value
 }
 
 function controllerrunning {

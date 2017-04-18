@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.16 2017-04-17 17:12:18 cmayer $
+# $Id: replicate.sh 3.17 2017-04-18 14:48:02 cmayer $
 #
 # install HA to a controller pair
 #
@@ -791,6 +791,8 @@ else
 	slave_parallel_workers=10
 	slave_preserve_commit_order=0
 	slave_pending_jobs_size_max=1g
+	gtid-mode=ON
+	enforce-gtid-consistency=ON
 	ADDITIONS_FOR_57
 	fi
 fi
@@ -973,6 +975,9 @@ fi
 #
 # restart the primary db
 #
+message "rename database log file"
+mv $APPD_ROOT/logs/database.log $APPD_ROOT/logs/database.log.`date +%F.%T`
+
 message "starting primary database"
 # Do not proceed unless the primary starts cleanly or we could end up with
 #  unexpected failovers.
@@ -1229,6 +1234,9 @@ runcmd ssh $secondary rm -f $datadir/master.info
 #
 # start the secondary database
 #
+message "rename secondary database log"
+ssh $secondary mv $APPD_ROOT/logs/database.log $APPD_ROOT/logs/database.log.`date +%F.%T`
+
 message "start secondary database"
 if ! remservice -t $secondary appdcontroller-db start | logonly 2>&1 ; then
 	fatal 10 "could not start secondary database"

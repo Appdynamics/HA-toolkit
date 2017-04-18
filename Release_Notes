@@ -461,3 +461,14 @@ Release notes for version 3.16
    this required a modification in the fundamental runuser functions
    in lib/init.sh and lib/runuser.sh.
 
+--------------------------------------
+Release notes for version 3.17
+
+1) more fragility with quoting has been eliminated.
+
+2) the database logs are now saved and recreated whenever replicate is
+   finalized.  this means that database logs will not be cluttered with
+   historical information.
+
+3) gtid mode is now enabled for the 5.7 databases.
+

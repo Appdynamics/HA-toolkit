@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.16 2017-04-17 17:12:18 cmayer $
+# $Id: appdcontroller.sh 3.17 2017-04-18 14:48:02 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -169,7 +169,7 @@ stop)
 	if [ $? -lt 3 ] ; then
 		echo "forcibly killing appserver"
 		pkill -9 -f "$APPD_ROOT/appserver/glassfish/domains/domain1"
-		echo "truncate ejb__timer__tbl;" | runuser $MYSQLCLIENT 
+		echo "truncate ejb__timer__tbl;" | run_mysql
 	fi
 	#
 	# an interesting case is if we are the active node, and replication is up,
@@ -177,12 +177,12 @@ stop)
 	# an appserver
 	#
 	if [ -f $SHUTDOWN_FAILOVER -a "`controller_mode`" == active ] ; then
-		secondary=`echo "show slave status\G" | runuser $MYSQLCLIENT | \
+		secondary=`echo "show slave status\G" | run_mysql | \
 			awk '/Master_Host:/ {print $2}'`
         echo 'update global_configuration_local set value="passive" \
-			where name="appserver.mode"' | runuser $MYSQLCLIENT
+			where name="appserver.mode"' | run_mysql
         echo 'update global_configuration_local set value="secondary" \
-			where name="ha.controller.type"' | runuser $MYSQLCLIENT
+			where name="ha.controller.type"' | run_mysql
 		runuser ssh $secondary "$APPD_ROOT/HA/failover.sh" \
 			-n primary_has_been_set_passive_and_stopped >/dev/null
 	fi
