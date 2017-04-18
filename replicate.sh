@@ -739,7 +739,9 @@ if $final ; then
 		./numa-patch-controller.sh
 	fi
 
+
 	message "stopping primary"
+	sql localhost "set global innodb_fast_shutdown=0;"
 	rsync_opts=$final_rsync_opts
 	rsync_throttle=""
 	( stop_appdynamics_services || $APPD_ROOT/bin/controller.sh stop ) | logonly 2>&1
