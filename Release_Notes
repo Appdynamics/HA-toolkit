@@ -472,3 +472,6 @@ Release notes for version 3.17
 
 3) gtid mode is now enabled for the 5.7 databases.
 
+4) setmonitor.sh now allows setting tier name
+
+

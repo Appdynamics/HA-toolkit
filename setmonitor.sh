@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: setmonitor.sh 3.16 2017-04-17 17:12:18 cmayer $
+# $Id: setmonitor.sh 3.17 2017-04-18 16:43:28 cmayer $
 #
 # instrument controller and machine agents to a monitoring host
 #
@@ -63,7 +63,12 @@ function usage()
 	echo "usage: $0 <options>"
 	echo "    [ -i <internal vip> ]"
 	echo "    [ -s <secondary hostname> ]"
-	echo "    [ -m url=[protocol://]<controller_monitor>[:port],access_key=\"1-2-3-4\"[,app_name=\"ABC controller\"][,account_name=someaccount] ]"
+	echo "    [ -m [attribute...] where attributes comma seperated:"
+	echo "         url=[protocol://]<controller_monitor>[:port]"
+	echo "         access_key=\"1-2-3-4\""
+	echo "         app_name=\"ABC controller\""
+	echo "         account_name=system"
+	echo "         tier_name=\"App Server\""
 	echo "    [ -a <machine agent install directory> ]"
 	echo "    [ -h ] print help"
 	exit 1
@@ -111,7 +116,8 @@ declare -A cmargs
 # access_key=\"1-2-3-4\"
 # [,app_name=\"ABC controller\"]
 # [,account_name=someaccount]
-#
+# [,tier_name=foo]
+
 function parse_monitor_def() {
 
 	local controller_monitor_args="$1"
@@ -183,7 +189,6 @@ while getopts s:m:a:i:h flag; do
 	esac
 done
 
-
 pri_short=$(shortname $primary)
 sec_short=$(shortname $secondary)
 
@@ -219,7 +224,7 @@ eval `parse_vip monitor $monitor`
 monitor_access_key="${cmargs['access_key']}"
 monitor_account="${cmargs['account_name']}"
 monitor_application="${cmargs['app_name']}"
-monitor_tier="App Server"
+monitor_tier="${cmargs['tier_name']}"
 
 if [ -z "$monitor_account" ] ; then
 	if [ "$monitor" = "$internal_vip" ] ; then
@@ -235,6 +240,9 @@ if [ -z "$monitor_application" ] ; then
 	else
 		monitor_application="$pri_short controller"
 	fi
+fi
+if [ -z "$monitor_tier" ] ; then
+	monitor_tier="App Server"
 fi
 if [ -z "$monitor_access_key" ] ; then
 	if [ "$monitor" != "$internal_vip" ] ; then
