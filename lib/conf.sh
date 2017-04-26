@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.16 2017-04-17 17:12:18 cmayer $
+# $Id: lib/conf.sh 3.18 2017-04-26 01:25:28 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -77,7 +77,7 @@ function controller_info_set() {
 		tmpfile=/tmp/cinfo_set.$$ ; rm -f $tmpfile
 		echo "<$property>$value</$property>" > $tmpfile
 		chmod 755 $tmpfile
-		runuser sed -i -e "\"/<\/controller-info>/r $tmpfile\"" $xml
+		runuser sed -i -e "\"/<controller-info>/r $tmpfile\"" $xml
 		rm -f $tmpfile
 	else
 		runuser sed -i -e "\"s,\(<$property>\).*\(</$property>\),\1$value\2,\"" $xml
@@ -90,7 +90,7 @@ function controller_info_unset() {
 	local xml=$1
 	local property=$2
 
-	runuser sed -i -e "\"/<$property>/,/{\/$property>/d\"" $xml
+	runuser sed -i -e "\"s/<$property>.*<\/$property>//\"" $xml
 }
 
 #

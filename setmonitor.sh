@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: setmonitor.sh 3.17 2017-04-18 16:43:28 cmayer $
+# $Id: setmonitor.sh 3.18 2017-04-26 01:25:28 cmayer $
 #
 # instrument controller and machine agents to a monitoring host
 #
@@ -327,6 +327,7 @@ for info in ${controller_infos[*]} ; do
 		controller_info_set $info account-name "$monitor_account"
 		controller_info_set $info account-access-key "$monitor_access_key"
 		controller_info_set $info controller-ssl-enabled "$monitor_ssl"
+		controller_info_set $info node-name $pri_short
 
 		if $need_encryption ; then
 			controller_info_set $info use-encrypted-credentials true
@@ -359,7 +360,7 @@ for info in ${controller_infos[*]} ; do
 		rm -f $ci_tmp
 		message "copy $info to secondary"
 		cp $info $ci_tmp
-		controller_info_set $ci_tmp node-name $secondary
+		controller_info_set $ci_tmp node-name $sec_short
 		scp -q $ci_tmp $secondary:$info
 		rm -f $ci_tmp
 	fi

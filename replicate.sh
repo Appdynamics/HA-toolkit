@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.17 2017-04-18 14:48:02 cmayer $
+# $Id: replicate.sh 3.18 2017-04-26 01:25:28 cmayer $
 #
 # install HA to a controller pair
 #
@@ -798,6 +798,8 @@ else
 	ADDITIONS_FOR_57
 	fi
 fi
+
+dbcnf_set socket $datadir/mysql.sock
 
 #
 # force server id - for failback

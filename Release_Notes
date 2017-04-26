@@ -474,4 +474,18 @@ Release notes for version 3.17
 
 4) setmonitor.sh now allows setting tier name
 
+--------------------------------------
+Release notes for version 3.18
+
+1) lib/conf.sh did not correctly delete properties in controller_info.xml;
+   this caused the emission of mailformed xml files, and the controllers
+   were not monitored properly. this was introduced in 3.14
+
+2) replicate now sets the default path for the mysql socket into the
+   data directory.  this fixes a problem with controllers that do not
+   start sometimes.
+
+3) setmonitor.sh did not set the primary node name.  if the original
+   controller-info.xml did not have a node-name in it, the secondary
+   appserver would not be monitored on failover.
 
