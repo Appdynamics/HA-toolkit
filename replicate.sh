@@ -981,6 +981,7 @@ fi
 #
 message "rename database log file"
 mv $APPD_ROOT/logs/database.log $APPD_ROOT/logs/database.log.`date +%F.%T`
+touch $APPD_ROOT/logs/database.log
 
 message "starting primary database"
 # Do not proceed unless the primary starts cleanly or we could end up with
