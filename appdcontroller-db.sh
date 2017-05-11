@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.17 2017-04-18 14:48:02 cmayer $
+# $Id: appdcontroller-db.sh 3.19 2017-05-11 14:09:21 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -276,11 +276,7 @@ function reserve_memory {
 
 	# remove events service large pages config from controller.sh
 	if [ -f $EVENTS_VMOPTIONS_FILE ] ; then
-		runuser ex -s $EVENTS_VMOPTIONS_FILE <<- DELETE_EVENTS_LARGE_PAGES
-			%s/^[\t ]*-XX:+UseLargePages[\t ]*\n//g
-			%s/^[\t ]*-XX:LargePageSizeInBytes=.*\n//g
-			wq
-		DELETE_EVENTS_LARGE_PAGES
+		runuser sed -i -e '/+UseLargePages/d' -e '/LargePageSizeInBytes/d' $EVENTS_VMOPTIONS_FILE
 	fi
 
 	#

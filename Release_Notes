@@ -489,3 +489,9 @@ Release notes for version 3.18
    controller-info.xml did not have a node-name in it, the secondary
    appserver would not be monitored on failover.
 
+--------------------------------------
+Release notes for version 3.19
+
+1) the appdcontroller-db.sh init script did not properly start the
+   database sometimes due to a hanging ex script.
+
