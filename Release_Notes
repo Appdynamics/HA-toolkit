@@ -495,3 +495,4 @@ Release notes for version 3.19
 1) the appdcontroller-db.sh init script did not properly start the
    database sometimes due to a hanging ex script.
 
+2) watchdog.sh did not include the lib/status.sh script, so an alias failed.

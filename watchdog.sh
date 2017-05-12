@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 3.15 2017-03-20 20:57:38 cmayer $
+# $Id: watchdog.sh 3.19 2017-05-11 17:54:49 cmayer $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -33,6 +33,7 @@ LOGNAME=watchdog.log
 . lib/ha.sh
 . lib/password.sh
 . lib/sql.sh
+. lib/status.sh
 
 #
 # this is needed to set the output of a pipe to the first failing process
