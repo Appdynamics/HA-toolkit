@@ -1,5 +1,5 @@
 #
-# $Id: lib/sql.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: lib/sql.sh 3.20 2017-06-02 15:12:22 cmayer $
 #
 # run sql statements
 # potentially logging, potentially with timeouts,
@@ -94,6 +94,7 @@ function sql {
 	else
 		trap sqltimeout SIGALRM
 		# start time bomb
+		sqlkilled=0
 		(sleep $3 ; kill -SIGALRM $mypid) &
 		sqlkiller=$!
 		disown $sqlkiller

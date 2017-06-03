@@ -496,3 +496,16 @@ Release notes for version 3.19
    database sometimes due to a hanging ex script.
 
 2) watchdog.sh did not include the lib/status.sh script, so an alias failed.
+
+--------------------------------------
+Release notes for version 3.20
+
+1) added watchdog.pid to the replicate excludes.   this prevents a rare
+   startup problem
+2) fixed a longstanding bug in the watchdog that caused spurious failovers.
+3) adjusted the disk_stat.sh monitor to report KB/sec and greatly increased
+   the reporting frequency.   this makes the min and max settings useful at
+   a much higher measurement overhead,  this still will use less than a tenth
+   of a core.
+4) added prototype code for hot-sync replicate.  not currently recommended
+   or supported.  needs percona xtrabackup and perl-DBD-mysql

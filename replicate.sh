@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.18 2017-04-26 01:25:28 cmayer $
+# $Id: replicate.sh 3.20 2017-06-02 18:16:28 cmayer $
 #
 # install HA to a controller pair
 #
@@ -70,6 +70,7 @@ debug=false
 appserver_only_sync=false
 upgrade=false
 final=false
+hotsync=false
 unencrypted=false
 start_appserver=true
 watchdog_enable=false
@@ -298,6 +299,7 @@ function usage()
 	echo "    [ -W ] use wildcard host in grant"
 	echo "    [ -7 ] enable parallel replication for mysql 5.7"
 	echo "    [ -h ] print help"
+	echo "	  [ -X ] use backup for hot sync"
 	exit 1
 }
 
@@ -346,7 +348,7 @@ message "hostname: " `hostname`
 message "appd root: $APPD_ROOT"
 message "appdynamics run user: $RUNUSER"
 
-while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS7 flag; do
+while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS7X flag; do
 	case $flag in
 	7)
 		mysql_57=true
@@ -381,6 +383,13 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS7 flag; do
 		;;
 	S)
 		ssl_replication=true
+		;;
+	X)
+		if grep -q ^server-id $APPD_ROOT/db/db.cnf ; then
+			hotsync=true
+		else
+			echo "HA not enabled - hot sync not possible"
+		fi
 		;;
 	u)
 		upgrade=true
@@ -740,11 +749,15 @@ if $final ; then
 	fi
 
 
-	message "stopping primary"
-	sql localhost "set global innodb_fast_shutdown=0;"
-	rsync_opts=$final_rsync_opts
-	rsync_throttle=""
-	( stop_appdynamics_services || $APPD_ROOT/bin/controller.sh stop ) | logonly 2>&1
+	if $use_backup ; then
+		message "using backup - no need to stop primary"
+	else
+		message "stopping primary"
+		sql localhost "set global innodb_fast_shutdown=0;"
+		rsync_opts=$final_rsync_opts
+		rsync_throttle=""
+		( stop_appdynamics_services || $APPD_ROOT/bin/controller.sh stop ) | logonly 2>&1
+	fi
 fi
 
 #
@@ -843,17 +856,19 @@ if $appserver_only_sync ; then
 		$APPD_ROOT/ $ROOTDEST
 		message "Rsyncs complete"
 		message "App server only sync done"
-		exit 0
-else
-	#
-	# clean out the old relay and bin-logs
-	#
-	message "Removing old replication logs"
-	runcmd rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info
-	runcmd ssh $secondary "find $datadir -print | grep bin-log | xargs rm  -f"
-	runcmd ssh $secondary "find $datadir -print | grep relay-log | xargs rm  -f"
-	runcmd ssh $secondary rm -f $datadir/master.info
+	exit 0
+fi
 
+#
+# clean out the old relay and bin-logs
+#
+message "Removing old replication logs"
+runcmd ssh $secondary "find $datadir -print | grep bin-log | xargs rm  -f"
+runcmd ssh $secondary "find $datadir -print | grep relay-log | xargs rm  -f"
+runcmd ssh $secondary rm -f $datadir/master.info
+
+if ! $hotsync ; then
+	runcmd rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info
 	#
 	# maximum paranoia:  build space ID maps of each of the innodb data files and 
 	# prune differences
@@ -891,7 +906,7 @@ else
 		awk '/^>/ {print $2}' > $tmpdir/worklist
 	diff $tmpdir/ibdlist.large.local $tmpdir/ibdlist.large.remote | \
 		awk '/^>/ {print $2}' >> $tmpdir/worklist
-	
+
 	discrepancies=`wc -w $tmpdir/worklist | awk '{print $1}'`
 	if [ $discrepancies -gt 0 ] ; then
 		message "found $discrepancies discrepancies"
@@ -901,44 +916,62 @@ else
 	else
 		message "no discrepancies"
 	fi
+fi
 
-	#
-	# copy the controller + data to the secondary
-	#
+#
+# copy the controller + data to the secondary
+#
 
-	message "Rsync'ing Controller: $APPD_ROOT"
+message "Rsync'ing Controller: $APPD_ROOT"
+logcmd rsync $rsync_opts \
+	$rsync_throttle $rsync_compression \
+	--exclude=lost+found \
+	--exclude=bin/controller.sh \
+	--exclude=license.lic \
+	--exclude=HA/\*.pid \
+	--exclude=logs/\* \
+	--exclude=db/data \
+	--exclude=db/bin/.status \
+	--exclude=app_agent_operation_logs \
+	--exclude=appserver/glassfish/domains/domain1/appagent/logs/\* \
+	--exclude=tmp \
+	$APPD_ROOT/ $ROOTDEST
+
+if [ -n "$machine_agent" ] ; then
+	message "Rsync'ing Machine Agent: $machine_agent"
 	logcmd rsync $rsync_opts \
 		$rsync_throttle $rsync_compression \
-		--exclude=lost+found \
-	    --exclude=bin/controller.sh \
-	    --exclude=license.lic \
-		--exclude=logs/\* \
-		--exclude=db/data \
-		--exclude=db/bin/.status \
-		--exclude=app_agent_operation_logs \
-		--exclude=appserver/glassfish/domains/domain1/appagent/logs/\* \
-		--exclude=tmp \
-		$APPD_ROOT/ $ROOTDEST
+		"$machine_agent/" "$MADEST"
+fi
 
-	if [ -n "$machine_agent" ] ; then
-		message "Rsync'ing Machine Agent: $machine_agent"
-		logcmd rsync $rsync_opts \
-			$rsync_throttle $rsync_compression \
-			"$machine_agent/" "$MADEST"
+if $hotsync ; then
+	message "hot sync"
+	sql localhost "RESET MASTER; RESET SLAVE;"
+	percona/bin/xtrabackup \
+		--defaults-file=/opt/AppDynamics/Controller/db/db.cnf \
+		--innodb-log-group-home_dir=$innodb_logdir \
+		--backup \
+		--user=root --password=secret \
+		--socket=/ssd/data/mysql.sock \
+		--stream=tar 2>/dev/null | ssh $secondary tar --extract --file=- --directory=$datadir
+	ssh $secondary rm -f $innodb_logdir/ib_logfile\* $datadir/ib_logfile\*
+	ssh $secondary $APPD_ROOT/HA/percona/bin/xtrabackup --prepare --target-dir=$datadir --innodb-log-group-home_dir=$innodb_logdir
+	if [ "$datadir" != "$innodb_logdir" ] ; then
+		ssh $secondary mv $datadir/ib_logfile\* $innodb_logdir
 	fi
-
+else
 	message "Rsync'ing Data: $datadir"
 	logcmd rsync $rsync_opts \
 		$rsync_throttle $rsync_compression \
 		--exclude=lost+found \
 		--exclude=ib_logfile\* \
-	    --exclude=bin-log\* \
-	    --exclude=relay-log\* \
-	    --exclude=\*.log \
-	    --exclude=master.info \
-	    --exclude=\*.pid \
+		--exclude=bin-log\* \
+		--exclude=relay-log\* \
+		--exclude=\*.log \
+		--exclude=master.info \
+		--exclude=\*.pid \
 		--exclude=auto.cnf \
-	    $datadir/ $DATADEST
+		$datadir/ $DATADEST
 	message "Rsyncs complete"
 fi
 
@@ -976,37 +1009,39 @@ if ! $final ; then
 	exit 0
 fi
 
-#
-# restart the primary db
-#
-message "rename database log file"
-mv $APPD_ROOT/logs/database.log $APPD_ROOT/logs/database.log.`date +%F.%T`
-touch $APPD_ROOT/logs/database.log
+if ! $hotsync ; then
+	#
+	# restart the primary db
+	#
+	message "rename database log file"
+	mv $APPD_ROOT/logs/database.log $APPD_ROOT/logs/database.log.`date +%F.%T`
+	touch $APPD_ROOT/logs/database.log
 
-message "starting primary database"
-# Do not proceed unless the primary starts cleanly or we could end up with
-#  unexpected failovers.
-if ! service appdcontroller-db start | logonly 2>&1 ; then
-	fatal 1 "failed to start primary database.  Exiting..."
+	message "starting primary database"
+	# Do not proceed unless the primary starts cleanly or we could end up with
+	#  unexpected failovers.
+	if ! service appdcontroller-db start | logonly 2>&1 ; then
+		fatal 1 "failed to start primary database.  Exiting..."
+	fi
+
+	#
+	# plug the various communications endpoints into domain.xml
+	#
+	if [ -n "$external_vip" ] ; then
+		message "edit domain.xml deeplink"
+		domain_set_jvm_option appdynamics.controller.ui.deeplink.url \
+			"$external_vip_protocol://$external_vip_host:$external_vip_port/controller"
+	fi
+
+	if [ -n "$internal_vip_host" ] ; then
+		message "set services host and port"
+		domain_set_jvm_option appdynamics.controller.services.hostName $internal_vip_host
+		domain_set_jvm_option appdynamics.controller.services.port $internal_vip_port
+	fi
 fi
 
 #
-# plug the various communications endpoints into domain.xml
-#
-if [ -n "$external_vip" ] ; then
-	message "edit domain.xml deeplink"
-	domain_set_jvm_option appdynamics.controller.ui.deeplink.url \
-		"$external_vip_protocol://$external_vip_host:$external_vip_port"
-fi
-
-if [ -n "$internal_vip_host" ] ; then
-	message "set services host and port"
-	domain_set_jvm_option appdynamics.controller.services.hostName $internal_vip_host
-	domain_set_jvm_option appdynamics.controller.services.port $internal_vip_port
-fi
-
-#
-# send the edited domain.xml
+# send the domain.xml
 #
 message "copy domain.xml to secondary"
 runcmd scp -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
@@ -1016,13 +1051,15 @@ runcmd scp -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xm
 #
 controller_infos=($(find $APPD_ROOT/appserver/glassfish/domains/domain1/appagent -name controller-info.xml -print))
 
-#
-# write the primary hostname into the node-name property
-#
-echo "setting up controller agent on primary"
-for ci in ${controller_infos[*]} ; do
-	controller_info_set $ci node-name $primary
-done
+if ! $hotsync ; then
+	#
+	# write the primary hostname into the node-name property
+	#
+	echo "setting up controller agent on primary"
+	for ci in ${controller_infos[*]} ; do
+		controller_info_set $ci node-name $primary
+	done
+fi
 
 #
 # write the secondary hostname into the node-name property
@@ -1173,12 +1210,17 @@ fi
 # if our db.cnf changed, we need to bounce the local db
 #
 if [ "$dbcnf_md5" != `md5sum $APPD_ROOT/db/db.cnf | cut  -d " " -f 1` ] ; then
-	message "bouncing database"
-	if ! service appdcontroller-db stop ; then
-		fatal 1 "-- failed to start primary database.  Exiting..."
-	fi
-	if ! service appdcontroller-db start ; then
-		fatal 1 "-- failed to start primary database.  Exiting..."
+	if $hotsync ; then
+		message "hot sync not possible - db.cnf changed"
+		exit 1
+	else
+		message "bouncing database"
+		if ! service appdcontroller-db stop ; then
+			fatal 1 "-- failed to start primary database.  Exiting..."
+		fi
+		if ! service appdcontroller-db start ; then
+			fatal 1 "-- failed to start primary database.  Exiting..."
+		fi
 	fi
 fi
 
@@ -1233,7 +1275,7 @@ runcmd ssh $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE
 # make sure the master.info is not going to start replication yet, since it will be
 # a stale log position
 #
-message "remove master.info"
+message "remove secondary master.info"
 runcmd ssh $secondary rm -f $datadir/master.info
 
 #
@@ -1267,6 +1309,15 @@ dbcnf_unset skip-slave-start
 
 message "removing skip-slave-start from secondary"
 dbcnf_unset skip-slave-start $secondary
+
+#
+# if hot sync, set the log position
+#
+if $hotsync ; then
+	read log_file log_offset <<< $(ssh $secondary cat $datadir/xtrabackup_binlog_info)
+	sql $secondary "SET MASTER TO MASTER_LOG_FILE=$log_file, MASTER_LOG_POS=$log_offset'"
+	message "SET MASTER TO MASTER_LOG_FILE=$log_file, MASTER_LOG_POS=$log_offset'"
+fi
 
 #
 # start the replication slaves
@@ -1389,7 +1440,7 @@ runcmd ssh -o StrictHostKeyChecking=no $sechost ssh -o StrictHostKeyChecking=no 
 #
 # restart the appserver
 #
-if [ $start_appserver = "true" ] ; then
+if $start_appserver ; then
 	message "start primary appserver"
 	if ! service appdcontroller start | logonly 2>&1 ; then
 		fatal 12 "could not start primary appdcontroller service"

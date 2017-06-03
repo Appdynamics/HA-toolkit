@@ -2,7 +2,7 @@
 # 
 # Monitors Disks on Linux 
 # 
-# $Id: disk-stat.sh 3.4 2016-09-20 23:38:07 cmayer $
+# $Id: disk-stat.sh 3.20 2017-06-02 15:05:40 cmayer $
 # 
 # using only: iostat, awk
 # 
@@ -23,7 +23,7 @@
 
 PATH=$PATH:/bin:/usr/sbin:/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 
-iostat -x 60 | awk ' 
+iostat -xk 1 | awk ' 
 /Device:/ { state ++; next }
 ( NF == 12 && state >= 2) { 
    state=2;
@@ -42,6 +42,8 @@ iostat -x 60 | awk '
    dev = $1; 
    printf("name=Hardware Resources|Disk|%s|reads per sec,aggregator=%s,value=%d\n", dev, agg, $4); 
    printf("name=Hardware Resources|Disk|%s|writes per sec,aggregator=%s,value=%d\n", dev, agg, $5); 
+   printf("name=Hardware Resources|Disk|%s|reads (kb/s),aggregator=%s,value=%d\n", dev, agg, $6); 
+   printf("name=Hardware Resources|Disk|%s|writes (kb/s),aggregator=%s,value=%d\n", dev, agg, $7); 
    printf("name=Hardware Resources|Disk|%s|avg req size (s),aggregator=%s,value=%d\n", dev, agg, $8); 
    printf("name=Hardware Resources|Disk|%s|avg queue length,aggregator=%s,value=%d\n", dev, agg, $9); 
    printf("name=Hardware Resources|Disk|%s|avg wait (ms),aggregator=%s,value=%d\n", dev, agg, $10); 
