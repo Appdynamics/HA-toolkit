@@ -499,10 +499,14 @@ eval `parse_vip external_vip $external_vip`
 eval `parse_vip internal_vip $internal_vip`
 
 # sanity check - verify that the appd_user and the directory owner are the same
+check_sanity
 if [ `ls -ld .. | awk '{print $3}'` != `id -un` ] ; then
 	echo "Controller root directory not owned by current user"
 	exit 1
 fi
+
+# check 2-way passwordless ssh works
+check_ssh_setup $primary $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
 
 if $appserver_only_sync && $final ; then
 	fatal 1 "\
@@ -571,14 +575,6 @@ trap handle_interrupt INT
 #
 if [ -z "$RUNUSER" ] ; then
 	fatal 1 user not set in $APPD_ROOT/db/db.cnf
-fi
-
-#
-# verify no-password ssh is set up
-#
-message "assert no password ssh"
-if ! ssh -o PasswordAuthentication=no -o StrictHostKeyChecking=no $secondary true ; then
-	fatal 4 "no-password ssh not set up"
 fi
 
 #
@@ -1424,18 +1420,6 @@ scp -q $APPD_ROOT/license.lic.$primary $secondary:$APPD_ROOT
 #
 message "enable secondary appserver"
 ssh $secondary rm -f $APPD_ROOT/HA/APPSERVER_DISABLE
-
-#
-# make sure host keys are properly set to prevent ssh from hanging
-#
-message "checking for ssh access issues"
-sechost=`sql localhost "show slave status" | get Master_Host`
-prihost=`sql $secondary "show slave status" | get Master_Host`
-if [ -z "$sechost" -o -z "$prihost" ] ; then
-	fatal 21 "prihost: $prihost sechost: $sechost setting failed"
-fi
-
-runcmd ssh -o StrictHostKeyChecking=no $sechost ssh -o StrictHostKeyChecking=no $prihost /bin/true
 
 #
 # restart the appserver

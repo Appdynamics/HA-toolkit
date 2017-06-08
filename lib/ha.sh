@@ -157,3 +157,63 @@ function find_machine_agent {
 	done
 }
 
+
+#
+# Check for various problems that prevent passwordless ssh working from each
+# node to the other.
+# Return non-zero for caller to exit if required.
+# Assumes writing to /tmp/.out and /tmp/.errs is possible
+# Requires:
+#  . lib/log.sh
+# Call as:
+#  check_ssh_setup $myhostname $otherhostname || err "2-way passwordless ssh not setup"
+# 
+# e.g. if function running on primary then:
+#  check_ssh_setup $primary $secondary
+#
+function check_ssh_setup {
+   (( $# == 2 )) || abend "Usage: ${FUNCNAME[0]} <myhostname> <otherhostname>"
+   local myhost=$1 otherhost=$2 retc OUT=/tmp/.out ERR=/tmp/.errs
+
+   touch $OUT && [[ -w $OUT ]] || abend "${FUNCNAME[0]}: unable to write to $OUT"
+   touch $ERR && [[ -w $ERR ]] || abend "${FUNCNAME[0]}: unable to write to $ERR"
+
+   # Test-1: check whether possible to reach $otherhost with ssh - fingerprint known or not
+   timeout 2s bash -c 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '$otherhost' echo $(id -un):$(id -gn)' >$OUT 2>$ERR
+   retc=$?
+   if (( $retc != 0 )) ; then
+      message "ssh Test-1: $myhost unable to reach $otherhost: $(<$ERR)"
+      return 2
+   fi
+   if [[ "$(<$OUT)" != "$(id -un):$(id -gn)" ]] ; then
+       message "ssh Test-1: $myhost unable to determine username:groupname on $otherhost: $(<$ERR). Please ensure same username and groupname on both HA servers and re-try"
+       return 3
+   fi
+
+   # Test-2: check whether otherhost's fingerprint is known to me
+   timeout 2s bash -c 'ssh '$otherhost' id -un' &> $ERR
+   retc=$?
+   if (( $retc != 0 )) ; then
+      message "ssh Test-2: $myhost does not recognise RSA fingerprint of $otherhost. From $myhost please test connection with \"ssh $otherhost pwd\" and then answer \"yes\" and re-try"
+      return 4
+   fi
+
+   # Test-3: check whether otherhost can reach me with ssh - fingerprint known or not
+   timeout 2s bash -c 'ssh '$otherhost' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '$myhost' id -un' &> $ERR
+   retc=$?
+   if (( $retc != 0 )) ; then
+      message "ssh Test-3: $otherhost unable to reach $myhost: $(<$ERR)"
+      return 5
+   fi
+
+   # Test-4: check whether otherhost knows of my RSA fingerprint
+   timeout 2s bash -c 'ssh '$otherhost' ssh '$myhost' hostname' &> $ERR
+   retc=$?
+   if (( $retc != 0 )) ; then
+      message "ssh Test-4: $otherhost does not recognise RSA fingerprint of $myhost. From $otherhost please test connection with \"ssh $myhost pwd\" and then answer \"yes\" and re-try"
+      return 6
+   fi
+
+   rm -f $OUT $ERR		# files are not deleted after unsuccessful earlier return
+   return 0
+}
