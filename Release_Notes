@@ -509,3 +509,10 @@ Release notes for version 3.20
    of a core.
 4) added prototype code for hot-sync replicate.  not currently recommended
    or supported.  needs percona xtrabackup and perl-DBD-mysql
+
+--------------------------------------
+Release notes for version 3.21
+
+1) Added check within replicate.sh and failover.sh for broken 2-way passwordless 
+   ssh between the two HA servers. This helps avoid complex failure cases 
+   introduced by server ssh administration changes.

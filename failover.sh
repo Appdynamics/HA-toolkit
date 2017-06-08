@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.21 2017-06-07 20:38:34 cmayer $
+# $Id: failover.sh 3.22 2017-06-07 21:38:15 rob.navarro $
 #
 # run on the passive node, activate this HA node.
 # 
@@ -161,6 +161,13 @@ if ! $primary_up ; then
 	break_replication=true
 fi
 
+
+secondary=`sql localhost "show slave status" | get Master_Host`
+if [[ -z "$secondary" ]] ; then
+	fatal 1 "unable to get Master_Host value from \"show slave status\". Giving up..."
+fi
+check_ssh_setup $(hostname) $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
+
 #
 # hard failover is not quite as hard as all that.
 # in a certain case, we don't break replication if all of:
@@ -180,8 +187,6 @@ if [ "$slave_io" == Yes -a "$slave_sql" == Yes ] ; then
 		break_replication=false	
 	fi
 fi
-
-check_ssh_setup $(hostname) $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
 
 #####
 #

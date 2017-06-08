@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.21 2017-06-07 20:38:34 cmayer $
+# $Id: replicate.sh 3.22 2017-06-07 21:38:15 rob.navarro $
 #
 # install HA to a controller pair
 #
@@ -287,7 +287,8 @@ function usage()
 	echo "    [ -i [protocol://]<internal vip>[:port] ]"
 	echo "    [ -m <monitoring descriptor> see setmonitor.sh -h"
 	echo "    [ -a <machine agent install directory> ]"
-	echo "    [ -f ]       do final install and activation"
+	echo "    [ -f ] confirm & do final install and activation"
+        echo "    [ -F ] just do final install and activation - no confirm"
 	echo "    [ -t [rsync speed limit]]" if unspecified or 0, unlimited
 	echo "    [ -U ] unencrypted rsync"
 	echo "    [ -z ] enable rsync compression"
