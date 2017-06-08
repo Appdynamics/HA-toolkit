@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: replicate.sh 3.20 2017-06-02 18:16:28 cmayer $
+# $Id: replicate.sh 3.20a 2017-06-07 20:06:28 cmayer $
 #
 # install HA to a controller pair
 #
@@ -749,7 +749,7 @@ if $final ; then
 	fi
 
 
-	if $use_backup ; then
+	if $hotsync ; then
 		message "using backup - no need to stop primary"
 	else
 		message "stopping primary"
