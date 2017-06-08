@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: failover.sh 3.21 2017-06-07 20:38:34 cmayer $
 #
 # run on the passive node, activate this HA node.
 # 
@@ -161,6 +161,28 @@ if ! $primary_up ; then
 	break_replication=true
 fi
 
+#
+# hard failover is not quite as hard as all that.
+# in a certain case, we don't break replication if all of:
+# (1) slave sql and slave io are running
+# (2) uptime is greater than some limit
+# then leave replication running
+#
+if [ "$slave_io" == Yes -a "$slave_sql" == Yes ] ; then
+	uptime=0
+	secondary=""
+
+	secondary=`sql localhost "show slave status" | get Master_Host`
+	if [ -n "$secondary" ] ; then
+		uptime=`sql $secondary "show status like 'Uptime'\G" | get Value`
+	fi
+	if [ "$uptime" -gt $NOTFAILED ] ; then
+		break_replication=false	
+	fi
+fi
+
+check_ssh_setup $(hostname) $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
+
 #####
 #
 # at this point, we are committed to failing over
@@ -184,26 +206,6 @@ done
 #
 message "Kill Local Appserver"
 service appdcontroller stop | log 2>&1
-
-#
-# hard failover is not quite as hard as all that.
-# in a certain case, we don't break replication if all of:
-# (1) slave sql and slave io are running
-# (2) uptime is greater than some limit
-# then leave replication running
-#
-if [ "$slave_io" == Yes -a "$slave_sql" == Yes ] ; then
-	uptime=0
-	secondary=""
-
-	secondary=`sql localhost "show slave status" | get Master_Host`
-	if [ -n "$secondary" ] ; then
-		uptime=`sql $secondary "show status like 'Uptime'\G" | get Value`
-	fi
-	if [ "$uptime" -gt $NOTFAILED ] ; then
-		break_replication=false	
-	fi
-fi
 
 #
 # persistently break replication
