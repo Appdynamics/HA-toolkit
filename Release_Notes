@@ -516,3 +516,9 @@ Release notes for version 3.21
 1) Added check within replicate.sh and failover.sh for broken 2-way passwordless 
    ssh between the two HA servers. This helps avoid complex failure cases 
    introduced by server ssh administration changes.
+
+--------------------------------------
+Release notes for version 3.22
+
+1) added APPD_UPGRADE to document upgrading the controllers in an HA pair
+
