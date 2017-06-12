@@ -29,7 +29,8 @@
 #
 if [ `id -un` == "$RUNUSER" ] ; then
 	function bg_runuser {
-		echo "$* >/dev/null 2>&1 & echo \$! ; disown" | bash &
+#		echo "$* >/dev/null 2>&1 & echo \$! ; disown" | bash &
+		nohup bash -c "$* &>/dev/null <&- & echo \$! ; disown" &
 	}
 	function run_mysql {
 		$MYSQLCLIENT
@@ -39,7 +40,8 @@ if [ `id -un` == "$RUNUSER" ] ; then
 	}
 else
 	function bg_runuser {
-		echo "$* >/dev/null & echo \$! ; disown" | su -s /bin/bash $RUNUSER
+#		echo "$* >/dev/null & echo \$! ; disown" | su -s /bin/bash $RUNUSER
+		nohup bash -c "su -s /bin/bash $RUNUSER $* &>/dev/null <&- & echo \$! ; disown" &
 	}
 	function run_mysql {
 		su -s $MYSQLCLIENT $RUNUSER
