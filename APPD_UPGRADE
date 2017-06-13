@@ -1,27 +1,33 @@
-
-1) stop the secondary database and watchdog.  this is to prevent a failover
-   and to preserve the state of the database should the upgrade go poorly.
-
-2) save the domain.xml and db.cnf on the primary.  we will need to back-patch
-    all the deltas in these files
-
-3) upgrade the primary.  this will add and remove tables, columns etc in the database.
-    these pile up in the primary bin-logs until the secondary is started, so we don't
-    want to start the secondary until we have finished the upgrade and validated it.
-
-4) stop the primary and patch the domain.xml and db.cnf files.
-
-5) start the controller and check it out.  make sure that all functionality is present.
- 
-6) once we are completely convinced that we are ready to update the known good
-    secondary, start the secondary datanbase.   this will start replication and begin applying
-    all the database changes that were part of the product upgrade.
-
-7) when seconds behind master == 0 on the secondary, appdstatus.sh should report
-    the new version.   this means that the secondary is inconsistent.  the database is
-    one version, and the application server is the older version.  now we want to run the
-    installer on the secondary, which will update the application server.
-
-8) stop the secondary application server and restart the secondary service.
-    your HA pair is now upgraded.
-
+- pre-requisites: 
+  check that Load Balancer correctly detects server liveness via calls to <controller>:<port>/controller/rest/serverstatus    that respond with text containing <available>true - otherwise the following upgrade process that starts Glassfish on the secondary for a time may wrongly be sent agent or UI traffic
+  
+- begin maintenance window (declare AppD service down)
+- on initial primary: stop Glassfish 
+- on initial secondary: stop watchdog and Glassfish:
+  sudo service appdcontroller stop
+- on initial secondary: monitor HA/appdstatus.sh until it reports Seconds_Behind_Master: 0
+- on initial primary: stop replication with:
+  HA/mysqlclient.sh <<< "stop slave"
+- on initial secondary: stop MySQL and add 'skip-slave-start=true' to end of db/db.cnf
+- now initial primary is unaffected by changes on secondary so it is a good backup in case upgrade fails. Secondary is up to the minute copy of primary also, so good for upgrade attempt
+- on initial secondary: upgrade controller 
+- on initial secondary: compare pre & post upgraded domain.xml & db.cnf configs and add in any local changes that were not preserved during upgrade. Check backup directory for pre-upgrade files.
+- on initial secondary: update MySQL with
+  HA/mysqlclient.sh <<< "update global_configuration_local set value='active' where name='appserver.mode' "
+  HA/mysqlclient.sh <<< "update global_configuration_local set value='primary' where name='ha.controller.type' "
+and restart Glassfish: bin/controller.sh stop-appserver; bin/controller.sh start-appserver. Once Glassfish up, login to UI via browser directly to server, if all looks good logout. Verify that curl <controller>:<port>/controller/rest/serverstatus returns updated version and <available>true<available>. 
+- if validations fails then can quickly revert to prior controller by:
+  turning off Glassfish & MySQL on secondary
+  on initial primary: start Glassfish
+  then re-do above upgrade steps until validation succeeds
+-on initial primary: update MySQL to ensure it later starts as passive/secondary
+  HA/mysqlclient.sh <<< "update global_configuration_local set value='passive' where name='appserver.mode' "
+  HA/mysqlclient.sh <<< "update global_configuration_local set value='secondary' where name='ha.controller.type' "
+- on initial primary: enable replication to allow it to apply DB table/column changes:
+  HA/mysqlclient.sh <<< "start slave"
+- on initial primary: monitor HA/appdstatus.sh until it reports Seconds_Behind_Master: 0
+- on initial primary: stop MySQL and upgrade controller
+- on initial primary: plan to copy domain.xml from 'initial secondary' server but compare with local file to discount or highlight & include differences. Ensure pre & post db.cnf differences are acceptable. Primary and secondary db.cnf files should only differ in 'server-id=' values
+- on initial primary: login to UI via browser directly to server, if all looks good logout. Verify that curl <controller>:<port>/controller/rest/serverstatus returns updated version and <available>false<available>. Verify that MySQL is replicating successfully. 
+- on initial primary: Stop Glassfish if no longer needed
+- if final validations fail and cannot be repaired then will need to recover by replicating current upgraded "initial secondary" over top of broken initial primary (slow but complete).
