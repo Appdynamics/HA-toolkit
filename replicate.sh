@@ -883,6 +883,11 @@ if ! $hotsync ; then
 		sort > $tmpdir/ibdlist.small.local
 
 	find $datadir/controller \
+		\( -name \*.par -o -name \*.frm \) \
+		-exec sh -c 'echo -n "{} " ; cat {} | md5sum' \; | \
+		sort > $tmpdir/metalist.local
+
+	find $datadir/controller \
 		-name \*.ibd \
 		-size +1M \
 		-exec sh -c 'echo -n "{} " ; od -N 150 -t x4 -A none {} | md5sum' \; | \
@@ -894,6 +899,13 @@ if ! $hotsync ; then
 		-name \*.ibd \( -size -1M -o -size 1M \) \
 		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" | \
 		sort > $tmpdir/ibdlist.small.remote
+
+	ssh $secondary "find $datadir/controller \
+		\( -name \*.par -o -name \*.frm \) \
+		\( -size -1M -o -size 1M \) \
+		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" | \
+		sort > $tmpdir/metalist.remote
+
 	ssh $secondary "find $datadir/controller \
 		-name \*.ibd -size +1M \
 		-exec sh -c 'echo -n \"{} \" ; od -N 150 -t x4 -A none {} | md5sum' \;" | \
@@ -901,6 +913,8 @@ if ! $hotsync ; then
 
 	diff $tmpdir/ibdlist.small.local $tmpdir/ibdlist.small.remote | \
 		awk '/^>/ {print $2}' > $tmpdir/worklist
+	diff $tmpdir/metalist.local $tmpdir/metalist.remote | \
+		awk '/^>/ {print $2}' >> $tmpdir/worklist
 	diff $tmpdir/ibdlist.large.local $tmpdir/ibdlist.large.remote | \
 		awk '/^>/ {print $2}' >> $tmpdir/worklist
 
