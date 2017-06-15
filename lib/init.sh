@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: init.sh 3.23 2017-06-15 14:39:58 cmayer $
+# $Id: lib/init.sh 3.23a 2017-06-15 16:13:57 cmayer $
 #
 # init.sh
 # contains functions to change user and run processes
@@ -30,7 +30,7 @@
 if [ `id -un` == "$RUNUSER" ] ; then
 	function bg_runuser {
 #		echo "$* >/dev/null 2>&1 & echo \$! ; disown" | bash &
-		nohup bash -c "$* &>/dev/null <&- & echo \$! ; disown" &
+		bash -c "$* >&/dev/null </dev/null & echo \$! ; disown -h"
 	}
 	function run_mysql {
 		$MYSQLCLIENT
@@ -41,7 +41,7 @@ if [ `id -un` == "$RUNUSER" ] ; then
 else
 	function bg_runuser {
 #		echo "$* >/dev/null & echo \$! ; disown" | su -s /bin/bash $RUNUSER
-		nohup bash -c "su -s /bin/bash $RUNUSER $* &>/dev/null <&- & echo \$! ; disown" &
+		su $RUNUSER bash -c "$* >&/dev/null </dev/null & echo \$! ; disown -h"
 	}
 	function run_mysql {
 		su -s $MYSQLCLIENT $RUNUSER
