@@ -522,3 +522,10 @@ Release notes for version 3.22
 
 1) added APPD_UPGRADE to document upgrading the controllers in an HA pair
 
+
+--------------------------------------
+Release notes for version 3.23
+1) the APPD_UPGRADE document was greatly expanded
+2) a rare replication bug is now prevented by validating .frm and .par files
+3) bg_runuser sometimes did not reliably start the watchdog
+

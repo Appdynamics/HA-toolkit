@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/init.sh 3.17 2017-04-18 14:48:02 cmayer $
+# $Id: init.sh 3.23 2017-06-15 14:39:58 cmayer $
 #
 # init.sh
 # contains functions to change user and run processes
