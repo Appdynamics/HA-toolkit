@@ -525,7 +525,12 @@ Release notes for version 3.22
 
 --------------------------------------
 Release notes for version 3.23
+
 1) the APPD_UPGRADE document was greatly expanded
 2) a rare replication bug is now prevented by validating .frm and .par files
 3) bg_runuser sometimes did not reliably start the watchdog
 
+--------------------------------------
+Release notes for version 3.24
+
+1) the ssh validation is broken.  It is bypassed until fixed.
