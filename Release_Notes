@@ -558,7 +558,9 @@ Release notes for version 3.25
 7) the watchdog.settings file is now being read for overrides of the
    default settings.
 
+8) a long standing syntax error in the pbrun wrapper has been fixed.
+
 KNOWN BUGS:
-8) the automatic propagation of the monitoring to the machine agent 
+9) the automatic propagation of the monitoring to the machine agent 
    is not reliable.  do this manually.
 
