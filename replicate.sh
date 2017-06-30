@@ -645,7 +645,11 @@ if $unencrypted ; then
 	ROOTDEST=rsync://$secondary:$RSYNC_PORT/default$APPD_ROOT
 	DATADEST=rsync://$secondary:$RSYNC_PORT/default$datadir
 	MADEST="rsync://$secondary:$RSYNC_PORT/default$machine_agent"
+<<<<<<< HEAD
 	JAVADEST="rsync://$secondary:$RSYNC_PORT/default${JAVA%bin/java}"
+=======
+	JAVADEST="rsync://$secondary:$RSYNC_PORT/default${JAVA%/bin/java}"
+>>>>>>> platform admin compatibility, unbreak, and bug fixes
 	kill_rsyncd
 	ssh $secondary mkdir -p $APPD_ROOT/HA
 	scp -q $APPD_ROOT/HA/rsyncd.conf $secondary:$APPD_ROOT/HA/rsyncd.conf
@@ -656,7 +660,11 @@ else
 	ROOTDEST=$secondary:$APPD_ROOT
 	DATADEST=$secondary:$datadir
 	MADEST="$secondary:$machine_agent"
+<<<<<<< HEAD
 	JAVADEST="$secondary:${JAVA%bin/java}"
+=======
+	JAVADEST="$secondary:${JAVA%/bin/java}"
+>>>>>>> platform admin compatibility, unbreak, and bug fixes
 fi
 
 if ! $appserver_only_sync ; then
@@ -952,9 +960,16 @@ fi
 message "Rsync'ing Controller: $APPD_ROOT"
 if ! echo $JAVA | grep -q $APPD_ROOT ; then
 	message "Rsync'ing java: $JAVA"
+<<<<<<< HEAD
 logcmd rsync $rsync_opts \
 	$rsync_throttle $rsync_compression \
 	${JAVA%bin/java} $JAVADEST
+=======
+	ssh $secondary mkdir -p	${JAVA%bin/java}
+	logcmd rsync $rsync_opts \
+		$rsync_throttle $rsync_compression \
+		${JAVA%bin/java} $JAVADEST
+>>>>>>> platform admin compatibility, unbreak, and bug fixes
 fi
 
 logcmd rsync $rsync_opts \
