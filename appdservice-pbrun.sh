@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-pbrun.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: appdservice-pbrun.sh 3.25 2017-06-29 19:27:55 cmayer $
 #
 # shell wrapper around pbrun for appdynamics service changes
 #
@@ -23,7 +23,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
 PBRUN=
 for pbrun in $PBRUN_PLACES ; do
-	if -x $pbrun ; then
+	if [ -x $pbrun ] ; then
 		PBRUN=$pbrun
 	fi
 done
