@@ -372,8 +372,10 @@ done
 if [ -n "$secondary" ] ; then
 	message "copy domain.xml to secondary"
 	scp -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
-	message "copy MONITOR to secondary"
-	scp -q -p $APPD_ROOT/HA/MONITOR $secondary:$APPD_ROOT/HA/MONITOR
+	if [ -f MONITOR ] ; then
+		message "copy MONITOR to secondary"
+		scp -q -p $APPD_ROOT/HA/MONITOR $secondary:$APPD_ROOT/HA/MONITOR
+	fi
 fi
 
 
