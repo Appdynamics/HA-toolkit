@@ -374,6 +374,7 @@ fi
 #
 if [ -f $APPD_ROOT/HA/NOROOT ] ; then
 	echo "removing $APPD_ROOT/HA/NOROOT" | tee $LOGFILE
+	rm -f $APPD_ROOT/HA/NOROOT
 fi
 
 
