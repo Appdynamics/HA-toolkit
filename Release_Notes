@@ -540,7 +540,7 @@ Release notes for version 3.25
 
 1) the java installation is not in the controller tree if the platform admin
    app was used to deploy the installation.   intelligence now locates the
-   java accordingly.
+   java accordingly. in addition, the database error log was moved.
 
 2) the failover.sh formerly logged the start of the secondary service in
    a confusing manner when starting the watchdog.   this is now quiet, to
@@ -557,3 +557,8 @@ Release notes for version 3.25
 
 7) the watchdog.settings file is now being read for overrides of the
    default settings.
+
+KNOWN BUGS:
+8) the automatic propagation of the monitoring to the machine agent 
+   is not reliable.  do this manually.
+

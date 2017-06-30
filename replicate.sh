@@ -1048,9 +1048,13 @@ if ! $hotsync ; then
 	#
 	# restart the primary db
 	#
-	message "rename database log file"
-	mv $APPD_ROOT/logs/database.log $APPD_ROOT/logs/database.log.`date +%F.%T`
-	touch $APPD_ROOT/logs/database.log
+	for logdir in $APPD_ROOT/logs $APPD_ROOT/db/logs ; do
+		if [ -f $logdir/database.log ] ; then
+			message "rename database log file in $logdir"
+			mv $logdir/database.log $logdir/database.log.`date +%F.%T`
+			touch $logdir/database.log
+		fi
+	done
 
 	message "starting primary database"
 	# Do not proceed unless the primary starts cleanly or we could end up with
@@ -1316,8 +1320,12 @@ runcmd ssh $secondary rm -f $datadir/master.info
 #
 # start the secondary database
 #
-message "rename secondary database log"
-ssh $secondary mv $APPD_ROOT/logs/database.log $APPD_ROOT/logs/database.log.`date +%F.%T`
+for logdir in $APPD_ROOT/logs $APPD_ROOT/db/logs ; do
+	if ssh $secondary test -f $logdir/database.log ; then
+		message "rename secondary database log file in $logdir"
+		ssh $secondary mv $logdir/database.log $logdir/database.log.`date +%F.%T`
+	fi
+done
 
 message "start secondary database"
 if ! remservice -t $secondary appdcontroller-db start | logonly 2>&1 ; then
