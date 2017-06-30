@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.14 2017-03-15 13:03:13 cmayer $
+# $Id: appdynamics-machine-agent.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # /etc/init.d/appdynamics-machine-agent
 #
@@ -61,10 +61,15 @@ if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
 	set -x
 fi
 
-JAVA=$APPD_ROOT/jre/bin/java
-
 # For security reasons, locally embed/include function library at HA.shar build time
 embed lib/init.sh
+embed lib/status.sh
+
+# find the java
+if ! export JAVA=$(find_java) ; then
+    echo cannot find java
+    exit 2
+fi
 
 function start() {
     require_root

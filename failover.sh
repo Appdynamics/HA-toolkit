@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.22 2017-06-07 21:38:15 rob.navarro $
+# $Id: failover.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # run on the passive node, activate this HA node.
 # 
@@ -324,8 +324,8 @@ service appdcontroller start
 #
 if [ "$primary_up" = "true" ] ; then
 	if $remote ; then
-		message "start passive secondary" | tee -a $fo_log
-		remservice -nqf $primary appdcontroller start
+		message "start passive secondary"
+		remservice -nqf $primary appdcontroller start | logonly 2>&1
 	fi
 fi
 

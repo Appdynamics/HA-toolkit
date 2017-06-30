@@ -1,6 +1,4 @@
-#!/bin/bash
-#
-# $Id: replicate.sh 3.23 2017-06-15 14:42:43 cmayer $
+# $Id: replicate.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # install HA to a controller pair
 #
@@ -39,6 +37,7 @@ LOGNAME=replicate.log
 . lib/ha.sh
 . lib/password.sh
 . lib/sql.sh
+. lib/status.sh
 
 #
 # place to put certs for ssl replication
@@ -468,6 +467,11 @@ if [ -z "$secondary" ] ; then
 	usage "secondary hostname must be set"
 fi
 
+# find the java - we might need to copy it.
+if ! export JAVA=$(find_java) ; then
+	fatal 10 "cannot find java"
+fi
+
 #
 # search for a machine agent in a few likely places
 #
@@ -608,9 +612,19 @@ fi
 # unbreak replication: only if both sides are kinda happy
 #
 if $unbreak ; then
+	scp $APPD_ROOT/bin/controller.sh $secondary:$APPD_ROOT/bin	
+
+	sql $secondary \
+		"update global_configuration_local set value='passive' where name = 'appserver.mode';"
+	sql $secondary \
+		"update global_configuration_local set value='secondary' where name = 'ha.controller.type';"
+	if ! sql $secondary "select value from global_configuration_local" | \
+		grep passive ; then
+		fatal 17 "cannot unbreak - database on $secondary down"
+	fi
 	dbcnf_unset skip-slave-start
 	dbcnf_unset skip-slave-start $secondary
-	sql $primary "start slave"
+	sql localhost "start slave"
 	sql $secondary "start slave"
 	./appdstatus.sh
 	exit 0
@@ -631,6 +645,7 @@ if $unencrypted ; then
 	ROOTDEST=rsync://$secondary:$RSYNC_PORT/default$APPD_ROOT
 	DATADEST=rsync://$secondary:$RSYNC_PORT/default$datadir
 	MADEST="rsync://$secondary:$RSYNC_PORT/default$machine_agent"
+	JAVADEST="rsync://$secondary:$RSYNC_PORT/default${JAVA%bin/java}"
 	kill_rsyncd
 	ssh $secondary mkdir -p $APPD_ROOT/HA
 	scp -q $APPD_ROOT/HA/rsyncd.conf $secondary:$APPD_ROOT/HA/rsyncd.conf
@@ -641,6 +656,7 @@ else
 	ROOTDEST=$secondary:$APPD_ROOT
 	DATADEST=$secondary:$datadir
 	MADEST="$secondary:$machine_agent"
+	JAVADEST="$secondary:${JAVA%bin/java}"
 fi
 
 if ! $appserver_only_sync ; then
@@ -934,6 +950,13 @@ fi
 #
 
 message "Rsync'ing Controller: $APPD_ROOT"
+if ! echo $JAVA | grep -q $APPD_ROOT ; then
+	message "Rsync'ing java: $JAVA"
+logcmd rsync $rsync_opts \
+	$rsync_throttle $rsync_compression \
+	${JAVA%bin/java} $JAVADEST
+fi
+
 logcmd rsync $rsync_opts \
 	$rsync_throttle $rsync_compression \
 	--exclude=lost+found \

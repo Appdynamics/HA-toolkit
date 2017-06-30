@@ -1,6 +1,6 @@
 #
 # makefile for HA script distro
-# $Id: Makefile 3.10 2017-02-15 18:00:41 cmayer $
+# $Id: Makefile 3.25 2017-06-29 17:19:20 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -57,6 +57,7 @@ HA.shar: build $(SOURCES) Makefile
 	echo "' | od -b | grep -q 015 ; then echo dos format script - exiting ; exit 0 ; fi ; true" >> HA.shar
 	echo 'if [ $$(basename $$(pwd -P)) != HA ] ; then' >> HA.shar
 	echo 'mkdir -p HA ; if ! [ -d HA ] ; then echo "no HA directory" ; exit 0 ; fi; echo cd to HA ; cd HA; fi' >> HA.shar
+	echo "echo unpacking HA version `cat VERSION`" >> HA.shar
 	cd build && shar $(NOT_EMBEDDED) $(DIRS) $(MONITORS) $(BASH_SRC) >> ../HA.shar
 	rm -f HA.shar.tmp ; mv HA.shar HA.shar.tmp
 	sed 's/^exit/chmod ugo+rx . .. ; find . -name \\*.sh -print | xargs chmod ugo+rx; exit/' < HA.shar.tmp >HA.shar

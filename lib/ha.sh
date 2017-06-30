@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.21 2017-06-07 20:38:34 cmayer $
+# $Id: lib/ha.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -218,3 +218,4 @@ function check_ssh_setup {
    rm -f $OUT $ERR		# files are not deleted after unsuccessful earlier return
    return 0
 }
+

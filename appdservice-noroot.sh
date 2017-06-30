@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.13 2017-03-12 22:26:39 cmayer $
+# $Id: appdservice-noroot.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -44,6 +44,12 @@ fi
 . lib/ha.sh
 . lib/conf.sh
 . lib/status.sh
+
+# find the java
+if ! export JAVA=$(find_java) ; then
+	echo cannot find java
+	exit 2
+fi
 
 #
 # load in customized sysconfig files if present
@@ -150,7 +156,7 @@ appdynamics-machine-agent:start)
 	if [ ! -d "$ma_dir" ] ; then
 		exit 0
 	fi
-	nohup $APPD_ROOT/jre/bin/java $JAVA_OPTS -jar $ma_dir/machineagent.jar >/dev/null 2>&1 &
+	nohup $JAVA $JAVA_OPTS -jar $ma_dir/machineagent.jar >/dev/null 2>&1 &
 	;;
 
 appdynamics-machine-agent:stop)

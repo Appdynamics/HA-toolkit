@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.17 2017-04-18 14:48:02 cmayer $
+# $Id: appdcontroller.sh 3.25 2017-06-29 17:19:20 cmayer $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -66,6 +66,12 @@ embed lib/init.sh
 embed lib/conf.sh
 embed lib/status.sh
 
+# find the java
+if ! export JAVA=$(find_java) ; then
+	echo cannot find java
+    exit 2
+fi
+
 check_sanity
 
 if [ -f "$APPD_ROOT/HA/LARGE_PAGES_ENABLE" ] ; then
@@ -81,9 +87,9 @@ start)
 	fi
 	service appdcontroller-db start
 	if [[ `id -u $RUNUSER` != "0" ]] && use_privileged_ports ; then
-		#trying to bind java to a privilged port as an unpriviliged user
-		setcap cap_net_bind_service=+ep "$APPD_ROOT/jre/bin/java"
-		echo "$APPD_ROOT/jre/lib/$(uname -m | sed -e 's/x86_64/amd64/')/jli" > \
+		#trying to bind java to a privileged port as an unpriviliged user
+		setcap cap_net_bind_service=+ep "$JAVA"
+		echo "${JAVA%/bin/java}/lib/$(uname -m | sed -e 's/x86_64/amd64/')/jli" > \
 			/etc/ld.so.conf.d/appdynamics.conf
 		ldconfig            
 	fi

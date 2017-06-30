@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.14 2017-03-13 11:43:40 cmayer $
+# $Id: install-init.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # install init scripts, including the machine agent.
 #
@@ -35,11 +35,6 @@ function usage {
 APPD_ROOT=`readlink -e ..`
 
 LOGFILE=$APPD_ROOT/logs/install-init.log
-
-if [ -f $APPD_ROOT/HA/NOROOT ] ; then
-	echo "$APPD_ROOT/HA/NOROOT exists - install-init.sh meaningless" | tee $LOGFILE
-	exit 1
-fi
 
 PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
 PBRUN=
@@ -373,5 +368,13 @@ done
 if [ -d "$machine_agent" ] ; then
 	chown -R $RUNUSER "$machine_agent"
 fi
+
+#
+# common use case - start with NOROOT, then root user deploys install-init.sh
+#
+if [ -f $APPD_ROOT/HA/NOROOT ] ; then
+	echo "removing $APPD_ROOT/HA/NOROOT" | tee $LOGFILE
+fi
+
 
 exit 0

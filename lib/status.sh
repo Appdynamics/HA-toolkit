@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/status.sh 3.17 2017-04-18 14:48:02 cmayer $
+# $Id: lib/status.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # common code to interrogate the status of various functions
 #
@@ -81,7 +81,7 @@ function controller_mode {
 }
 
 function controllerrunning {
-	if pgrep -f -u $RUNUSER "$APPD_ROOT/jre/bin/java -jar ./../modules/admin-cli.jar" >/dev/null ; then
+	if pgrep -f -u $RUNUSER "java -jar ./../modules/admin-cli.jar" >/dev/null ; then
 		return 1
 	fi
 	if runuser "$APPD_ROOT/appserver/glassfish/bin/asadmin" list-domains | \
@@ -114,5 +114,27 @@ function machine_agent_running {
 	else
 		return 1
 	fi
+}
+
+#
+# find java
+#
+function find_java {
+    if [ -f $APPD_ROOT/appserver/glassfish/config/asenv.conf ] ; then
+        AS_JAVA=$(grep ^AS_JAVA= $APPD_ROOT/appserver/glassfish/config/asenv.conf |
+        awk -F= '{print $2}' | sed -e 's/^"//' -e 's/"$//')
+    fi
+    unset JAVA
+    for java in $AS_JAVA $APPD_ROOT/jre ; do
+        if [ -x $java/bin/java ] ; then
+            export JAVA=$java/bin/java
+            break;
+        fi
+    done
+    if [ -z "$JAVA" ] ; then
+        return 1
+    fi
+    echo $JAVA
+    return 0
 }
 

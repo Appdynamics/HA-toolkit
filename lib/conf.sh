@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.18 2017-04-26 01:25:28 cmayer $
+# $Id: lib/conf.sh 3.25 2017-06-29 18:00:40 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -30,6 +30,7 @@ DB_CONF=$APPD_ROOT/db/db.cnf
 APPSERVER_DISABLE=$APPD_ROOT/HA/APPSERVER_DISABLE
 SHUTDOWN_FAILOVER=$APPD_ROOT/HA/SHUTDOWN_FAILOVER
 WATCHDOG_ENABLE=$APPD_ROOT/HA/WATCHDOG_ENABLE
+WATCHDOG_SETTINGS=$APPD_ROOT/HA/watchdog.settings
 ASSASSIN_PIDFILE=$APPD_ROOT/HA/appd_assassin.pid
 WATCHDOG_PIDFILE=$APPD_ROOT/HA/appd_watchdog.pid
 WATCHDOG_STATUS=$APPD_ROOT/logs/watchdog.status

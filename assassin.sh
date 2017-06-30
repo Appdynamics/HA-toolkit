@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: assassin.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -95,7 +95,7 @@ while true ; do
 	# load balancer.  this cannot wait.
 	# 
 	message "killing appserver unconditionally on $primary"
-	ssh $primary pkill -9 -f "$APPD_ROOT/.*/java -cp $APPD_ROOT/.*glassfish"
+	ssh $primary pkill -9 -f ".*java .*appserver/glassfish"
 
 	#
 	# if the local database becomes primary, we don't need to run anymore.

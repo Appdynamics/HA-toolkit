@@ -534,3 +534,26 @@ Release notes for version 3.23
 Release notes for version 3.24
 
 1) the ssh validation is broken.  It is bypassed until fixed.
+
+--------------------------------------
+Release notes for version 3.25
+
+1) the java installation is not in the controller tree if the platform admin
+   app was used to deploy the installation.   intelligence now locates the
+   java accordingly.
+
+2) the failover.sh formerly logged the start of the secondary service in
+   a confusing manner when starting the watchdog.   this is now quiet, to
+   the failover.log only.
+
+3) connected with the fixes for java platform admin. the controller is located
+   with a more general regexp in pgrep that will match all controllers.
+
+4) the MONITOR files is copied to the secondary by the setmonitor.sh script
+
+5) NOROOT is removed by a successful run of install-init.sh
+
+6) we now announce the HA version when unpacking the shar file
+
+7) the watchdog.settings file is now being read for overrides of the
+   default settings.
