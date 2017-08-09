@@ -1,3 +1,4 @@
+#!/bin/bash
 # $Id: replicate.sh 3.25 2017-06-29 17:19:20 cmayer $
 #
 # install HA to a controller pair

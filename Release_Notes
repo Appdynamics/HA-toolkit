@@ -564,3 +564,7 @@ KNOWN BUGS:
 9) the automatic propagation of the monitoring to the machine agent 
    is not reliable.  do this manually.
 
+--------------------------------------
+Release notes for version 3.26
+
+1) the #!/bin/bash was inadvertently removed from replicate.sh
