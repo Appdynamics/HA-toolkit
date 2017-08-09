@@ -1,21 +1,89 @@
-$Id: UPGRADING 3.1 2016-08-25 23:01:49 cmayer Exp $
+$Id: UPGRADING 3.26 2017-08-09 14:44:16 cmayer Exp $
 
-upgrading the HA toolkit usually does not require a re-replicate or restart of the 
-application or database.
+The HA package is installed in the HA subdirectory of the controller
+root.  This can be determined from examining the running executable path
+of the mysql process.   In the following description, this directory,
+which has the bin, logs, db, and appserver subdirectories, will be referred
+to as /controller_root. The appdynamics service account will be denoted by
+appdyn.
 
-to upgrade the HA toolkit, 
+Upgrading the HA toolkit usually does not require a re-replicate or restart of the application or database.
 
-1) copy or move the HA.shar to the HA directory
-2) unpack it using bash HA.shar
-3) inspect the /etc/sysconfig or /etc/default versions of
+1) become the appsynamics user and cd to the controller_root directory
+   all the following commands are performed from the /controller_root.
+
+	su - appdyn
+	cd /controller_root
+
+2) save the state of the HA configuration.  make a recursive copy of the 
+   HA directory and capture /etc/sysconfig/appd* and /etc/init.d/appd*. 
+   the latter 2 sets of files may not be accessible to the appdynamics user, 
+   depending on permissions.
+
+	cd /controller_root
+	cp -r HA HA.save
+	mkdir -p HA.save/init
+	mkdir -p HA.save/sysconfig
+	cp /etc/init.d/appd* HA.save/init
+	cp /etc/sysconfig/appd* HA.save/sysconfig
+
+3) retrieve the most recent version of the HA.shar file
+   https://github.com/Appdynamics/HA-toolkit/releases/latest
+   currently, there is no direct link to the latest HA.shar, due
+   to limitations in github.
+ 
+4) copy the downloaded HA.shar to the HA directory
+
+	cp /tmp/HA.shar /controller_root/HA
+
+5) unpack it using bash HA.shar
+
+  	bash HA.shar
+ 
+6) inspect the /etc/sysconfig or /etc/default versions of
    the *.sysconfig files to see if any midifications have been made to them.
    if so, merge the differences to the sysconfig files in this directory.
    edit any settings you might need in the sysconfig files.
-4) inspect the watchdog.settings.template file to see if any additions have
+
+	for i in appdcontroller appdcontroller-db appdynamics-machine-agent ; do
+		diff HA/$i.sysconfig HA.save/sysconfig/$i
+	done
+
+7) inspect the watchdog.settings.template file to see if any additions have
    been made, and merge them into your watchdog.settings file
-5) recursively copy the HA directory to the secondary HA directory
-6) run install-init with the appropriate options as root on the primary
-7) run install-init on the secondary in the same way
-8) restart the watchdog on the secondary if enabled. do this
-   by stopping the secondary appdcontroller service and then starting it.
-9) validate both installations by running appdstatus.sh
+
+	diff HA/watchdog.settings.template HA.save/watchdog.settings
+
+8) recursively copy the HA directory to the secondary HA directory
+
+	scp -r HA secondary_host:/controller_root
+
+9) if not using the restricted NOROOT function, 
+   run HA/install-init.sh with the appropriate options as root on the primary
+	if using sudo to do privilegs escalation:
+
+	sudo /controller_root/HA/install-init.sh -s	
+
+   if using the c wrapper:
+
+	sudo /controller_root/HA/install-init.sh -c	
+
+10) run HA/install-init.sh on the secondary in the same way
+
+11) restart the watchdog on the secondary.
+
+	sudo service appdcontroller stop
+	sudo service appdcontroller start
+
+12) verify that the appdynamics processes and HA installation is functional:
+	run the following on both nodes. if it shows healthy operation, the
+    /controller_root/HA.save directory can be removed.
+
+	/controller_root/HA/appdstatus.sh
+   
+FAIL CASE) should the installation go poorly, the HA upgrade can be backed
+   out by removing the HA directory, and renaming /controller_root/HA.save
+   as /controller_root/HA.  to replace the sysconfig and init files, the
+   old install-init.sh should be run.  validate that the /etc/init.d and 
+   /etc/sysconfig files saved in HA.save in step 1 are identical.
+ 

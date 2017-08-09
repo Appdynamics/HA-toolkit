@@ -1,3 +1,5 @@
+$Id: APPD_UPGRADE 3.26 2017-08-09 14:44:58 cmayer Exp $
+
 This document describes the best practice workflow for upgrading the
 controllers in an HA cluster.  In the below workflow, the distinction
 is made between secondary and primary.   primary and secondary are 
@@ -41,7 +43,7 @@ use a different privilege escalation method, replace the invocations of
     secondary will contain the pre-upgrade files.
 
 11) on primary: start the controller
-    sudo serbice appdcontroller start
+    sudo service appdcontroller start
 
 12) validate installation
     Once Glassfish up, login to UI via browser directly to server, 

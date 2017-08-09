@@ -568,3 +568,9 @@ KNOWN BUGS:
 Release notes for version 3.26
 
 1) the #!/bin/bash was inadvertently removed from replicate.sh
+
+2) a coding error caused replicate.sh to fail when log files do not exist 
+   on the secondary.
+
+3) some minor doc fixes
+

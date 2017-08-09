@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: replicate.sh 3.26 2017-08-09 14:43:47 cmayer $
 #
 # install HA to a controller pair
 #
@@ -877,9 +877,9 @@ fi
 # clean out the old relay and bin-logs
 #
 message "Removing old replication logs"
-runcmd ssh $secondary "find $datadir -print | grep bin-log | xargs rm  -f"
-runcmd ssh $secondary "find $datadir -print | grep relay-log | xargs rm  -f"
-runcmd ssh $secondary rm -f $datadir/master.info
+ssh $secondary "find $datadir -print | grep bin-log | xargs rm  -f"
+ssh $secondary "find $datadir -print | grep relay-log | xargs rm  -f"
+ssh $secondary rm -f $datadir/master.info
 
 if ! $hotsync ; then
 	runcmd rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info
