@@ -2,7 +2,7 @@
 # 
 # Monitors Numa on Linux 
 # 
-# $Id: numa-stat.sh 3.27 2017-08-10 09:25:16 cmayer $
+# $Id: numa-stat.sh 3.27 2017-08-10 09:29:00 cmayer $
 # 
 # Copyright 2017 AppDynamics, Inc 
 # 
@@ -21,7 +21,7 @@
 
 PATH=$PATH:/bin:/usr/sbin:/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 
-# seconds between samples
+# seconds between samples - 5 minutes here
 INTERVAL=$(( 5 * 60 ))
 
 LASTPULSE=0
@@ -47,7 +47,6 @@ stats=$(numastat -m | awk '
 	/MemFree/  { do_stat(); }
 	/MemUsed/  { do_stat(); }
 ')
-echo "pulse"
 fi
 
 echo "$stats"
