@@ -1,0 +1,2 @@
+this is a machine agent monitor that surfaces numa statistics 
+we collect the numa stats only every 5 minutes by default.
