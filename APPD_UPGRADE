@@ -75,7 +75,7 @@ use a different privilege escalation method, replace the invocations of
     sudo service appdcontroller-db stop
 
 19) on secondary: apply changes to domain.xml and db.cnf
-    these files may be copied from the primary
+    domain.xml may be copied from the primary, db.cnf can but must have a unique server-id value
 
 20) on secondary: start the database and controller
     sudo service appdcontroller-db start
