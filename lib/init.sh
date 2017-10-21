@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/init.sh 3.23a 2017-06-15 16:13:57 cmayer $
+# $Id: lib/init.sh 3.24 2017-10-21 00:47:23 rob.navarro $
 #
 # init.sh
 # contains functions to change user and run processes
@@ -21,36 +21,6 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 # 
-# runuser quoting is a definite PITA.  the way to stay sane is to note
-# exactly when you want $ to be expanded and make that explicit, passing
-# escaped $ signs when you want the expansion deferred
-#
-# finally, the bg_runuser function should return the pid
-#
-if [ `id -un` == "$RUNUSER" ] ; then
-	function bg_runuser {
-#		echo "$* >/dev/null 2>&1 & echo \$! ; disown" | bash &
-		bash -c "$* >&/dev/null </dev/null & echo \$! ; disown -h"
-	}
-	function run_mysql {
-		$MYSQLCLIENT
-	}
-	function runuser {
-		echo "$*" | bash
-	}
-else
-	function bg_runuser {
-#		echo "$* >/dev/null & echo \$! ; disown" | su -s /bin/bash $RUNUSER
-		su $RUNUSER bash -c "$* >&/dev/null </dev/null & echo \$! ; disown -h"
-	}
-	function run_mysql {
-		su -s $MYSQLCLIENT $RUNUSER
-	}
-	function runuser {
-		echo "$*" | su -s /bin/bash $RUNUSER
-	}
-fi
-export -f runuser bg_runuser
 
 # enable Debian systems to work also
 function service {

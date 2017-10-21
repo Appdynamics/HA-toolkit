@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: lib/ha.sh 3.26 2017-10-21 00:47:23 rob.navarro $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -20,10 +20,15 @@
 #   limitations under the License.
 # 
 
+if ! declare -f abend &> /dev/null ; then
+	echo "ERROR: ${BASH_SOURCE[0]}: lib/log.sh not included. This is a coding error! " >&2
+	exit 1
+fi
+
 # with help from:
 # http://stackoverflow.com/questions/1923435/how-do-i-echo-stars-when-reading-password-with-read
 function getpw { 
-        (( $# == 1 )) || err "Usage: ${FUNCNAME[0]} <variable name>"
+        (( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <variable name>"
         local pwch inpw1 inpw2=' ' prompt; 
         
         ref=$1 
@@ -67,15 +72,15 @@ function getpw {
 #  . hafunctions.sh
 #  save_mysql_passwd $APPD_ROOT
 function save_mysql_passwd {
-	(( $# == 1 )) || err "Usage: ${FUNCNAME[0]} <APPD_ROOT>"
+	(( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <APPD_ROOT>"
 
 	local thisfn=${FUNCNAME[0]} APPD_ROOT=$1 
-	[[ -d $1 ]] || err "$thisfn: \"$1\" is not APPD_ROOT"
+	[[ -d $1 ]] || fatal "$thisfn: \"$1\" is not APPD_ROOT"
 	local rootpw_obf="$APPD_ROOT/db/.rootpw.obf"
 
 	getpw __inpw1 || exit 1		# updates __inpw1 *ONLY* if global variable
 	obf=$(obfuscate $__inpw1) || exit 1
-	echo $obf > $rootpw_obf || err "$thisfn: failed to save obfuscated passwd to $rootpw_obf"
+	echo $obf > $rootpw_obf || fatal "$thisfn: failed to save obfuscated passwd to $rootpw_obf"
 	chmod 600 $rootpw_obf || warn "$thisfn: failed to make $rootpw_obf readonly"
 }
 
@@ -157,62 +162,100 @@ function find_machine_agent {
 	done
 }
 
+# output all the names and aliases on the input /etc/hosts file for the current
+# hostname
+function get_names {
+   (( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <hostname>"
+   local host=$1
+
+   awk '
+   BEGIN	{ IGNORECASE = 1 }
+   $1 ~ /^[[:space:]]*#/ {next} 
+   $1 ~ /^127.0./ {next} 
+   $1 ~ /[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/ && $0 ~ /'$host'/ {for (i=2; i <= NF; ++i) print $i}'
+}
+export -f get_names
 
 #
 # Check for various problems that prevent passwordless ssh working from each
 # node to the other.
+# Checks all /etc/hosts names for $(hostname) calling ssh to all secondary's 
+# /etc/hosts entries and vice versa.
 # Return non-zero for caller to exit if required.
-# Assumes writing to /tmp/.out and /tmp/.errs is possible
 # Requires:
 #  . lib/log.sh
 # Call as:
-#  check_ssh_setup $myhostname $otherhostname || err "2-way passwordless ssh not setup"
+#  check_ssh_setup $otherhostname || fatal "2-way passwordless ssh not setup"
 # 
 # e.g. if function running on primary then:
-#  check_ssh_setup $primary $secondary
+#  check_ssh_setup $secondary
 #
 function check_ssh_setup {
-   return 0
+   (( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <otherhostname>"
+   local myhost=$(hostname) otherhost=$1 i j OUT=/tmp/.out.$$ ERR=/tmp/.errs.$$
+
+   touch $OUT && [[ -w $OUT ]] || abend "${FUNCNAME[0]}: unable to write to $OUT"
+   touch $ERR && [[ -w $ERR ]] || abend "${FUNCNAME[0]}: unable to write to $ERR"
+
+   # suffers a slight chicken and egg problem as we need /etc/hosts of $otherhost
+   # but have not established that ssh to secondary works yet... hence initial
+   # test
+   timeout 2s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' pwd' >$OUT 2>$ERR
+   retc=$?
+   if (( $retc != 0 )) ; then
+      message "ssh Test-0: $myhost unable to reach $otherhost: $(<$ERR)"
+      return 2
+   fi
+   local pattern='^/.*'
+   if [[ ! "$(<$OUT)" =~ $pattern ]] ; then
+       message "ssh Test-0: $myhost unable to run 'pwd' on $otherhost: $(<$ERR). Please fix and re-try"
+       return 3
+   fi
+   rm -f $OUT $ERR
+
+   local mynames=$(cat /etc/hosts | get_names $myhost)
+   local othernames=$(ssh -o StrictHostKeyChecking=no $otherhost cat /etc/hosts | get_names $otherhost)
+   if [[ -z "$othernames" ]] ; then
+      message "ssh Test-0: $myhost unable to cat /etc/hosts on $otherhost. Please fix and re-try"
+      return 4
+   fi
+   # now check that all names for current hostname can make passwordless ssh call to all names
+   # for $otherhost and vice-versa
+   for i in $mynames ; do
+      for j in $othernames ; do
+         do_check_ssh_setup $i $j || return $?
+      done
+   done
+}
+
+# Helper function for check_ssh_setup() that tests ssh between two named hosts.
+# Note that these tests will also add entries into the ~/.ssh/known_hosts
+# files of both hosts.
+function do_check_ssh_setup {
    (( $# == 2 )) || abend "Usage: ${FUNCNAME[0]} <myhostname> <otherhostname>"
-   local myhost=$1 otherhost=$2 retc OUT=/tmp/.out ERR=/tmp/.errs
+   local myhost=$1 otherhost=$2 retc OUT=/tmp/.out.$$ ERR=/tmp/.errs.$$
 
    touch $OUT && [[ -w $OUT ]] || abend "${FUNCNAME[0]}: unable to write to $OUT"
    touch $ERR && [[ -w $ERR ]] || abend "${FUNCNAME[0]}: unable to write to $ERR"
 
    # Test-1: check whether possible to reach $otherhost with ssh - fingerprint known or not
-   timeout 2s bash -c 'ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '$otherhost' echo $(id -un):$(id -gn)' >$OUT 2>$ERR
+   timeout 2s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' echo $(id -un):$(id -gn)' >$OUT 2>$ERR
    retc=$?
    if (( $retc != 0 )) ; then
       message "ssh Test-1: $myhost unable to reach $otherhost: $(<$ERR)"
-      return 2
+      return 5
    fi
    if [[ "$(<$OUT)" != "$(id -un):$(id -gn)" ]] ; then
        message "ssh Test-1: $myhost unable to determine username:groupname on $otherhost: $(<$ERR). Please ensure same username and groupname on both HA servers and re-try"
-       return 3
-   fi
-
-   # Test-2: check whether otherhost's fingerprint is known to me
-   timeout 2s bash -c 'ssh '$otherhost' id -un' &> $ERR
-   retc=$?
-   if (( $retc != 0 )) ; then
-      message "ssh Test-2: $myhost does not recognise RSA fingerprint of $otherhost. From $myhost please test connection with \"ssh $otherhost pwd\" and then answer \"yes\" and re-try"
-      return 4
+       return 6
    fi
 
    # Test-3: check whether otherhost can reach me with ssh - fingerprint known or not
-   timeout 2s bash -c 'ssh '$otherhost' ssh -o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null '$myhost' id -un' &> $ERR
+   timeout 2s bash -c 'ssh '$otherhost' ssh -o StrictHostKeyChecking=no '$myhost' id -un' &> $ERR
    retc=$?
    if (( $retc != 0 )) ; then
       message "ssh Test-3: $otherhost unable to reach $myhost: $(<$ERR)"
-      return 5
-   fi
-
-   # Test-4: check whether otherhost knows of my RSA fingerprint
-   timeout 2s bash -c 'ssh '$otherhost' ssh '$myhost' hostname' &> $ERR
-   retc=$?
-   if (( $retc != 0 )) ; then
-      message "ssh Test-4: $otherhost does not recognise RSA fingerprint of $myhost. From $otherhost please test connection with \"ssh $myhost pwd\" and then answer \"yes\" and re-try"
-      return 6
+      return 8
    fi
 
    rm -f $OUT $ERR		# files are not deleted after unsuccessful earlier return

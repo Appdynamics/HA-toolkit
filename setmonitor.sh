@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: setmonitor.sh 3.18 2017-04-26 01:25:28 cmayer $
+# $Id: setmonitor.sh 3.20 2017-10-21 00:47:23 rob.navarro $
 #
 # instrument controller and machine agents to a monitoring host
 #
@@ -25,7 +25,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 cd $(dirname $0)
 
 LOGNAME=setmonitor.log
-need_encryption=false
+need_secure_cred_store=false
 
 # source function libraries
 . lib/log.sh
@@ -74,39 +74,6 @@ function usage()
 	exit 1
 }
 
-#
-# given a name and url, crack the url and set the 3 variables:
-# $name_host, $name_port, $name_protocol
-#
-function parse_vip()
-{
-	local vip_name=$1
-	local vip_def=$2
-
-	[[ -z "$vip_def" ]] && return
-
-	echo $vip_def | awk -F: -v vip_name=$vip_name '
-		BEGIN { 
-			host=""; 
-			protocol="http";
-			port="8090"; 
-		}
-		/http[s]*:/ {protocol=$1; host=$2; port=$3;next}
-		/:/ {host=$1; port=$2;next}
-		{host=$1}
-		END {
-			if (port == "") {
-				port = (protocol=="https")?443:8090;
-			}
-			gsub("^//","",host);
-			gsub("[^0-9]*$","",port);
-			printf("%s_host=%s\n", vip_name, host);
-			printf("%s_port=%s\n", vip_name, port);
-			printf("%s_protocol=%s\n", vip_name, protocol);
-		}
-	'
-}
-
 declare -A cmargs
 
 #
@@ -120,7 +87,7 @@ declare -A cmargs
 
 function parse_monitor_def() {
 
-	local controller_monitor_args="$1"
+	local controller_monitor_args="$1" key value
 
 	declare -a vals A
 	# vals array gets comma delimited settings
@@ -151,7 +118,7 @@ message "hostname: " `hostname`
 message "appd root: $APPD_ROOT"
 message "appdynamics run user: $RUNUSER"
 
-while getopts s:m:a:i:h flag; do
+while getopts "s:m:a:i:h" flag; do
 	case $flag in
 	a)
 		machine_agent=$OPTARG
@@ -188,6 +155,7 @@ while getopts s:m:a:i:h flag; do
 		;;
 	esac
 done
+shift $(( $OPTIND - 1 ))
 
 pri_short=$(shortname $primary)
 sec_short=$(shortname $secondary)
@@ -257,6 +225,15 @@ if [ -z "$monitor_access_key" ] ; then
 	fi
 fi
 
+# if explicit monitor details not given then use -i <internal_vip> 
+# e.g.scheme://host:port/path provided instead
+# else if no -i <internal_vip> then just leave to defaults below
+if (( "${#cmargs[*]}" == 0 )) && [[ -n "$internal_vip" ]] ; then
+	monitor_host=$internal_vip_host
+	monitor_protocol=$internal_vip_protocol
+	monitor_port=$internal_vip_port
+fi
+
 #
 # worst case defaults
 #
@@ -285,17 +262,17 @@ credpass=
 
 if echo $monitor_access_key | grep -q -s "^-001" ; then
 	message "key appears to require decryption"
-	need_encryption=true
+	need_secure_cred_store=true
 
 	# let's load up the credential store params from the first nonblank
 	for info in ${controller_infos[*]} ; do
 		if [ -f "$info" ] ; then
-			xcredfile=$(controller_info_get $info credential-store-filename)
-			if [ -z "$credfile" -a "$xcredfile" != unset ] ; then
+			xcredfile=$(controller_info_get $info credential-store-filename | head -1)
+			if [[ -z "$credfile" && -n "$xcredfile" ]] ; then
 				credfile=$xcredfile
 			fi
-			xcredpass=$(controller_info_get $info credential-store-password)
-			if [ -z "$credpass" -a "$xcredpass" != unset ] ; then
+			xcredpass=$(controller_info_get $info credential-store-password | head -1)
+			if [[ -z "$credpass" && -n "$xcredpass" ]] ; then
 				credpass=$xcredpass
 			fi
 		fi
@@ -329,7 +306,7 @@ for info in ${controller_infos[*]} ; do
 		controller_info_set $info controller-ssl-enabled "$monitor_ssl"
 		controller_info_set $info node-name $pri_short
 
-		if $need_encryption ; then
+		if $need_secure_cred_store ; then
 			controller_info_set $info use-encrypted-credentials true
     		controller_info_set $info credential-store-filename $credfile
     		controller_info_set $info credential-store-password $credpass

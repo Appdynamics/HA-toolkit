@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: install-init.sh 3.26 2017-10-21 00:45:29 rob.navarro $
 #
 # install init scripts, including the machine agent.
 #
@@ -55,7 +55,10 @@ if ! [ -d $APPD_ROOT/bin ] ; then
 fi
 
 # source function library
+. $APPD_ROOT/HA/lib/log.sh
+. $APPD_ROOT/HA/lib/runuser.sh
 . $APPD_ROOT/HA/lib/ha.sh
+. $APPD_ROOT/HA/lib/password.sh
 . $APPD_ROOT/HA/lib/init.sh
 . $APPD_ROOT/HA/lib/conf.sh
 
@@ -206,6 +209,7 @@ function install_init {
 	local stop_pri=$3
 
 	echo "installing /etc/init.d/$service"
+	rm -f /etc/init.d/$service			# remove potential sym links
 	cp ./$service.sh /etc/init.d/$service
 	chmod 0755 /etc/init.d/$service
 
@@ -250,6 +254,14 @@ fi
 if [ "$missing_dependencies" -gt 0 ] ; then
 	exit 1
 fi
+
+#
+# check that HA Toolkit has access to MySQL clients via password in any of:
+#   MYSQL_ROOT_PASSWD - env variable
+#   $APPD_ROOT/db/.rootpw
+#   $APPD_ROOT/db/.rootpw.obf
+#
+get_mysql_passwd > /dev/null
 
 #
 # since our RUNUSER isn't root, we want to make it so that sudo works
@@ -376,6 +388,3 @@ if [ -f $APPD_ROOT/HA/NOROOT ] ; then
 	echo "removing $APPD_ROOT/HA/NOROOT" | tee $LOGFILE
 	rm -f $APPD_ROOT/HA/NOROOT
 fi
-
-
-exit 0

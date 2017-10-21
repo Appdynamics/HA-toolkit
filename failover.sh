@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: failover.sh 3.26 2017-10-21 00:45:29 rob.navarro $
 #
 # run on the passive node, activate this HA node.
 # 
@@ -166,7 +166,7 @@ secondary=`sql localhost "show slave status" | get Master_Host`
 if [[ -z "$secondary" ]] ; then
 	fatal 1 "unable to get Master_Host value from \"show slave status\". Giving up..."
 fi
-check_ssh_setup $(hostname) $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
+check_ssh_setup $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
 
 #
 # hard failover is not quite as hard as all that.

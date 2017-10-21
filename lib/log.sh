@@ -21,9 +21,28 @@
 #   limitations under the License.
 #
 #
+
+# this function should have no external dependencies and so should be callable
+# from anywhere...returning 0 for success or non-zero for failure
+# Call as:
+#  APPD_ROOT=$(get_appd_root) || exit 1
+function get_appd_root {
+	local cwd=$(pwd -P || readlink -e .)
+	if [[ "${cwd##*/}" != "HA" ]] ; then
+		echo "ERROR: ${FUNCNAME[0]}: must be run within 'HA' sub-directory of controller install directory" >&2
+		return 1
+	fi
+	echo $(readlink -e ..)
+}
+
 if [ -z "$APPD_ROOT" ] ; then
-	# let's assume that whoever is calling us has cd'd to the HA directory
-	APPD_ROOT=`readlink -e ..`
+	# let's also check that whoever is calling us has cd'd to the HA directory
+	APPD_ROOT=$(get_appd_root) || exit 1
+fi
+
+if [[ -z "$LOGNAME" ]] ; then
+   echo "ERROR: ${FUNCNAME[0]}: LOGNAME variable is not set. This is a coding bug!" >&2
+   exit 1
 fi
 
 #
@@ -33,11 +52,20 @@ function pwmask {
 	sed -u -e 's/--password=[^ ]*/--password=/'
 }
 
-LOGFILE=$APPD_ROOT/logs/$LOGNAME
+# Init processes at startup should not log into $APPD_ROOT as generally that is
+# reserved for $RUNUSER EUID processes. Instead will send output elsewhere by
+# assigning full path instead of just filename to LOGNAME
+if [[ "${LOGNAME:0:1}" != "/" ]] ; then
+	LOGFILE=$APPD_ROOT/logs/$LOGNAME	# caller needs path adding
+else
+	LOGFILE=$LOGNAME			# assume caller wants specific path
+fi
 
 function log {
-	local out=/dev/tty
-	if ! tty -s ; then
+	local out
+	if [[ -t 0 ]] ; then
+		out=/dev/tty
+	else
 		out=/dev/null
 	fi
 
@@ -48,11 +76,15 @@ function logonly {
 	pwmask >> $LOGFILE
 }
 
+# output to STDERR and to log file
+function warn {
+	echo "$@" >&2
+	logmsg "$@"
+}
+
+# output to /dev/tty only - no log file entry
 function gripe {
-	local out=/dev/tty
-	if ! tty -s ; then
-		out=/dev/null
-	fi
+	local out=/dev/stderr	# otherwise why gripe?
 
 	echo "$@" > $out
 }
@@ -62,8 +94,10 @@ function logmsg {
 }
 
 function message {
-	local out=/dev/tty
-	if ! tty -s ; then
+	local out
+	if [[ -t 0 ]] ; then
+		out=/dev/tty
+	else
 		out=/dev/null
 	fi
 
@@ -111,3 +145,9 @@ function log_rename {
 	fi
 }
 
+function debug
+{
+   while read -p '?dbg> ' L ; do
+      eval "$L"
+   done < /dev/tty
+}

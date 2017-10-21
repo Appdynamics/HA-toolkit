@@ -12,7 +12,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller-db.sh 3.19 2017-05-11 14:09:21 cmayer $
+# $Id: appdcontroller-db.sh 3.20 2017-10-21 00:45:29 rob.navarro $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -65,8 +65,13 @@ if [ ! -f $EVENTS_VMOPTIONS_FILE ] ; then
 fi
 LIMITS=/etc/security/limits.d/appdynamics.conf
 
+# pathname for log output - insisting on output to /tmp
+LOGNAME="/tmp/$(T=${0##*/}; echo ${T%.*}).log"
+
 # For security reasons, locally embed/include function library at HA.shar build time
+embed lib/log.sh		# require LOGNAME to be set
 embed lib/password.sh
+embed lib/runuser.sh
 embed lib/init.sh
 embed lib/conf.sh
 embed lib/status.sh

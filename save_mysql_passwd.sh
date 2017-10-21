@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: save_mysql_passwd.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: save_mysql_passwd.sh 3.13 2017-10-21 00:47:23 rob.navarro $
 #
 # a simple wrapper around the obfuscated password saver function
 #
@@ -21,6 +21,8 @@
 export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
+
+LOGNAME=save_mysql_passwd.log
 
 . lib/log.sh
 . lib/ha.sh

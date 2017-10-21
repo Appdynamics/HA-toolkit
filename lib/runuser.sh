@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/runuser.sh 3.17 2017-04-18 14:48:02 cmayer $
+# $Id: lib/runuser.sh 3.18 2017-10-21 00:47:23 rob.navarro $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -16,23 +16,88 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 #
-# contains function stubs to make the runuser hook disappear
-# this file is intended to be included by shell scripts running
-# as the appdynamics user only.
-#
-# init scripts are intended to embed lib/init.sh instead
-# 
-# finally, if we are root, then this means that root had better
-# be the user defined in db.cnf
-#
 
-function bg_runuser {
-	echo "$*" | exec nohup bash >/dev/null 2>&1 &
+####
+# Contains definition of RUNUSER (effective user) as well as the
+# family of utility functions to wrap commands that sometimes need 
+# to be run as the current user and sometime as the effective user of
+# AppD.
+#
+# Generally the rule is if current effective UID != to the MySQL user
+# then cause all filesystem accesses to run with the effective UID
+# of the MySQL user.
+#
+# These wrapper functions are needed to:
+# 1.  prevent processes started as root from making files that 
+#     non-root users can then later not read.
+# 2.  enable root started processes from accessing NFS mounted filestore
+#
+# This file needs to be included or embedded prior to any use of the
+# the runuser, bg_runuser wrapper functions
+####
+
+#
+# This function has only 2 external dependencies:
+# 1. APPD_ROOT is set
+# 2. $APPD_ROOT/db/db.cnf is readable by current user
+#
+# Returns the username referenced by MySQL's db/db.cnf as the single
+# most reliable record of which effective user AppD should run as.
+#
+# Avoids unpleasant cyclic dependency by just ASSUMING $APPD_ROOT/db/db.cnf
+# is readable. Otherwise using runuser() functions assume the existence of
+# $RUNUSER... which has not yet been determined.
+#
+# Remember that when called by Init script RUNUSER will already have
+# been set.
+# Call as:
+#  RUNUSER=$(get_runuser) || exit 1
+function get_runuser {
+	if [[ -z "$APPD_ROOT" ]] ; then
+		echo "ERROR: ${FUNCNAME[0]}: APPD_ROOT is not set. This is a coding bug! " >&2
+		exit 1
+	fi
+	if ! awk -F= '$1 ~ /^[[:space:]]*user$/ {print $2}' $APPD_ROOT/db/db.cnf ; then
+		echo "ERROR: ${FUNCNAME[0]}: APPD_ROOT is not set correctly." >&2
+		exit 1
+	fi
 }
-function runuser {
-	echo "$*" | bash
-}
-function run_mysql {
-	$MYSQLCLIENT
-}
-export -f runuser bg_runuser
+
+if [[ -z "$RUNUSER" ]] ; then
+	RUNUSER=$(get_runuser) || exit 1
+fi
+
+#
+# runuser quoting is a definite PITA.  the way to stay sane is to note
+# exactly when you want $ to be expanded and make that explicit, passing
+# escaped $ signs when you want the expansion deferred
+#
+# finally, the bg_runuser function should return the pid
+#
+if [[ `id -un` == "$RUNUSER" ]] ; then
+        function bg_runuser {
+#               echo "$* >/dev/null 2>&1 & echo \$! ; disown" | bash &
+		bash -c "$* &>> ${logfile:-/dev/null} </dev/null & echo \$! ; disown"
+        }
+        function run_mysql {
+                $MYSQLCLIENT
+        }
+        function runuser {
+#               echo "$*" | bash
+                bash -c "$*"
+        }
+else
+        function bg_runuser {
+#               echo "$* >/dev/null & echo \$! ; disown" | su -s /bin/bash $RUNUSER
+		su -s /bin/bash -l ${RUNUSER:-unset_runuser} -c "$* &>> ${logfile:-/dev/null} </dev/null & echo \$! ; disown"
+        }
+        function run_mysql {
+#               su -s $MYSQLCLIENT $RUNUSER
+                su -s /bin/bash -l ${RUNUSER:-unset_runuser} -c $MYSQLCLIENT
+        }
+        function runuser {
+#               echo "$*" | su -s /bin/bash $RUNUSER
+                su -s /bin/bash -l ${RUNUSER:-unset_runuser} -c "$*"
+        }
+fi
+export -f runuser bg_runuser run_mysql

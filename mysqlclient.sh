@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: mysqlclient.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: mysqlclient.sh 3.13 2017-10-21 00:47:23 rob.navarro $
 #
 # trivial command that executes sql for us.  this is intended
 # to be invoked from an init script via runuser, so we can log
@@ -40,7 +40,7 @@ if [ -t 0 ] ; then
 fi
 mysqlopts=-EB
 
-while getopts ct flag; do
+while getopts "ctr::" flag; do
 	case $flag in
 	t)
 		terminal=true
@@ -48,33 +48,43 @@ while getopts ct flag; do
 	c)
 		mysqlopts=
 		;;
+
+	r)	mysqlopts="$(tr ',' ' ' <<< "$OPTARG")"
+		;;
+
 	*)
 		echo "usage: $0 <options>"
 		echo "    [ -t ] interactive"
 		echo "    [ -c ] compatible with controller-sh login-db"
+		echo "    [ -r -s,-C ] raw comma separated MySQL client options"
 		exit 0
 		;;
 	esac
 done
+shift $(( $OPTIND - 1 ))
 
 if $terminal ; then
-	$MYSQL -A --host=localhost "${CONNECT[@]}" controller
+	$MYSQL -A $mysqlopts --host=localhost "${CONNECT[@]}" controller
 	exit 0
 fi
 
 SQL=/tmp/mysqlclient.$$.sql
 RESULT=/tmp/mysqlclient.$$.result
+ERR=/tmp/mysqlclient.$$.err
 
 cat > $SQL
-$MYSQL $mysqlopts --host=localhost "${CONNECT[@]}" controller 2>> $LOGFILE 1> $RESULT < $SQL
+$MYSQL $mysqlopts --host=localhost "${CONNECT[@]}" controller 2> $ERR 1> $RESULT < $SQL
+RETC=$?
 
 if [ -f $APPD_ROOT/HA/LOG_SQL ] ; then
 	echo "mysqlclient: " `date` >> $LOGFILE
-	cat $SQLFILE >> $LOGFILE
+	cat $SQL >> $LOGFILE
 	echo "result:" >> $LOGFILE
-	cat $RESULT >> $LOGFILE
+	cat $ERR $RESULT >> $LOGFILE
 fi
 
-cat $RESULT
+[[ -s "$ERR" ]] && cat $ERR
+[[ -s "$RESULT" ]] && cat $RESULT
 
-rm -f $RESULT $SQL
+rm -f $RESULT $SQL $ERR
+exit $RETC

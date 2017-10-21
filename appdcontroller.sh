@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: appdcontroller.sh 3.26 2017-10-21 00:45:29 rob.navarro $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -60,8 +60,13 @@ fi
 
 OPEN_FD_LIMIT=65536
 
+# pathname for log output - insisting on output to /tmp
+LOGNAME="/tmp/$(T=${0##*/}; echo ${T%.*}).log"
+
 # For security reasons, locally embed/include function library at HA.shar build time
+embed lib/log.sh
 embed lib/password.sh
+embed lib/runuser.sh
 embed lib/init.sh
 embed lib/conf.sh
 embed lib/status.sh

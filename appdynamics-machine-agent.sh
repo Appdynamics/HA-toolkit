@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: appdynamics-machine-agent.sh 3.26 2017-10-21 00:45:29 rob.navarro $
 #
 # /etc/init.d/appdynamics-machine-agent
 #
@@ -61,7 +61,11 @@ if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
 	set -x
 fi
 
+# pathname for log output - insisting on output to /tmp
+LOGNAME="/tmp/$(T=${0##*/}; echo ${T%.*}).log"
+
 # For security reasons, locally embed/include function library at HA.shar build time
+embed lib/runuser.sh
 embed lib/init.sh
 embed lib/status.sh
 

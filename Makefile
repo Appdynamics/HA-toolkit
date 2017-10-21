@@ -1,6 +1,6 @@
 #
 # makefile for HA script distro
-# $Id: Makefile 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: Makefile 3.26 2017-10-21 00:44:18 rob.navarro $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -30,8 +30,10 @@ BASH_SRC= assassin.sh failover.sh watchdog.sh \
 	appdcontroller.sysconfig.template \
 	appdcontroller-db.sysconfig.template \
 	numa.settings.template numa-patch-controller.sh \
-	save_mysql_passwd.sh rsyncd.conf \
-	lib/password.sh lib/ha.sh lib/sql.sh lib/log.sh lib/conf.sh \
+	userid-patch-controller.sh check_for_root_files.sh \
+	save_mysql_passwd.sh rsyncd.conf
+
+BASH_LIBS= lib/password.sh lib/ha.sh lib/sql.sh lib/log.sh lib/conf.sh \
 	lib/runuser.sh lib/init.sh lib/status.sh
 
 C_SRC= appdservice.c
@@ -47,7 +49,7 @@ NOT_EMBEDDED= VERSION README.txt RUNBOOK UPGRADING Release_Notes $(C_SRC)
 
 BASH_SRC_EMBEDDED := $(addprefix build/,$(BASH_SRC))
 
-SOURCES= $(NOT_EMBEDDED) $(BASH_SRC_EMBEDDED)
+SOURCES= $(NOT_EMBEDDED) $(BASH_SRC_EMBEDDED) $(addprefix build/,$(BASH_LIBS))
 
 all: HA.shar
 
@@ -58,13 +60,16 @@ HA.shar: build $(SOURCES) Makefile
 	echo 'if [ $$(basename $$(pwd -P)) != HA ] ; then' >> HA.shar
 	echo 'mkdir -p HA ; if ! [ -d HA ] ; then echo "no HA directory" ; exit 0 ; fi; echo cd to HA ; cd HA; fi' >> HA.shar
 	echo "echo unpacking HA version `cat VERSION`" >> HA.shar
-	cd build && shar $(NOT_EMBEDDED) $(DIRS) $(MONITORS) $(BASH_SRC) >> ../HA.shar
+	cd build && shar $(NOT_EMBEDDED) $(DIRS) $(MONITORS) $(BASH_SRC) $(BASH_LIBS) >> ../HA.shar
 	rm -f HA.shar.tmp ; mv HA.shar HA.shar.tmp
 	sed 's/^exit/chmod ugo+rx . .. ; find . -name \\*.sh -print | xargs chmod ugo+rx; exit/' < HA.shar.tmp >HA.shar
 	rm HA.shar.tmp
 
-build/%: % tools/embed.pl
-	perl tools/embed.pl $< > $@
+$(BASH_SRC_EMBEDDED): $(BASH_SRC) $(BASH_LIBS)
+	perl tools/embed.pl $(notdir $@) > $@
+
+$(addprefix build/,$(BASH_LIBS)): $(BASH_LIBS)
+	cp lib/$(notdir $@) $@
 
 build: $(NOT_EMBEDDED)
 	mkdir -p build

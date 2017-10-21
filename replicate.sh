@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.26 2017-08-09 14:43:47 cmayer $
+# $Id: replicate.sh 3.27 2017-10-21 00:47:23 rob.navarro $
 #
 # install HA to a controller pair
 #
@@ -304,39 +304,6 @@ function usage()
 	exit 1
 }
 
-#
-# given a name and url, crack the url and set the 3 variables:
-# $name_host, $name_port, $name_protocol
-#
-function parse_vip()
-{
-	local vip_name=$1
-	local vip_def=$2
-
-	[[ -z "$vip_def" ]] && return
-
-	echo $vip_def | awk -F: -v vip_name=$vip_name '
-		BEGIN { 
-			host=""; 
-			protocol="http";
-			port="8090"; 
-		}
-		/http[s]*:/ {protocol=$1; host=$2; port=$3;next}
-		/:/ {host=$1; port=$2;next}
-		{host=$1}
-		END {
-			if (port == "") {
-				port = (protocol=="https")?443:8090;
-			}
-			gsub("^//","",host);
-			gsub("[^0-9]*$","",port);
-			printf("%s_host=%s\n", vip_name, host);
-			printf("%s_port=%s\n", vip_name, port);
-			printf("%s_protocol=%s\n", vip_name, protocol);
-		}
-	'
-}
-
 log_rename
 
 #
@@ -512,7 +479,8 @@ if [ `ls -ld .. | awk '{print $3}'` != `id -un` ] ; then
 fi
 
 # check 2-way passwordless ssh works
-check_ssh_setup $primary $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
+message "checking 2-way passwordless ssh"
+check_ssh_setup $secondary || fatal 1 "2-way passwordless ssh healthcheck failed"
 
 if $appserver_only_sync && $final ; then
 	fatal 1 "\
@@ -711,7 +679,7 @@ if ! $appserver_only_sync ; then
 	# this may fail totally
 	#
 	message "stopping secondary db if present"
-	( stop_appdynamics_services $secondary || ssh $secondary $APPD_ROOT/bin/controller.sh stop ) | logonly 2>&1
+	( stop_appdynamics_services $secondary || ssh $secondary "[[ -f $APPD_ROOT/bin/controller.sh ]] && $APPD_ROOT/bin/controller.sh stop" ) | logonly 2>&1
 
 	#
 	# the secondary loses controller.sh until we are ready
@@ -761,7 +729,10 @@ if $final ; then
 		message "patching controller.sh for numa"
 		./numa-patch-controller.sh
 	fi
-
+	if [[ -x userid-patch-controller.sh ]] ; then
+		message "patching controller.sh to avoid userid startup/shutdown issues"
+		./userid-patch-controller.sh
+	fi
 
 	if $hotsync ; then
 		message "using backup - no need to stop primary"
@@ -1121,7 +1092,7 @@ if [ -n "$machine_agent" ] ; then
 	ma_def_flag="-a"
 	ma_def="$machine_agent"
 fi
-./setmonitor.sh -s $secondary "$monitor_def_flag" "$monitor_def" "$ma_def_flag" "$ma_def" -i $internal_vip
+./setmonitor.sh -s $secondary $monitor_def_flag $monitor_def $ma_def_flag $ma_def -i $internal_vip
 
 if $debug ; then
 	message "building file lists"
@@ -1135,34 +1106,23 @@ if $wildcard ; then
 	grant_secondary='%'
 else
 	#
-	# let's probe the canonical hostnames from the local database
+	# Use all /etc/hosts names for both primary and secondary for MySQL GRANT commands - 
+	# more robust in the event that /etc/hosts has missing fully qualified names on one
+	# host or other /etc/hosts inconsistencies between HA nodes
 	#
-	message "canonicalize hostnames"
-	primary1=`$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
-		/ERROR 1045/ { gsub("^.*@",""); print $1;}
-		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
+	grant_primary=$(get_names $(hostname) < /etc/hosts)
+	grant_secondary=$(ssh -o StrictHostKeyChecking=no $secondary cat /etc/hosts | get_names $secondary)
 
-	secondary1=`ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
-		/ERROR 1045/ { gsub("^.*@",""); print $1;}
-		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
-
-	#
-	# print the canonical hostnames
-	#
-	if [ "$primary1" = 'ERROR' -o "$secondary1" = 'ERROR' -o -z "$primary1" -o -z "$secondary1" ] ; then
-		gripe "cannot establish communications between mysql instances"
-		gripe "check firewall rules"
-		gripe "primary: $primary1"
-		gripe "secondary: $secondary1"
-		$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | log
-		ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | log
-		fatal 5
-	fi
-
-	[[ $primary1 != localhost ]] && primary=$primary1	# avoid issues with 127.0.0.1 having been set to hostname in /etc/hosts
-	[[ $secondary1 != localhost ]] && secondary=$secondary1	# avoid issues with 127.0.0.1 having been set to hostname in /etc/hosts
-	grant_primary=$primary
-	grant_secondary=$secondary
+	# prepare comma separated user string for upcoming SQL grant command 
+	# e.g. 'controller_repl'@'host1','controller_repl'@'host1alias'
+	for i in $grant_primary ; do
+		primary_user_arr+=("'controller_repl'@'$i' IDENTIFIED BY 'controller_repl'")
+	done
+	grant_primary_users=$(IFS=,; echo "${primary_user_arr[*]}")
+	for i in $grant_secondary ; do
+		secondary_user_arr+=("'controller_repl'@'$i' IDENTIFIED BY 'controller_repl'")
+	done
+	grant_secondary_users=$(IFS=,; echo "${secondary_user_arr[*]}")
 fi
 
 message "primary: $primary grant to: $grant_primary"
@@ -1273,7 +1233,7 @@ RESET SLAVE ALL;
 RESET MASTER;
 DELETE FROM mysql.user where user='controller_repl';
 FLUSH PRIVILEGES;
-GRANT REPLICATION SLAVE ON *.* TO 'controller_repl'@'$grant_secondary' IDENTIFIED BY 'controller_repl' $USE_SSL;
+GRANT REPLICATION SLAVE ON *.* TO $grant_secondary_users $USE_SSL;
 CHANGE MASTER TO MASTER_HOST='$secondary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=$dbport $PRIMARY_SSL;
 update global_configuration_local set value = 'active' where name = 'appserver.mode';
 update global_configuration_local set value = 'primary' where name = 'ha.controller.type';
@@ -1286,7 +1246,7 @@ RESET SLAVE ALL;
 RESET MASTER;
 DELETE FROM mysql.user where user='controller_repl';
 FLUSH PRIVILEGES;
-GRANT REPLICATION SLAVE ON *.* TO 'controller_repl'@'$grant_primary' IDENTIFIED BY 'controller_repl' $USE_SSL;
+GRANT REPLICATION SLAVE ON *.* TO $grant_primary_users $USE_SSL;
 CHANGE MASTER TO MASTER_HOST='$primary', MASTER_USER='controller_repl', MASTER_PASSWORD='controller_repl', MASTER_PORT=$dbport $SECONDARY_SSL;
 update global_configuration_local set value = 'passive' where name = 'appserver.mode';
 update global_configuration_local set value = 'secondary' where name = 'ha.controller.type';
@@ -1434,7 +1394,7 @@ elif [ $local_lic -ne 0 ] ; then
 	message "copying license file to  secondary"
 	scp -q $APPD_ROOT/license.lic.$secondary $secondary:$APPD_ROOT/license.lic
 else
-	message "secondary license file required"
+	message "SECONDARY LICENSE FILE REQUIRED"
 fi
 
 #

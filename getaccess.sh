@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: getaccess.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: getaccess.sh 3.13 2017-10-21 00:45:29 rob.navarro $
 # helper script to get the access key from an account table
 #
 # Copyright 2016 AppDynamics, Inc
@@ -24,6 +24,8 @@ cd $(dirname $0)
 APPD_ROOT=`readlink -e ..`
 account=system
 host=localhost
+
+LOGNAME=getaccess.log
 
 . lib/log.sh
 . lib/runuser.sh

@@ -574,3 +574,32 @@ Release notes for version 3.26
 
 3) some minor doc fixes
 
+--------------------------------------
+Release notes for version 3.27
+
+1) Fixed assorted logging issues to more reliably get messages when things go wrong.
+
+2) Prevent occasional ssh hangs between nodes when new hostnames are used. All
+   names and aliases within /etc/hosts are added to ~/.ssh/known_hosts and kept 
+   up to date.
+
+3) Prevent occasional MySQL replication failure due to permissions failure when
+   new hostnames or aliases are added to /etc/hosts. All aliases for current
+   hostname are permitted to connect to MySQL on the other host for replication only.
+
+4) Fixed bug in controller-info.xml update.
+
+5) Automatic backup of all HA Toolkit modified files to same directory 
+   with extension ".$(date +%s)".
+
+6) Added option to mysqlclient.sh "-r" to allow the raw pass-through of MySQL client
+   command line options - helpful for raw/silent output with mysqlclient.sh -r -s.
+
+7) Fixed bug in Glassfish Java agent monitor config when no -m (monitor) args
+   supplied. 
+
+8) Warn at Glassfish startup and shutdown if being run by userid that is not
+   the same as expected by MySQL. This helps to fix issues when root is accidentally
+   used to start or stop Glassfish which then prevents successful startup by
+   subsequent non-root userid. Instructions are provided on how to fix the issue
+   if it is detected.

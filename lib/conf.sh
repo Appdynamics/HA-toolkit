@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.25 2017-06-29 18:00:40 cmayer $
+# $Id: lib/conf.sh 3.26 2017-10-21 00:45:29 rob.navarro $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -24,6 +24,12 @@
 # 
 # all the configuration file names and locations
 #
+
+if ! declare -f runuser &> /dev/null ; then
+        echo "ERROR: ${BASH_SOURCE[0]}: lib/runuser.sh not included. This is a coding error! " >&2
+        exit 1
+fi
+
 lockfile=/var/lock/subsys/$NAME
 
 DB_CONF=$APPD_ROOT/db/db.cnf
@@ -56,15 +62,56 @@ function strip_white() {
 }
 
 #
+# get possible multiple values from named XML file and element, one per row
+# Call as:
+#  runuser get_xml_element_value $DOMAIN $property
+#
+function get_xml_element_value {
+	local thisfn=${FUNCNAME[0]}
+	(( $# == 2 )) || abend "Usage: $thisfn <xml file> <node name>"
+	local xml=$1
+ 	local property=$2
+
+	[[ -r $xml ]] || abend "$thisfn: unable to read $xml"
+	[[ -n $property ]] || abend "$thisfn: needs non-empty property name"
+	awk '$0 !~ /^\/ >|^ -/ {print}' < <(xmllint --shell $1 <<< "cat //$2/text()")
+}
+export -f get_xml_element_value
+
+#
+# count how many nodes of given name in supplied XML file
+#
+# This is helpful because no/0 elements of given name imply a insert
+# where as 1 or more, whether empty or not, imply an update
+#
+function count_xml_element {
+	local thisfn=${FUNCNAME[0]}
+	(( $# == 2 )) || abend "Usage: $thisfn <xml file> <node name>"
+	local xml=$1
+ 	local property=$2
+
+	[[ -r $xml ]] || abend "$thisfn: unable to read $xml"
+	[[ -n $property ]] || abend "$thisfn: needs non-empty property name"
+	awk '$0 ~ /is a number/ {print $NF}' < <(xmllint --shell $xml <<< "xpath count(//$property)")
+#	awk '	$0 ~ /^\/ > .{2} > $/ 		{print $3} 
+#		$0 ~ /^\/\/.*Node Set$/ 	{print $(NF-2)} 
+#		$0 ~ /^\/ > '$property' > $/ 	{print "1"}' < <(xmllint --shell $xml <<< "cd //$property" 2>&1)
+}
+export -f count_xml_element
+
+#
 # get a property from a controller_info file
+#
+# Need to differentiate between <x></x> existing but with no contained value
+# and between simple absence of <x>.*</x>
 #
 function controller_info_get() {
 	local xml=$1
 	local property=$2
 
-	runuser cat $xml | tr -d '\n' | grep "<$property>" | \
-		sed -e "s/^.*<$property>//" -e "s,</$property>.*$,," | strip_white
+	runuser get_xml_element_value $xml $property
 }
+export -f controller_info_get
 
 #
 # set a property into a controller_info file
@@ -74,16 +121,18 @@ function controller_info_set() {
 	local property=$2
 	local value=$3
 
-	if [ -z "$(controller_info_get $xml $property)" ] ; then
+	if (( $(count_xml_element $xml $property) == 0 )) ; then
 		tmpfile=/tmp/cinfo_set.$$ ; rm -f $tmpfile
 		echo "<$property>$value</$property>" > $tmpfile
 		chmod 755 $tmpfile
-		runuser sed -i -e "\"/<controller-info>/r $tmpfile\"" $xml
+		runuser sed -i.$(date +%s) -e "\"/<controller-info>/r $tmpfile\"" $xml
 		rm -f $tmpfile
 	else
-		runuser sed -i -e "\"s,\(<$property>\).*\(</$property>\),\1$value\2,\"" $xml
+		runuser sed -i.$(date +%s) -e "\"s,\(<$property>\).*\(</$property>\),\1$value\2,\"" $xml
 	fi
 }
+export -f controller_info_set
+
 #
 # unset a property in a controller_info file
 #
@@ -91,7 +140,7 @@ function controller_info_unset() {
 	local xml=$1
 	local property=$2
 
-	runuser sed -i -e "\"s/<$property>.*<\/$property>//\"" $xml
+	runuser sed -i.$(date +%s) -e "\"s/<$property>.*<\/$property>//\"" $xml
 }
 
 #
@@ -192,7 +241,7 @@ function domain_unset_jvm_option {
 		;;
 	esac
 
-	runuser sed -i -e "\"$xml_context{/$selector/d}\"" $DOMAIN_XML
+	runuser sed -i.$(date +%s) -e "\"$xml_context{/$selector/d}\"" $DOMAIN_XML
 }
 
 #
@@ -235,8 +284,8 @@ function domain_set_jvm_option {
 	if [ "$(domain_get_jvm_option $property)" != "unset" ] ; then
 		setter="$changer"
 	fi
-	sed -i -e "$xml_context{$setter}" $DOMAIN_XML
-} 
+	sed -i.$(date +%s) -e "$xml_context{$setter}" $DOMAIN_XML
+}
 
 # set a property into the db.cnf file
 # if the property is already there, edit it, else append it
@@ -262,7 +311,7 @@ function dbcnf_set {
 
 	if grep -q "^[[:space:]]*$property\(=\|$\)" $IN ; then
 		if ! [ -z "$value" ] ; then
-			sed -i "s,\(^[[:space:]]*$property=\).*$,\1$value," $OUT >/dev/null
+			sed -i.$(date +%s) "s,\(^[[:space:]]*$property=\).*$,\1$value," $OUT >/dev/null
 		fi
 	else
 		if [ -z "$value" ] ; then
@@ -299,7 +348,7 @@ function dbcnf_unset {
 	runuser $CP $DBCNF $IN
 	cp $IN $OUT
 
-	sed -i "/^[[:space:]]*$property\b/d" $OUT >/dev/null
+	sed -i.$(date +%s) "/^[[:space:]]*$property\b/d" $OUT >/dev/null
 
 	if ! cmp -s $IN $OUT ; then
 		$CP $OUT $DBCNF
@@ -316,8 +365,6 @@ function dbcnf_get {
 	val=`runuser grep "\"^[[:space:]]*$property=\"" $DB_CONF | awk -F= '{print $2}'`
 	if [ -n "$val" ] ; then
 		echo $val
-	elif runuser grep -q "\"^[[:space:]]*\b$property\b\"" $DB_CONF ; then
-		echo $property
 	else
 		echo unset
 	fi
@@ -375,3 +422,37 @@ if [ -n "$RUNUSER" ] ; then
 	fi
 fi
 RUNUSER=$FILE_RUNUSER
+
+#
+# given a name and url, crack the url and set the 3 variables:
+# $name_host, $name_port, $name_protocol
+#
+function parse_vip()
+{
+        local vip_name=$1
+        local vip_def=$2
+
+        [[ -z "$vip_def" ]] && return
+
+        echo $vip_def | awk -F: -v vip_name=$vip_name '
+                BEGIN {
+                        host="";
+                        protocol="http";
+                        port="8090";
+                }
+                /http[s]*:/ {protocol=$1; host=$2; port=$3;next}
+                /:/ {host=$1; port=$2;next}
+                {host=$1}
+                END {
+                        if (port == "") {
+                                port = (protocol=="https")?443:8090;
+                        }
+                        gsub("^//","",host);
+                        gsub("/.*$","",host);   # drop any trailing /controller
+                        gsub("[^0-9]*$","",port);
+                        printf("%s_host=%s\n", vip_name, host);
+                        printf("%s_port=%s\n", vip_name, port);
+                        printf("%s_protocol=%s\n", vip_name, protocol);
+                }
+        '
+}

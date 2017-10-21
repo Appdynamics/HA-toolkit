@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: numa-patch-controller.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: numa-patch-controller.sh 3.13 2017-10-21 00:47:23 rob.navarro $
 #
 # patch the controller.sh script to enable numa support
 #
@@ -57,7 +57,7 @@ fi
 #
 # check if controller.sh has mysqld_safe numa-ized
 #
-while grep "^[[:space:]]*bin/mysqld_safe" $CONTR_TMP;  do
+while grep -q "^[[:space:]]*bin/mysqld_safe" $CONTR_TMP;  do
 	ex -s $CONTR_TMP <<- ADDMYSQL
 	/^[[:space:]]*bin\/mysqld_safe
 	i
