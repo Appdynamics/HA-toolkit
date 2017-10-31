@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.26 2017-10-21 00:47:23 rob.navarro $
+# $Id: lib/ha.sh 3.27 2017-10-30 14:58:31 rob.navarro $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -35,9 +35,9 @@ function getpw {
 	while [[ "$inpw1" != "$inpw2" ]] ; do
 		prompt="Enter MySQL root password: "
 		inpw1=''
-		while read -p "$prompt" -r -s -n1 pwch ; do 
+		while IFS= read -p "$prompt" -r -s -n1 pwch ; do 
 			if [[ -z "$pwch" ]]; then 
-				echo > /dev/tty
+				[[ -t 0 ]] && echo 
 				break 
 			else 
 				prompt='*'
@@ -47,9 +47,9 @@ function getpw {
 
 		prompt="re-enter same password: "
 		inpw2=''
-		while read -p "$prompt" -r -s -n1 pwch ; do 
+		while IFS= read -p "$prompt" -r -s -n1 pwch ; do 
 			if [[ -z "$pwch" ]]; then 
-				echo > /dev/tty
+				[[ -t 0 ]] && echo
 				break 
 			else 
 				prompt='*'
@@ -79,7 +79,7 @@ function save_mysql_passwd {
 	local rootpw_obf="$APPD_ROOT/db/.rootpw.obf"
 
 	getpw __inpw1 || exit 1		# updates __inpw1 *ONLY* if global variable
-	obf=$(obfuscate $__inpw1) || exit 1
+	obf=$(obfuscate "$__inpw1") || exit 1
 	echo $obf > $rootpw_obf || fatal "$thisfn: failed to save obfuscated passwd to $rootpw_obf"
 	chmod 600 $rootpw_obf || warn "$thisfn: failed to make $rootpw_obf readonly"
 }

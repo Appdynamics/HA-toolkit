@@ -63,8 +63,8 @@ fi
 
 function log {
 	local out
-	if [[ -t 0 ]] ; then
-		out=/dev/tty
+	if [[ -t 1 ]] ; then
+		out=/dev/stdout
 	else
 		out=/dev/null
 	fi
@@ -82,7 +82,7 @@ function warn {
 	logmsg "$@"
 }
 
-# output to /dev/tty only - no log file entry
+# output to /dev/stderr only - no log file entry
 function gripe {
 	local out=/dev/stderr	# otherwise why gripe?
 
@@ -95,8 +95,8 @@ function logmsg {
 
 function message {
 	local out
-	if [[ -t 0 ]] ; then
-		out=/dev/tty
+	if [[ -t 1 ]] ; then
+		out=/dev/stdout
 	else
 		out=/dev/null
 	fi
@@ -149,5 +149,5 @@ function debug
 {
    while read -p '?dbg> ' L ; do
       eval "$L"
-   done < /dev/tty
+   done < /dev/stdin
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/runuser.sh 3.18 2017-10-21 00:47:23 rob.navarro $
+# $Id: lib/runuser.sh 3.19 2017-10-30 14:58:31 rob.navarro $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -57,10 +57,23 @@ function get_runuser {
 		echo "ERROR: ${FUNCNAME[0]}: APPD_ROOT is not set. This is a coding bug! " >&2
 		exit 1
 	fi
-	if ! awk -F= '$1 ~ /^[[:space:]]*user$/ {print $2}' $APPD_ROOT/db/db.cnf ; then
+	local euser RETC
+	euser=$(awk -F= '$1 ~ /^[[:space:]]*user$/ {print $2}' $APPD_ROOT/db/db.cnf)
+	RETC=$?
+
+	if (( $RETC != 0 )) ; then
 		echo "ERROR: ${FUNCNAME[0]}: APPD_ROOT is not set correctly." >&2
 		exit 1
 	fi
+	if [[ -z "$euser" ]] ; then
+		if grep -q user=  $APPD_ROOT/db/db.cnf &>/dev/null; then
+			echo "ERROR: ${FUNCNAME[0]}: your awk version needs upgrading. Please install gawk." >&2
+		else
+			echo "ERROR: ${FUNCNAME[0]}: $APPD_ROOT/db/db.cnf is not valid MySQL config - missing user=... option." >&2
+		fi
+		exit 1
+	fi
+	echo $euser
 }
 
 if [[ -z "$RUNUSER" ]] ; then

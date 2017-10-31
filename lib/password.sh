@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/password.sh 3.11 2017-03-03 00:28:47 cmayer $
+# $Id: lib/password.sh 3.12 2017-10-30 14:58:31 rob.navarro $
 #
 # passwordfunctions.sh
 # contains common code used by the HA toolkit
@@ -127,8 +127,8 @@ function obfuscate {
 		data=$1
 	fi
 	case $otype in
-		ofa1 | '' )	obf_ofa1 $data ;;	# default case
-		ofa2)		obf_ofa2 $data ;;
+		ofa1 | '' )	obf_ofa1 "$data" ;;	# default case
+		ofa2)		obf_ofa2 "$data" ;;
 		*)		abend "unknown obfuscation type \"$otype\"" ;;
 	esac
 }

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: watchdog.sh 3.19 2017-05-11 17:54:49 cmayer $
+# $Id: watchdog.sh 3.20 2017-10-30 21:46:31 rob.navarro $
 #
 # watchdog.sh
 # run on the passive node, fail over if we see the primary is very sick
@@ -328,8 +328,8 @@ function poll {
 
 		#
 		# then, is the primary database up listening
-		#
-		if ssh $primary $MYSQLADMIN --host=localhost "${CONNECT[@]}" ping >/dev/null 2>&1 ; then
+		# (use <<< "$dbpasswd" to allow for spaces in password)
+		if ssh $primary $MYSQLADMIN "${ACONNECT[@]}" ping <<< "$dbpasswd" &>/dev/null; then
 			dbfail=0
 		else
 			dbopfail=0

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdynamics-machine-agent.sh 3.26 2017-10-21 00:45:29 rob.navarro $
+# $Id: appdynamics-machine-agent.sh 3.27 2017-10-30 14:58:00 rob.navarro $
 #
 # /etc/init.d/appdynamics-machine-agent
 #
@@ -83,7 +83,8 @@ function start() {
     mkdir -p /var/lock/subsys
 	rm -f $pidfile
 
-	pid=`bg_runuser $JAVA $JAVA_OPTS -jar $MACHINE_AGENT_HOME/machineagent.jar`
+	# place every machine agent in its own process session to simplify killing it later
+	pid=`bg_runuser setsid $JAVA $JAVA_OPTS -jar $MACHINE_AGENT_HOME/machineagent.jar`
 	echo $pid > $pidfile
     touch $lockfile
 }

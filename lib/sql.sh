@@ -1,5 +1,5 @@
 #
-# $Id: lib/sql.sh 3.20 2017-06-02 15:12:22 cmayer $
+# $Id: lib/sql.sh 3.21 2017-10-30 15:23:44 rob.navarro $
 #
 # run sql statements
 # potentially logging, potentially with timeouts,
@@ -28,6 +28,7 @@ dbport=${dbport:-`dbcnf_get port`}
 MYSQL="$APPD_ROOT/db/bin/mysql"
 MYSQLADMIN="$APPD_ROOT/db/bin/mysqladmin"
 CONNECT=(--protocol=TCP --user=root --port=$dbport)
+ACONNECT=(--host=localhost ${CONNECT[@]})		# mysqladmin specific without dbpasswd
 
 if [ ! -f $APPD_ROOT/db/.mylogin.cnf ] ; then
 	dbpasswd=${dbpasswd:-`get_mysql_passwd`}
@@ -77,7 +78,7 @@ function sql {
 	rm -f $DELFILES
 
 	if [ "$1" == localhost ] ; then
-		COMMAND=($MYSQL -BE --host=localhost ${CONNECT[@]} controller)
+		COMMAND=($MYSQL -BE --host=localhost "${CONNECT[@]}" controller)
 	else
 		COMMAND=(ssh $1 $APPD_ROOT/HA/mysqlclient.sh)
 	fi

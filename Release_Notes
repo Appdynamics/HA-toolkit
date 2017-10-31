@@ -603,3 +603,12 @@ Release notes for version 3.27
    used to start or stop Glassfish which then prevents successful startup by
    subsequent non-root userid. Instructions are provided on how to fix the issue
    if it is detected.
+
+--------------------------------------
+Release notes for version 3.27.1
+
+1) catch out of date awk that silently ignores character classes (usually Debian issue)
+
+2) allow spaces within MySQL root password
+
+3) fix bug in "service appdynamics-machine-agent stop" that sometimes killed a running ./replicate.sh
