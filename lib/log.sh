@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: log.sh 3.3 2016-12-05 14:36:20 cmayer $
+# $Id: lib/log.sh 3.4 2017-11-03 10:30:54 rob.navarro $
 #
 # logging code for the HA toolkit - include this first
 #
@@ -62,14 +62,11 @@ else
 fi
 
 function log {
-	local out
 	if [[ -t 1 ]] ; then
-		out=/dev/stdout
+		pwmask | tee -a $LOGFILE
 	else
-		out=/dev/null
+		pwmask >> $LOGFILE
 	fi
-
-	pwmask | tee -a $LOGFILE > $out
 }
 
 function logonly {
@@ -82,11 +79,9 @@ function warn {
 	logmsg "$@"
 }
 
-# output to /dev/stderr only - no log file entry
+# output to STDERR only - no log file entry
 function gripe {
-	local out=/dev/stderr	# otherwise why gripe?
-
-	echo "$@" > $out
+	echo "$@" >&2
 }
 
 function logmsg {
@@ -94,14 +89,10 @@ function logmsg {
 }
 
 function message {
-	local out
 	if [[ -t 1 ]] ; then
-		out=/dev/stdout
-	else
-		out=/dev/null
+		echo "  -- " "$@"
 	fi
 
-	echo "  -- " "$@" > $out
 	logmsg "$@"
 }
 

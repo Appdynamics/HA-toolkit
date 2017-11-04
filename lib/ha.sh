@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.27 2017-10-30 14:58:31 rob.navarro $
+# $Id: lib/ha.sh 3.28 2017-11-03 18:11:53 rob.navarro $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -163,7 +163,8 @@ function find_machine_agent {
 }
 
 # output all the names and aliases on the input /etc/hosts file for the current
-# hostname
+# hostname which starts with current hostname e.g. for hostname = serv01 it will match
+# /etc/hosts entries for serv01.x.y or a.serv01.y.z or serv01
 function get_names {
    (( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <hostname>"
    local host=$1
@@ -172,7 +173,7 @@ function get_names {
    BEGIN	{ IGNORECASE = 1 }
    $1 ~ /^[[:space:]]*#/ {next} 
    $1 ~ /^127.0./ {next} 
-   $1 ~ /[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/ && $0 ~ /'$host'/ {for (i=2; i <= NF; ++i) print $i}'
+   $1 ~ /[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+\.[[:digit:]]+$/ && $0 ~ /\y'$host'\y/ {for (i=2; i <= NF; ++i) print $i}'
 }
 export -f get_names
 
@@ -213,12 +214,30 @@ function check_ssh_setup {
    fi
    rm -f $OUT $ERR
 
-   local mynames=$(cat /etc/hosts | get_names $myhost)
-   local othernames=$(ssh -o StrictHostKeyChecking=no $otherhost cat /etc/hosts | get_names $otherhost)
-   if [[ -z "$othernames" ]] ; then
+   local myhosts=$(< /etc/hosts)
+   if [[ -z "$myhosts" ]] ; then
+      message "ssh Test-0: $myhost unable to read /etc/hosts. Please fix and re-try"
+      return 4
+   fi
+
+   local mynames=$(get_names $myhost <<< "$myhosts" | sort -ur)
+   if [[ -z "$mynames" ]] ; then
+      message "ssh Test-0: $myhost unable to find any /etc/hosts entries for itself. Skipping test..."
+      return 0
+   fi
+
+   local otherhosts=$(ssh -o StrictHostKeyChecking=no $otherhost cat /etc/hosts)
+   if [[ -z "$otherhosts" ]] ; then
       message "ssh Test-0: $myhost unable to cat /etc/hosts on $otherhost. Please fix and re-try"
       return 4
    fi
+
+   local othernames=$(get_names $otherhost <<< "$otherhosts")
+   if [[ -z "$othernames" ]] ; then
+      message "ssh Test-0: $otherhost unable to find any /etc/hosts entries for itself. Skipping test..."
+      return 0
+   fi
+
    # now check that all names for current hostname can make passwordless ssh call to all names
    # for $otherhost and vice-versa
    for i in $mynames ; do

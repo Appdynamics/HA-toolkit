@@ -612,3 +612,12 @@ Release notes for version 3.27.1
 2) allow spaces within MySQL root password
 
 3) fix bug in "service appdynamics-machine-agent stop" that sometimes killed a running ./replicate.sh
+
+--------------------------------------
+Release notes for version 3.27.2
+
+1) patch release to prevent ssh checks from failing replicate if /etc/hosts does
+   not contain any host information
+
+2) remove references to symbolic links /dev/stdout or /dev/stderr and avoid errors
+   with some sudo use cases
