@@ -621,3 +621,8 @@ Release notes for version 3.27.2
 
 2) remove references to symbolic links /dev/stdout or /dev/stderr and avoid errors
    with some sudo use cases
+
+--------------------------------------
+Release notes for version 3.27.3
+
+1) check for bad file ownership caused annoying awk error '[:space:]' on some systems

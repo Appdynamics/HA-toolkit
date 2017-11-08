@@ -28,7 +28,7 @@
 
 # assume intended effective user name is that which was set during installation and
 # saved away within the ${INSTALL_DIR}/db/db.cnf file under the "user" option
-INSTALL_USER=$(awk -F= '$1 ~ /^[:space:]*user/ {print $2}' ${INSTALL_DIR}/db/db.cnf)
+INSTALL_USER=$(awk -F= '$1 ~ /^\s*user/ {print $2}' ${INSTALL_DIR}/db/db.cnf)
 if [ -z "${INSTALL_USER}" ] ; then  
    INSTALL_USER=UNKNOWN_APPD_USER
 fi
