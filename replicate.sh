@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.27 2017-10-21 00:47:23 rob.navarro $
+# $Id: replicate.sh 3.28 2017-11-14 20:51:23 rob.navarro $
 #
 # install HA to a controller pair
 #
@@ -1104,29 +1104,81 @@ fi
 if $wildcard ; then
 	grant_primary='%'
 	grant_secondary='%'
+	grant_primary_users="'controller_repl'@'${grant_primary}' IDENTIFIED BY 'controller_repl'"
+	grant_secondary_users="'controller_repl'@'${grant_secondary}' IDENTIFIED BY 'controller_repl'"
 else
 	#
 	# Use all /etc/hosts names for both primary and secondary for MySQL GRANT commands - 
 	# more robust in the event that /etc/hosts has missing fully qualified names on one
 	# host or other /etc/hosts inconsistencies between HA nodes
+	# Add to this list the FQDN that MySQL may be able to lookup.
 	#
 	grant_primary=$(get_names $(hostname) < /etc/hosts)
+	if [[ -z "$grant_primary" ]] ; then
+		gripe "Local /etc/hosts does not appear to contain an entry for current hostname: $(hostname)"
+		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"
+		grant_primary=$(hostname)
+	fi
 	grant_secondary=$(ssh -o StrictHostKeyChecking=no $secondary cat /etc/hosts | get_names $secondary)
+	if [[ -z "$grant_secondary" ]] ; then
+		gripe "Secondary /etc/hosts does not appear to contain an entry for its hostname: $secondary"
+		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"
+		grant_secondary=$secondary
+	fi
 
-	# prepare comma separated user string for upcoming SQL grant command 
+	#
+	# let's probe the canonical hostnames from the local database in case this results in different
+	# hostname for MySQL to permit connections from
+	#
+	primary1=`$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
+		/ERROR 1045/ { gsub("^.*@",""); print $1;}
+		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
+	secondary1=`ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
+		/ERROR 1045/ { gsub("^.*@",""); print $1;}
+		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
+
+	#
+	# print the canonical hostnames
+	#
+	if [ "$primary1" = 'ERROR' -o "$secondary1" = 'ERROR' -o -z "$primary1" -o -z "$secondary1" ] ; then
+		gripe "cannot establish communications between mysql instances"
+		gripe "check firewall rules"
+		gripe "primary: $primary1"
+		gripe "secondary: $secondary1"
+		$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | log
+		ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | log
+		fatal 5
+	fi
+	[[ "$primary1" == "localhost" ]] && primary1=""		# lose this contribution if just localhost
+	[[ "$secondary1" == "localhost" ]] && secondary1=""	# lose this contribution if just localhost
+
+	# unique list of hostnames - they might not be reachable though...
+	grant_primary_unique_hosts=$(sort -u <<< "$(printf '%s\n' $grant_primary $primary1)")
+	grant_secondary_unique_hosts=$(sort -u <<< "$(printf '%s\n' $grant_secondary $secondary1)")
+
+	# verify_no_shared_names "$grant_primary_unique_hosts" "$grant_secondary_unique_hosts" || exit 1
+	for i in $grant_primary_unique_hosts ; do
+		for j in $grant_secondary_unique_hosts ; do
+			if [[ "$i" == "$j" ]] ; then
+				fatal 5 "The HA servers share a common hostname or alias '$i'. Please fix this and re-run."
+			fi
+		done
+	done
+
+	# prepare comma separated user string for upcoming SQL grant command - duplicate hosts removed
 	# e.g. 'controller_repl'@'host1','controller_repl'@'host1alias'
-	for i in $grant_primary ; do
+	for i in $grant_primary_unique_hosts; do
 		primary_user_arr+=("'controller_repl'@'$i' IDENTIFIED BY 'controller_repl'")
 	done
-	grant_primary_users=$(IFS=,; echo "${primary_user_arr[*]}")
-	for i in $grant_secondary ; do
+	grant_primary_users=$(IFS=,; echo "${primary_user_arr[*]}")		# comma separate
+	for i in $grant_secondary_unique_hosts; do
 		secondary_user_arr+=("'controller_repl'@'$i' IDENTIFIED BY 'controller_repl'")
 	done
-	grant_secondary_users=$(IFS=,; echo "${secondary_user_arr[*]}")
+	grant_secondary_users=$(IFS=,; echo "${secondary_user_arr[*]}")		# comma separate
 fi
 
-message "primary: $primary grant to: $grant_primary"
-message "secondary: $secondary grant to: $grant_secondary"
+message "primary: $primary grant to: "$grant_primary_unique_hosts
+message "secondary: $secondary grant to: "$grant_secondary_unique_hosts
 
 #
 # do all the setup needed for ssl; db.cnf and cert creation
@@ -1411,10 +1463,10 @@ if [ -f $APPD_ROOT/license.lic.$primary ] ; then
 fi
 
 if [ $lic -lt $copy_lic ] ; then
-	message "using newer $license.lic.$primary"
+	message "using newer license.lic.$primary"
 	cp $APPD_ROOT/license.lic.$primary $APPD_ROOT/license.lic
 elif [ $lic -ne 0 ] ; then
-	message "saving license to $license.lic.$primary"
+	message "saving license to license.lic.$primary"
 	cp $APPD_ROOT/license.lic $APPD_ROOT/license.lic.$primary
 else
 	message "no primary license file"

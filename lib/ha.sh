@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.28 2017-11-03 18:11:53 rob.navarro $
+# $Id: lib/ha.sh 3.29 2017-11-14 20:51:13 rob.navarro $
 #
 # ha.sh
 # contains common code used by the HA toolkit
@@ -204,44 +204,46 @@ function check_ssh_setup {
    timeout 2s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' pwd' >$OUT 2>$ERR
    retc=$?
    if (( $retc != 0 )) ; then
-      message "ssh Test-0: $myhost unable to reach $otherhost: $(<$ERR)"
+      gripe "ssh Test-0: $myhost unable to reach $otherhost: $(<$ERR)"
       return 2
    fi
    local pattern='^/.*'
    if [[ ! "$(<$OUT)" =~ $pattern ]] ; then
-       message "ssh Test-0: $myhost unable to run 'pwd' on $otherhost: $(<$ERR). Please fix and re-try"
+       gripe "ssh Test-0: $myhost unable to run 'pwd' on $otherhost: $(<$ERR). Please fix and re-try"
        return 3
    fi
    rm -f $OUT $ERR
 
    local myhosts=$(< /etc/hosts)
    if [[ -z "$myhosts" ]] ; then
-      message "ssh Test-0: $myhost unable to read /etc/hosts. Please fix and re-try"
+      gripe "ssh Test-0: $myhost unable to read /etc/hosts. Please fix and re-try"
       return 4
    fi
 
    local mynames=$(get_names $myhost <<< "$myhosts" | sort -ur)
    if [[ -z "$mynames" ]] ; then
-      message "ssh Test-0: $myhost unable to find any /etc/hosts entries for itself. Skipping test..."
+      gripe "ssh Test-0: $myhost unable to find any /etc/hosts entries for itself."
+      gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...Skipping test"
       return 0
    fi
 
    local otherhosts=$(ssh -o StrictHostKeyChecking=no $otherhost cat /etc/hosts)
    if [[ -z "$otherhosts" ]] ; then
-      message "ssh Test-0: $myhost unable to cat /etc/hosts on $otherhost. Please fix and re-try"
+      gripe "ssh Test-0: $myhost unable to cat /etc/hosts on $otherhost. Please fix and re-try"
       return 4
    fi
 
    local othernames=$(get_names $otherhost <<< "$otherhosts")
    if [[ -z "$othernames" ]] ; then
-      message "ssh Test-0: $otherhost unable to find any /etc/hosts entries for itself. Skipping test..."
+      gripe "ssh Test-0: $otherhost unable to find any /etc/hosts entries for itself."
+      gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...Skipping test"
       return 0
    fi
 
    # now check that all names for current hostname can make passwordless ssh call to all names
    # for $otherhost and vice-versa
-   for i in $mynames ; do
-      for j in $othernames ; do
+   for i in $(sort -u <<< "$(printf '%s\n' $mynames)") ; do
+      for j in $(sort -u <<< "$(printf '%s\n' $othernames)") ; do
          do_check_ssh_setup $i $j || return $?
       done
    done

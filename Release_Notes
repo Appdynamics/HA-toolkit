@@ -626,3 +626,10 @@ Release notes for version 3.27.2
 Release notes for version 3.27.3
 
 1) check for bad file ownership caused annoying awk error '[:space:]' on some systems
+
+--------------------------------------
+Release notes for version 3.27.4
+
+1) patch release to fix broken wildcard -W option
+
+2) extra sanity checks to catch /etc/hosts errors
