@@ -633,3 +633,8 @@ Release notes for version 3.27.4
 1) patch release to fix broken wildcard -W option
 
 2) extra sanity checks to catch /etc/hosts errors
+
+--------------------------------------
+Release notes for version 3.27.5
+
+1) patch release to ensure text for fatal errors get logged

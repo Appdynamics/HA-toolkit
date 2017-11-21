@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/log.sh 3.4 2017-11-03 10:30:54 rob.navarro $
+# $Id: lib/log.sh 3.5 2017-11-21 10:21:04 rob.navarro $
 #
 # logging code for the HA toolkit - include this first
 #
@@ -105,6 +105,7 @@ function abend {
 	local level=0
 
 	gripe "$@"
+	logmsg "$@"
 	echo "exit code $exitcode" | log
 	echo "backtrace: " | log
 	for func in ${FUNCNAME[*]} ; do
@@ -121,6 +122,7 @@ function fatal {
 	local exitcode=$1
 	shift
 	gripe "$@"
+	logmsg "$@"
 	gripe "exit code $exitcode"
 	kill -INT $$
 	exit $exitcode
