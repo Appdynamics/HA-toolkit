@@ -22,7 +22,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 
-LOGNAME=save_mysql_passwd.log
+LOGFNAME=save_mysql_passwd.log
 
 . lib/log.sh
 . lib/ha.sh

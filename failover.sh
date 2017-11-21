@@ -26,7 +26,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 
-LOGNAME=failover.log
+LOGFNAME=failover.log
 
 # source function libraries
 . lib/log.sh

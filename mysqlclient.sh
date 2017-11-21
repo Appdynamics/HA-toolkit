@@ -24,7 +24,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 
-LOGNAME=mysqlclient.log
+LOGFNAME=mysqlclient.log
 
 # source function libraries
 . lib/log.sh

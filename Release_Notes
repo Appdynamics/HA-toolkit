@@ -638,3 +638,8 @@ Release notes for version 3.27.4
 Release notes for version 3.27.5
 
 1) patch release to ensure text for fatal errors get logged
+
+--------------------------------------
+Release notes for version 3.27.6
+
+1) patch release to ensure install-init.sh logs appear

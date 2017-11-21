@@ -29,7 +29,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 
-LOGNAME=replicate.log
+LOGFNAME=replicate.log
 
 # source function libraries
 . lib/log.sh

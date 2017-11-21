@@ -4,7 +4,7 @@
 #
 # logging code for the HA toolkit - include this first
 #
-# all use the global LOGNAME
+# all use the global LOGFNAME
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -40,8 +40,8 @@ if [ -z "$APPD_ROOT" ] ; then
 	APPD_ROOT=$(get_appd_root) || exit 1
 fi
 
-if [[ -z "$LOGNAME" ]] ; then
-   echo "ERROR: ${FUNCNAME[0]}: LOGNAME variable is not set. This is a coding bug!" >&2
+if [[ -z "$LOGFNAME" ]] ; then
+   echo "ERROR: ${FUNCNAME[0]}: LOGFNAME variable is not set. This is a coding bug!" >&2
    exit 1
 fi
 
@@ -54,11 +54,11 @@ function pwmask {
 
 # Init processes at startup should not log into $APPD_ROOT as generally that is
 # reserved for $RUNUSER EUID processes. Instead will send output elsewhere by
-# assigning full path instead of just filename to LOGNAME
-if [[ "${LOGNAME:0:1}" != "/" ]] ; then
-	LOGFILE=$APPD_ROOT/logs/$LOGNAME	# caller needs path adding
+# assigning full path instead of just filename to LOGFNAME
+if [[ "${LOGFNAME:0:1}" != "/" ]] ; then
+	LOGFILE=$APPD_ROOT/logs/$LOGFNAME	# caller needs path adding
 else
-	LOGFILE=$LOGNAME			# assume caller wants specific path
+	LOGFILE=$LOGFNAME			# assume caller wants specific path
 fi
 
 function log {

@@ -66,10 +66,10 @@ fi
 LIMITS=/etc/security/limits.d/appdynamics.conf
 
 # pathname for log output - insisting on output to /tmp
-LOGNAME="/tmp/$(T=${0##*/}; echo ${T%.*}).log"
+LOGFNAME="/tmp/$(T=${0##*/}; echo ${T%.*}).log"
 
 # For security reasons, locally embed/include function library at HA.shar build time
-embed lib/log.sh		# require LOGNAME to be set
+embed lib/log.sh		# require LOGFNAME to be set
 embed lib/password.sh
 embed lib/runuser.sh
 embed lib/init.sh

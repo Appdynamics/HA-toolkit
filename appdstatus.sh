@@ -22,7 +22,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 
-LOGNAME=status.log
+LOGFNAME=status.log
 
 . lib/log.sh
 . lib/runuser.sh

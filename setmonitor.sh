@@ -24,7 +24,7 @@ export PATH=/bin:/usr/bin:/sbin:/usr/sbin
 
 cd $(dirname $0)
 
-LOGNAME=setmonitor.log
+LOGFNAME=setmonitor.log
 need_secure_cred_store=false
 
 # source function libraries

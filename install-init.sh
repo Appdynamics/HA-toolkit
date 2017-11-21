@@ -34,7 +34,7 @@ function usage {
 
 APPD_ROOT=`readlink -e ..`
 
-LOGFILE=$APPD_ROOT/logs/install-init.log
+LOGFNAME=install-init.log
 
 PBRUN_PLACES="/usr/local/bin/pbrun /usr/bin/pbrun"
 PBRUN=

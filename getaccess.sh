@@ -25,7 +25,7 @@ APPD_ROOT=`readlink -e ..`
 account=system
 host=localhost
 
-LOGNAME=getaccess.log
+LOGFNAME=getaccess.log
 
 . lib/log.sh
 . lib/runuser.sh

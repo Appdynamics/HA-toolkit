@@ -62,7 +62,7 @@ if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
 fi
 
 # pathname for log output - insisting on output to /tmp
-LOGNAME="/tmp/$(T=${0##*/}; echo ${T%.*}).log"
+LOGFNAME="/tmp/$(T=${0##*/}; echo ${T%.*}).log"
 
 # For security reasons, locally embed/include function library at HA.shar build time
 embed lib/runuser.sh
