@@ -207,6 +207,13 @@ while [ -f $WATCHDOG_PIDFILE ] ; do
 done
 
 #
+# call the user pre-hook if one exists - this is a place to turn off old things
+#
+if [ -x ./failover_pre_hook.sh ] ; then
+	./failover_pre_hook.sh
+fi
+
+#
 # kill the local appserver if it's running
 #
 message "Kill Local Appserver"
@@ -340,6 +347,14 @@ If unsure, safest way to re-enable replication is to perform full
 replication using replicate.sh -f option to re-establish HA
 MESSAGE
 
+fi
+
+#
+# call the user hook if one exists - this is a good place to revector a proxy
+# or call an API to change DNS, if we want to do that kind of thing
+#
+if [ -x ./failover_hook.sh ] ; then
+	./failover_hook.sh
 fi
 
 #
