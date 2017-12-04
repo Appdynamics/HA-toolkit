@@ -28,7 +28,7 @@ dbport=${dbport:-`dbcnf_get port`}
 MYSQL="$APPD_ROOT/db/bin/mysql"
 MYSQLADMIN="$APPD_ROOT/db/bin/mysqladmin"
 CONNECT=(--protocol=TCP --user=root --port=$dbport)
-ACONNECT=(--host=localhost ${CONNECT[@]})		# mysqladmin specific without dbpasswd
+ACONNECT=(--host=localhost -p ${CONNECT[@]})		# mysqladmin specific without dbpasswd
 
 if [ ! -f $APPD_ROOT/db/.mylogin.cnf ] ; then
 	dbpasswd=${dbpasswd:-`get_mysql_passwd`}

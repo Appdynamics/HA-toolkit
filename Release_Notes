@@ -644,7 +644,6 @@ Release notes for version 3.27.6
 
 1) patch release to ensure install-init.sh logs appear
 
-
 --------------------------------------
 Release notes for version 3.28
 
@@ -653,3 +652,7 @@ Release notes for version 3.28
    directory will cause that file to be run after before failover on the new
    primary. 
 
+--------------------------------------
+Release notes for version 3.28.1
+
+1) fixed missing LOGFNAME for noroot use case

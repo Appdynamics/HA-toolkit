@@ -38,6 +38,10 @@ if [ -f $APPD_ROOT/HA/INITDEBUG ] ; then
     set -x
 fi
 
+# Usually this script is called by replicate.sh and so LOGFNAME is assigned.
+# But as this script can be called standalone, we need to assign LOGFNAME if not already set.
+[[ -n "$LOGFNAME" ]] || LOGFNAME=appdservice-noroot.log
+
 . lib/log.sh
 . lib/runuser.sh
 . lib/password.sh
