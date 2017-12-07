@@ -90,6 +90,17 @@ authorized_keys file.  in detail, assuming user appduser, node1 and node2
 All of the above commands may not be needed, and some of them may prompt for a
 password.
 
+Permissions need to be as below:
+
+    chmod 700 .ssh
+    chmod 644 .ssh/id_rsa.pub
+    chmod 600 .ssh/id_rsa
+    chmod 600 .ssh/authorized_keys
+
+To check if the passwordless ssh succeeds test it with the command below.
+
+ssh -oNumberOfPasswordPrompts=0 other_node "echo success"
+
 	2) reliable symmetrical reverse host lookup must be configured.  the best
 way is to place the host names into each /etc/hosts file.   reverse DNS adds 
 an additional point of failure.  
