@@ -656,3 +656,10 @@ Release notes for version 3.28
 Release notes for version 3.28.1
 
 1) fixed missing LOGFNAME for noroot use case
+
+--------------------------------------
+Release notes for version 3.28.2
+
+1) fixed missing application name for internal monitoring when there is a space in the application name
+
+2) fixed setting appdynamics.controller.services.hostName and appdynamics.controller.services.port to external VIP host and port respectively

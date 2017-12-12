@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.28 2017-11-14 20:51:23 rob.navarro $
+# $Id: replicate.sh 3.28.2 2017-12-12 11:29:00 saradhi.potharaju $
 #
 # install HA to a controller pair
 #
@@ -1042,12 +1042,9 @@ if ! $hotsync ; then
 		message "edit domain.xml deeplink"
 		domain_set_jvm_option appdynamics.controller.ui.deeplink.url \
 			"$external_vip_protocol://$external_vip_host:$external_vip_port/controller"
-	fi
-
-	if [ -n "$internal_vip_host" ] ; then
 		message "set services host and port"
-		domain_set_jvm_option appdynamics.controller.services.hostName $internal_vip_host
-		domain_set_jvm_option appdynamics.controller.services.port $internal_vip_port
+		domain_set_jvm_option appdynamics.controller.services.hostName $external_vip_host
+		domain_set_jvm_option appdynamics.controller.services.port $external_vip_port
 	fi
 fi
 
@@ -1092,7 +1089,7 @@ if [ -n "$machine_agent" ] ; then
 	ma_def_flag="-a"
 	ma_def="$machine_agent"
 fi
-./setmonitor.sh -s $secondary $monitor_def_flag $monitor_def $ma_def_flag $ma_def -i $internal_vip
+./setmonitor.sh -s $secondary -i $internal_vip "$monitor_def_flag" "$monitor_def" "$ma_def_flag" "$ma_def"
 
 if $debug ; then
 	message "building file lists"
