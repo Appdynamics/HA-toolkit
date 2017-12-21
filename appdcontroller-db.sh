@@ -159,7 +159,7 @@ function set_limits {
 		if [ ! -f $pam ] ; then 
 			continue
 		fi
-		if grep -Eq "^\s*session\s+required\s+pam_limits\.so" $pam ; then
+		if ! grep -Eq "^\s*session\s+required\s+pam_limits\.so" $pam ; then
 			echo "session required	pam_limits.so" >> $pam
 			break
 		fi
