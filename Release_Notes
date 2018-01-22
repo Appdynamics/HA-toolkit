@@ -663,3 +663,10 @@ Release notes for version 3.28.2
 1) fixed missing application name for internal monitoring when there is a space in the application name
 
 2) fixed setting appdynamics.controller.services.hostName and appdynamics.controller.services.port to external VIP host and port respectively
+
+--------------------------------------
+Release notes for version 3.28.3
+
+1) fixed minor bug that kept adding rows to /etc/pam.d/common-session
+
+2) removed '-l' option to su that does full login setup for process that conflicted with environments with stty in startup scripts or fell foul of RH 7.4 security preventing functional users from doing su -l during ssh call.

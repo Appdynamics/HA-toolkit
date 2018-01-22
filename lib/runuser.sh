@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/runuser.sh 3.19 2017-10-30 14:58:31 rob.navarro $
+# $Id: lib/runuser.sh 3.20 2018-01-21 22:10:49 rob.navarro $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -102,15 +102,15 @@ if [[ `id -un` == "$RUNUSER" ]] ; then
 else
         function bg_runuser {
 #               echo "$* >/dev/null & echo \$! ; disown" | su -s /bin/bash $RUNUSER
-		su -s /bin/bash -l ${RUNUSER:-unset_runuser} -c "$* &>> ${logfile:-/dev/null} </dev/null & echo \$! ; disown"
+		su -s /bin/bash ${RUNUSER:-unset_runuser} -c "$* &>> ${logfile:-/dev/null} </dev/null & echo \$! ; disown"
         }
         function run_mysql {
 #               su -s $MYSQLCLIENT $RUNUSER
-                su -s /bin/bash -l ${RUNUSER:-unset_runuser} -c $MYSQLCLIENT
+                su -s /bin/bash ${RUNUSER:-unset_runuser} -c $MYSQLCLIENT
         }
         function runuser {
 #               echo "$*" | su -s /bin/bash $RUNUSER
-                su -s /bin/bash -l ${RUNUSER:-unset_runuser} -c "$*"
+                su -s /bin/bash ${RUNUSER:-unset_runuser} -c "$*"
         }
 fi
 export -f runuser bg_runuser run_mysql
