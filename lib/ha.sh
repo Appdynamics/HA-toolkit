@@ -201,7 +201,7 @@ function check_ssh_setup {
    # suffers a slight chicken and egg problem as we need /etc/hosts of $otherhost
    # but have not established that ssh to secondary works yet... hence initial
    # test
-   timeout 2s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' pwd' >$OUT 2>$ERR
+   timeout 9s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' pwd' >$OUT 2>$ERR
    retc=$?
    if (( $retc != 0 )) ; then
       gripe "ssh Test-0: $myhost unable to reach $otherhost: $(<$ERR)"
@@ -260,7 +260,7 @@ function do_check_ssh_setup {
    touch $ERR && [[ -w $ERR ]] || abend "${FUNCNAME[0]}: unable to write to $ERR"
 
    # Test-1: check whether possible to reach $otherhost with ssh - fingerprint known or not
-   timeout 2s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' echo $(id -un):$(id -gn)' >$OUT 2>$ERR
+   timeout 9s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' echo $(id -un):$(id -gn)' >$OUT 2>$ERR
    retc=$?
    if (( $retc != 0 )) ; then
       message "ssh Test-1: $myhost unable to reach $otherhost: $(<$ERR)"
@@ -272,7 +272,7 @@ function do_check_ssh_setup {
    fi
 
    # Test-3: check whether otherhost can reach me with ssh - fingerprint known or not
-   timeout 2s bash -c 'ssh '$otherhost' ssh -o StrictHostKeyChecking=no '$myhost' id -un' &> $ERR
+   timeout 9s bash -c 'ssh '$otherhost' ssh -o StrictHostKeyChecking=no '$myhost' id -un' &> $ERR
    retc=$?
    if (( $retc != 0 )) ; then
       message "ssh Test-3: $otherhost unable to reach $myhost: $(<$ERR)"
