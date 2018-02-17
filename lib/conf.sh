@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.26 2017-10-21 00:45:29 rob.navarro $
+# $Id: lib/conf.sh 3.27 2018-02-16 20:00:24 rob.navarro $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -308,6 +308,10 @@ function dbcnf_set {
 	fi
 	runuser $CP $DBCNF $IN
 	cp $IN $OUT
+
+	# patch odd failure case when file does not end with newline
+	# (idea from http://backreference.org/2010/05/23/sanitizing-files-with-no-trailing-newline/)
+	tail -c1 $OUT | read -r _ || echo >> $OUT
 
 	if grep -q "^[[:space:]]*$property\(=\|$\)" $IN ; then
 		if ! [ -z "$value" ] ; then

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/password.sh 3.12 2017-10-30 14:58:31 rob.navarro $
+# $Id: lib/password.sh 3.13 2018-02-16 20:00:37 rob.navarro $
 #
 # passwordfunctions.sh
 # contains common code used by the HA toolkit
@@ -155,13 +155,15 @@ export -f deobfuscate
 #    Do NOT persist to disk.
 # 2. respect $APPD_ROOT/db/.rootpw if present
 # 3. respect $APPD_ROOT/db/.rootpw.obf if present
-# 4. gripe, letting them know how to persist a password
+# 4. respect $APPD_ROOT/db/.mylogin.cnf if present and MYSQL_TEST_LOGIN_FILE defined
+# 5. gripe, letting them know how to persist a password
 #
 # Call as:
 #  dbpasswd=`get_mysql_passwd`
 function get_mysql_passwd {
 	local clear obf otype inpw2=' '
 	local rootpw="$APPD_ROOT/db/.rootpw" rootpw_obf="$APPD_ROOT/db/.rootpw.obf"
+	local mysqlpw="$APPD_ROOT/db/.mylogin.cnf"
 
 	if [[ -n "$MYSQL_ROOT_PASSWD" ]] ; then
 		echo $MYSQL_ROOT_PASSWD
@@ -175,11 +177,18 @@ function get_mysql_passwd {
 		[[ -n "$clear" ]] || \
 			fatal 2 "unable to deobfuscate passwd from $rootpw_obf"
 		echo $clear
+	elif [[ -s $mysqlpw && -n "$MYSQL_TEST_LOGIN_FILE" ]] ; then
+		clear=$(awk -F= '$1 ~ "word" {print $2}' <<< "$(../db/bin/my_print_defaults -s client)")
+		[[ -n "$clear" ]] || fatal 3 "unable to get passwd from $mysqlpw"
+		echo $clear
 	else
-		fatal 3 "no password in db/.rootpw, db/.rootpw.obf or MYSQL_ROOT_PASSWORD please run save_mysql_passwd.sh"
+		fatal 3 "no password in MYSQL_ROOT_PASSWORD, db/.rootpw, db/.rootpw.obf or db/.mylogin.cnf please run save_mysql_passwd.sh"
 	fi
 }
 export -f get_mysql_passwd
 
+# sneaky way to get MySQL toot: mysql_config_editor to write its encrypted .mylogin.cnf
+# to a place that is guaranteed to exist. Some clients have no writeable user home 
+# directory !
 export MYSQL_TEST_LOGIN_FILE=$APPD_ROOT/db/.mylogin.cnf
 

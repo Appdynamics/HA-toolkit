@@ -670,3 +670,13 @@ Release notes for version 3.28.3
 1) fixed minor bug that kept adding rows to /etc/pam.d/common-session
 
 2) removed '-l' option to su that does full login setup for process that conflicted with environments with stty in startup scripts or fell foul of RH 7.4 security preventing functional users from doing su -l during ssh call.
+
+--------------------------------------
+Release notes for version 3.28.4
+
+1. fixed ability of Toolkit to interoperate with MySQL v5.7 native password storage. 
+   Enable all stored password handling as usual with cd HA; ./save_mysql_passwd.sh
+
+2. patched db.cnf config updater to cope with missing newlines - sometimes emitted by EC
+
+3. excluded db/mysql.pid from replication to allow reliable MySQL shutdown on secondary

@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.28.2 2017-12-12 11:29:00 saradhi.potharaju $
+# $Id: replicate.sh 3.28.3 2018-02-16 20:00:50 rob.navarro $
 #
 # install HA to a controller pair
 #
@@ -815,7 +815,7 @@ runcmd ssh $secondary mkdir -p $datadir
 # do a permissive chmod on the entire destination
 #
 message "chmod destination"
-runcmd ssh $secondary "find $APPD_ROOT -type f -exec chmod +wr {} +"
+runcmd ssh $secondary "find $APPD_ROOT -type f -exec chmod u+wr {} +"
 
 #
 # check date on both nodes.  rsync is sensitive to skew
@@ -936,6 +936,7 @@ logcmd rsync $rsync_opts \
 	--exclude=bin/controller.sh \
 	--exclude=license.lic \
 	--exclude=HA/\*.pid \
+	--exclude=db/\*.pid \
 	--exclude=logs/\* \
 	--exclude=db/data \
 	--exclude=db/bin/.status \
