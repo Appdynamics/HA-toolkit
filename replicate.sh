@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.28.3 2018-02-16 20:00:50 rob.navarro $
+# $Id: replicate.sh 3.28.4 2018-02-20 17:26:28 rob.navarro $
 #
 # install HA to a controller pair
 #
@@ -1111,13 +1111,13 @@ else
 	# host or other /etc/hosts inconsistencies between HA nodes
 	# Add to this list the FQDN that MySQL may be able to lookup.
 	#
-	grant_primary=$(get_names $(hostname) < /etc/hosts)
+	grant_primary=$(get_names $(hostname) <<< "$(getent hosts $(hostname))" )
 	if [[ -z "$grant_primary" ]] ; then
 		gripe "Local /etc/hosts does not appear to contain an entry for current hostname: $(hostname)"
 		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"
 		grant_primary=$(hostname)
 	fi
-	grant_secondary=$(ssh -o StrictHostKeyChecking=no $secondary cat /etc/hosts | get_names $secondary)
+	grant_secondary=$(get_names $secondary <<< "$(ssh -o StrictHostKeyChecking=no $secondary getent hosts $secondary)")
 	if [[ -z "$grant_secondary" ]] ; then
 		gripe "Secondary /etc/hosts does not appear to contain an entry for its hostname: $secondary"
 		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"

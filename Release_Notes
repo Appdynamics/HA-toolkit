@@ -680,3 +680,9 @@ Release notes for version 3.28.4
 2. patched db.cnf config updater to cope with missing newlines - sometimes emitted by EC
 
 3. excluded db/mysql.pid from replication to allow reliable MySQL shutdown on secondary
+
+--------------------------------------
+Release notes for version 3.28.5
+
+1. patch for https://github.com/Appdynamics/HA-toolkit/issues/77 which wrongly failed 
+   replicate finalise if same hostname alias existed in different domain names
