@@ -45,7 +45,7 @@ MONITORS= \
 	monitors/MysqlMonitor/monitor.xml monitors/MysqlMonitor/mysql-stat.sh \
 	monitors/DiskMonitor/README monitors/MysqlMonitor/README
 
-NOT_EMBEDDED= VERSION README.txt RUNBOOK UPGRADING Release_Notes $(C_SRC)
+NOT_EMBEDDED= APPD_UPGRADE VERSION README.txt RUNBOOK UPGRADING Release_Notes $(C_SRC)
 
 BASH_SRC_EMBEDDED := $(addprefix build/,$(BASH_SRC))
 
