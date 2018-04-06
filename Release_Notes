@@ -686,3 +686,9 @@ Release notes for version 3.28.5
 
 1. patch for https://github.com/Appdynamics/HA-toolkit/issues/77 which wrongly failed 
    replicate finalise if same hostname alias existed in different domain names
+
+--------------------------------------
+Release notes for version 3.28.6
+
+1. trivial add of APPD_UPGRADE file to distribution artifact
+
