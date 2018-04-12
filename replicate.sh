@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.28.4 2018-02-20 17:26:28 rob.navarro $
+# $Id: replicate.sh 3.28.7 2018-04-11 22:31:16 cmayer $
 #
 # install HA to a controller pair
 #
@@ -1327,6 +1327,15 @@ runcmd ssh $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE
 #
 message "remove secondary master.info"
 runcmd ssh $secondary rm -f $datadir/master.info
+
+#
+# if there is a secondary doublewrite file, remove it, since it will contain
+# stale entries and prevent a successful database startup
+#
+doublewrite_file=$(dbcnf_get innodb_doublewrite_file)
+if [ -n $doublewrite_file ] ; then
+	runcmd ssh $secondary rm -f $doublewrite_file
+fi
 
 #
 # start the secondary database

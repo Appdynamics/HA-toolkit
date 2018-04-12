@@ -692,3 +692,9 @@ Release notes for version 3.28.6
 
 1. trivial add of APPD_UPGRADE file to distribution artifact
 
+--------------------------------------
+Release notes for version 3.28.7
+
+1. added support for the doublewrite file that can be configured to optional
+database implementations.
+
