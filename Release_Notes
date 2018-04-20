@@ -698,3 +698,13 @@ Release notes for version 3.28.7
 1. added support for the doublewrite file that can be configured to optional
 database implementations.
 
+--------------------------------------
+Release notes for version 3.29
+
+1. added an interlock so that multiple replicate instances cannot run
+
+2. made the ibd file checksum on large files a bit stronger.  if the first 
+   block is not identical, prune the file.
+
+3. suppressed a misleading noisy diagnostic
+

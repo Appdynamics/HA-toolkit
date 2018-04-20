@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.28.7 2018-04-11 22:31:16 cmayer $
+# $Id: replicate.sh 3.29 2018-04-20 12:00:25 cmayer $
 #
 # install HA to a controller pair
 #
@@ -26,6 +26,8 @@
 #   limitations under the License.
 #
 export PATH=/bin:/usr/bin:/sbin:/usr/sbin
+
+INTERLOCK=REPLICATE_RUNNING
 
 cd $(dirname $0)
 
@@ -304,12 +306,30 @@ function usage()
 	exit 1
 }
 
+#
+# only allow one replicate at a time
+#
+if [ -f $INTERLOCK ] ; then
+	#
+	# since we scribble our pid into the interlock file
+	# this is a soft test for a valid interlock
+	#
+	repl_pid=$(cat $INTERLOCK)
+	if [ -d /proc/$(cat $INTERLOCK) ] ; then
+		echo "only one replicate is allowed at a time; please check"
+		echo "pid $repl_pid, and remove $INTERLOCK only if it is not a replicate"
+		exit 1
+	fi
+	rm -f $INTERLOCK
+fi
+echo $$ > $INTERLOCK
+
 log_rename
 
 #
 # log versions and arguments
 #
-message "replication log " `date`
+message "replication log " `date` "for pid $$"
 message "version: " `grep '$Id' $0 | head -1`
 message "command line options: " "$@"
 message "hostname: " `hostname`
@@ -509,6 +529,7 @@ function kill_rsyncd() {
 function cleanup() {
 	rm -rf $tmpdir
 	kill_rsyncd
+	rm -f $INTERLOCK
 }
 
 trap cleanup EXIT
@@ -650,7 +671,7 @@ if ! $appserver_only_sync ; then
 	# make sure replication has stopped
 	#
 	message "stopping replication"
-	sql localhost "STOP SLAVE;RESET SLAVE ALL;RESET MASTER;"
+	sql localhost "STOP SLAVE;RESET SLAVE ALL;RESET MASTER;" >/dev/null 2>&1
 
 	#
 	# sanity check: make sure we are not the passive side. replicating the
@@ -859,7 +880,10 @@ if ! $hotsync ; then
 	# prune differences
 	# caution: gnarly quoting
 	#
-	# also, for files <= 1M, checksum the whole thing, not just the first block
+	# buld 3 lists:
+	# for ibd files <= 1M, md5 of the whole thing
+	# for .par and .frm files, md5
+	# for ibd file > 1M, md5 of the first 16k
 	#
 	message "Building innodb file maps"
 	rm -f $tmpdir/ibdlist.local $tmpdir/ibdlist.remote
@@ -878,7 +902,7 @@ if ! $hotsync ; then
 	find $datadir/controller \
 		-name \*.ibd \
 		-size +1M \
-		-exec sh -c 'echo -n "{} " ; od -N 150 -t x4 -A none {} | md5sum' \; | \
+		-exec sh -c 'echo -n "{} " ; dd if={} count=32 status=none | md5sum' \; | \
 		sort > $tmpdir/ibdlist.large.local
 
 	ssh $secondary mkdir -p $datadir/controller
@@ -896,7 +920,7 @@ if ! $hotsync ; then
 
 	ssh $secondary "find $datadir/controller \
 		-name \*.ibd -size +1M \
-		-exec sh -c 'echo -n \"{} \" ; od -N 150 -t x4 -A none {} | md5sum' \;" | \
+		-exec sh -c 'echo -n \"{} \" ; dd if={} count=32 status=none | md5sum' \;" | \
 		sort > $tmpdir/ibdlist.large.remote
 
 	diff $tmpdir/ibdlist.small.local $tmpdir/ibdlist.small.remote | \
