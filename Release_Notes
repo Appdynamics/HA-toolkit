@@ -708,3 +708,8 @@ Release notes for version 3.29
 
 3. suppressed a misleading noisy diagnostic
 
+--------------------------------------
+Release notes for version 3.29.1
+
+1. added a check to abort on undecoded arguments on command line.
+

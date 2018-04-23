@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.29 2018-04-20 12:00:25 cmayer $
+# $Id: replicate.sh 3.29.1 2018-04-23 11:32:53 cmayer $
 #
 # install HA to a controller pair
 #
@@ -302,7 +302,7 @@ function usage()
 	echo "    [ -W ] use wildcard host in grant"
 	echo "    [ -7 ] enable parallel replication for mysql 5.7"
 	echo "    [ -h ] print help"
-	echo "	  [ -X ] use backup for hot sync"
+	echo "    [ -X ] use backup for hot sync"
 	exit 1
 }
 
@@ -450,6 +450,10 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS7X flag; do
 		;;
 	esac
 done
+shift $((OPTIND-1))
+if [ $# -ne 0 ] ; then
+	usage "bad argument: $1"
+fi
 
 if [ -z "$secondary" ] ; then
 	usage "secondary hostname must be set"
