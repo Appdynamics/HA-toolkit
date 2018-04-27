@@ -2,7 +2,7 @@
 #
 # Monitors INNODB
 #
-# $Id: mysql-stat.sh 3.3 2016-09-08 03:09:03 cmayer $
+# $Id: mysql-stat.sh 3.4 2018-04-27 14:17:35 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -27,7 +27,7 @@ PATH=$PATH:/bin:/usr/sbin:/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 # check in some likely places where a controller might be installed
 #
 if [ -z "$APPD_ROOT" ] ; then
-	for dir in /opt/AppDynamics/Controller /opt/appdynamics/controller ; do
+	for dir in /opt/AppDynamics/Controller /opt/appdynamics/controller /apps/appdynamics/controller ; do
 		if [ -f $dir/db/db.cnf ] ; then
 			APPD_ROOT=$dir
 			break
@@ -62,12 +62,12 @@ echo "show engine innodb status\G" | $MYSQLCLIENT | awk '
 
 	/^INDIVIDUAL BUFFER POOL INFO/ { state = 2; }
 
-	/^TRANSACTIONS/ { state = 3; }
-	/^History list length/ { if (state == 3) histlen = $4; }
-	/^---TRANSACTION.*ACTIVE/ { if (state == 3) {
-		xcount++;
-		active = $4; if (active > hiwat) {hiwat = active}
-	}}
+	#/^TRANSACTIONS/ { state = 3; }
+	#/^History list length/ { if (state == 3) histlen = $4; }
+	#/^---TRANSACTION.*ACTIVE/ { if (state == 3) {
+	#	xcount++;
+	#	active = $4; if (active > hiwat) {hiwat = active}
+	#}}
 
 	/^FILE I/ { state = 4; }
 	/reads.*writes.*fsyncs/ { if (state == 4) {
@@ -97,8 +97,8 @@ echo "show engine innodb status\G" | $MYSQLCLIENT | awk '
 		printf("name=Custom Metrics|Mysql|Buffers Dirty,aggregator=OBSERVATION,value=%d\n", dirty);
 		printf("name=Custom Metrics|Mysql|Buffers Old,aggregator=OBSERVATION,value=%d\n", oldpages);
 
-		printf("name=Custom Metrics|Mysql|Transaction count,aggregator=OBSERVATION,value=%d\n", xcount);
-		printf("name=Custom Metrics|Mysql|Transaction high time,aggregator=OBSERVATION,value=%d\n", hiwat);
+#		printf("name=Custom Metrics|Mysql|Transaction count,aggregator=OBSERVATION,value=%d\n", xcount);
+#		printf("name=Custom Metrics|Mysql|Transaction high time,aggregator=OBSERVATION,value=%d\n", hiwat);
 
 		printf("name=Custom Metrics|Mysql|File reads,aggregator=OBSERVATION,value=%d\n", reads);
 		printf("name=Custom Metrics|Mysql|File writes,aggregator=OBSERVATION,value=%d\n", writes);
@@ -141,6 +141,14 @@ echo "select value from global_configuration_local where name = 'appserver.mode'
 
 	END { 
 		printf("name=Custom Metrics|Mysql|Appserver Active,aggregator=OBSERVATION,value=%d\n", active);
+	}
+'
+echo "select max(time) as hiwat, count(*) as xcount from information_schema.processlist where command ='Query'\G" | $MYSQLCLIENT | awk '
+	/hiwat:/ { hiwat = $2; }
+	/xcount:/ { xcount = $2; }
+	END {
+		printf("name=Custom Metrics|Mysql|Transaction count,aggregator=OBSERVATION,value=%d\n", xcount);
+		printf("name=Custom Metrics|Mysql|Transaction high time,aggregator=OBSERVATION,value=%d\n", hiwat);
 	}
 '
 
