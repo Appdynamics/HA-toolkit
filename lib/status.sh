@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/status.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: status.sh 3.30 2018-05-01 12:39:50 cmayer $
 #
 # common code to interrogate the status of various functions
 #
@@ -71,7 +71,7 @@ function db_running {
 }
 
 function get {
-	local key
+	local key=$1
 	awk "/$key:/ {print \$2}"
 }
 

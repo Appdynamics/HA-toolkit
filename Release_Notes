@@ -713,3 +713,18 @@ Release notes for version 3.29.1
 
 1. added a check to abort on undecoded arguments on command line.
 
+--------------------------------------
+Release notes for version 3.30
+
+1. with mysql 5.7, password warnings broke the get function in lib/status.sh
+   the init scripts should now work as designed.  after installing mysql 5.7,
+   running save_mysql_password will eliminate the warnings.
+
+2. when running replicate -j, the secondary license file is no longer clobbered
+
+3. replicate -j will now update the secondary controller-info.xml with the right
+   node-name.
+
+4. replicate -j now deletes the generated and osgi-cache directories
+
+5. more hardening for tcsh login shell

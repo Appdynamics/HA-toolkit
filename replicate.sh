@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.29.1 2018-04-23 11:32:53 cmayer $
+# $Id: replicate.sh 3.30 2018-05-01 13:39:05 cmayer $
 #
 # install HA to a controller pair
 #
@@ -128,7 +128,7 @@ function remote_check_installed_service {
    	local chkconfig=$(ssh -q $host "which /sbin/chkconfig" 2>/dev/null)
    	local lservice=$service_bin
 
-   	ssh -q $host "bash -c '[[ -f /etc/init.d/$svc_name ]]'" || return 1
+   	ssh -q $host bash -c "test -f /etc/init.d/$svc_name" || return 1
 
    	if [[ -n "$chkconfig" ]] ; then
       		return $(ssh -q $host "$chkconfig --list $svc_name >/dev/null 2>&1")
@@ -275,6 +275,21 @@ Please re-run install-init.sh on one or both hosts with the same options."
 		((errors++))
 	fi
 	return $errors
+}
+
+function secondary_set_node_name() {
+#
+# write the secondary hostname into the node-name property
+#
+	ci_tmp=/tmp/ci-$$.xml
+	rm -f $ci_tmp
+	message "setting up controller agent on secondary"
+	for ci in ${controller_infos[*]} ; do
+		scp $secondary:$ci $ci_tmp
+		controller_info_set $ci_tmp node-name $secondary
+		scp $ci_tmp $secondary:$ci
+	done
+	rm -f $ci_tmp
 }
 
 function usage()
@@ -593,6 +608,11 @@ else
 fi
 
 #
+# get the list of controller-info files
+#
+controller_infos=($(find $APPD_ROOT/appserver/glassfish/domains/domain1/appagent -name controller-info.xml -print))
+
+#
 # make sure we aren't replicating to ourselves!
 #
 myhostname=`hostname`
@@ -704,7 +724,7 @@ if ! $appserver_only_sync ; then
 	# this may fail totally
 	#
 	message "stopping secondary db if present"
-	( stop_appdynamics_services $secondary || ssh $secondary "[[ -f $APPD_ROOT/bin/controller.sh ]] && $APPD_ROOT/bin/controller.sh stop" ) | logonly 2>&1
+	( stop_appdynamics_services $secondary || ssh $secondary bash -c "test -x $APPD_ROOT/bin/controller.sh && $APPD_ROOT/bin/controller.sh stop" ) | logonly 2>&1
 
 	#
 	# the secondary loses controller.sh until we are ready
@@ -863,8 +883,14 @@ if $appserver_only_sync ; then
 		--exclude=db/\*                                                \
 		--exclude=logs/\*                                              \
 		--exclude=tmp\*                                                \
+		--exclude=license.lic					\
 		$APPD_ROOT/ $ROOTDEST
 		message "Rsyncs complete"
+		secondary_set_node_name
+		message "removing osgi-cache and generated"
+		ssh $secondary rm -rf \
+		$APPD_ROOT/appserver/glassfish/domains/domain1/osgi-cache/\* \
+		$APPD_ROOT/appserver/glassfish/domains/domain1/generated/\*
 		message "App server only sync done"
 	exit 0
 fi
@@ -1083,11 +1109,6 @@ fi
 message "copy domain.xml to secondary"
 runcmd scp -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 
-#
-# get the list of controller-info files
-#
-controller_infos=($(find $APPD_ROOT/appserver/glassfish/domains/domain1/appagent -name controller-info.xml -print))
-
 if ! $hotsync ; then
 	#
 	# write the primary hostname into the node-name property
@@ -1098,18 +1119,7 @@ if ! $hotsync ; then
 	done
 fi
 
-#
-# write the secondary hostname into the node-name property
-#
-ci_tmp=/tmp/ci-$$.xml
-rm -f $ci_tmp
-message "setting up controller agent on secondary"
-for ci in ${controller_infos[*]} ; do
-	scp $secondary:$ci $ci_tmp
-	controller_info_set $ci_tmp node-name $secondary
-	scp $ci_tmp $secondary:$ci
-done
-rm -f $ci_tmp
+secondary_set_node_name
 
 #
 # call the setmonitor script to set the monitoring host and params
