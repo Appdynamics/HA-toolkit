@@ -728,3 +728,15 @@ Release notes for version 3.30
 4. replicate -j now deletes the generated and osgi-cache directories
 
 5. more hardening for tcsh login shell
+
+--------------------------------------
+Release notes for version 3.31
+
+1) a rare bug prevented files from being properly pruned on the secondary.  this caused
+   the secondary database to not start due to space id collisions.
+
+2) failover.sh in some cases left the global_configuration_local in an odd state.
+   the new version has a cleaner state transition if the remote database crashes during the failover,
+   not an unusual thing if the primary is corrupt and in a crash-restart loop.
+
+3) appdservice-noroot.sh now reports when the assassin is being started

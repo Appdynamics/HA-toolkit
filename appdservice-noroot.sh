@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: appdservice-noroot.sh 3.31 2018-05-04 16:09:14 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -97,6 +97,7 @@ appdcontroller:start)
 			if assassin_running ; then
 				echo assassin already running
 			else
+				echo -n assassin ' '
 				nohup $APPD_ROOT/HA/assassin.sh >/dev/null
 				pid=$!
 				# wait for the process to die or sign on
@@ -105,7 +106,9 @@ appdcontroller:start)
 						break
 					fi
 					sleep 1
+					echo -n "."
 				done
+				echo started
 			fi
 		fi
 	else

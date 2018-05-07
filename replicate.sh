@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.30 2018-05-01 13:39:05 cmayer $
+# $Id: replicate.sh 3.31 2018-05-04 16:16:14 cmayer $
 #
 # install HA to a controller pair
 #
@@ -911,7 +911,7 @@ if ! $hotsync ; then
 	# caution: gnarly quoting
 	#
 	# buld 3 lists:
-	# for ibd files <= 1M, md5 of the whole thing
+	# for ibd files <= 1M or .par or .frm, md5 of the whole thing
 	# for .par and .frm files, md5
 	# for ibd file > 1M, md5 of the first 16k
 	#
@@ -919,46 +919,38 @@ if ! $hotsync ; then
 	rm -f $tmpdir/ibdlist.local $tmpdir/ibdlist.remote
 
 	find $datadir/controller \
-		-name \*.ibd \
-		\( -size -1M -o -size 1M \) \
-		-exec sh -c 'echo -n "{} " ; cat {} | md5sum' \; | \
-		sort > $tmpdir/ibdlist.small.local
+		\( -name \*.ibd -not -size +1M \) \
+		-or -name \*.par \
+		-or -name \*.frm \
+		-exec sh -c 'echo -n "{} " ; cat {} | md5sum -' \; \
+		> $tmpdir/ibdlist.small.local
 
 	find $datadir/controller \
-		\( -name \*.par -o -name \*.frm \) \
-		-exec sh -c 'echo -n "{} " ; cat {} | md5sum' \; | \
-		sort > $tmpdir/metalist.local
-
-	find $datadir/controller \
-		-name \*.ibd \
-		-size +1M \
-		-exec sh -c 'echo -n "{} " ; dd if={} count=32 status=none | md5sum' \; | \
-		sort > $tmpdir/ibdlist.large.local
+		-name \*.ibd -size +1M \
+		-exec sh -c 'echo -n "{} " ; dd if={} count=32 status=none | md5sum -' \; \
+		> $tmpdir/ibdlist.large.local
 
 	ssh $secondary mkdir -p $datadir/controller
 
 	ssh $secondary "find $datadir/controller \
-		-name \*.ibd \( -size -1M -o -size 1M \) \
-		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" | \
-		sort > $tmpdir/ibdlist.small.remote
-
-	ssh $secondary "find $datadir/controller \
-		\( -name \*.par -o -name \*.frm \) \
-		\( -size -1M -o -size 1M \) \
-		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" | \
-		sort > $tmpdir/metalist.remote
+		\( -name \*.ibd -not -size +1M \) \
+		-or -name \*.par \
+		-or -name \*.frm \
+		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" \
+		> $tmpdir/ibdlist.small.remote
 
 	ssh $secondary "find $datadir/controller \
 		-name \*.ibd -size +1M \
-		-exec sh -c 'echo -n \"{} \" ; dd if={} count=32 status=none | md5sum' \;" | \
-		sort > $tmpdir/ibdlist.large.remote
+		-exec sh -c 'echo -n \"{} \" ; dd if={} count=32 status=none | md5sum' \;" \
+		> $tmpdir/ibdlist.large.remote
 
-	diff $tmpdir/ibdlist.small.local $tmpdir/ibdlist.small.remote | \
-		awk '/^>/ {print $2}' > $tmpdir/worklist
-	diff $tmpdir/metalist.local $tmpdir/metalist.remote | \
-		awk '/^>/ {print $2}' >> $tmpdir/worklist
-	diff $tmpdir/ibdlist.large.local $tmpdir/ibdlist.large.remote | \
-		awk '/^>/ {print $2}' >> $tmpdir/worklist
+	cat $tmpdir/ibdlist.small.local $tmpdir/ibdlist.large.local | \
+		sort > $tmpdir/sums.local
+
+	cat $tmpdir/ibdlist.small.remote $tmpdir/ibdlist.large.remote | \
+		sort > $tmpdir/sums.remote
+
+	diff $tmpdir/sums.local $tmpdir/sums.remote | awk '/^[><]/ {print $2}' | sort -u $tmpdir/worklist
 
 	discrepancies=`wc -w $tmpdir/worklist | awk '{print $1}'`
 	if [ $discrepancies -gt 0 ] ; then

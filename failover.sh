@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: failover.sh 3.26 2017-10-21 00:45:29 rob.navarro $
+# $Id: failover.sh 3.31 2018-05-04 16:16:25 cmayer $
 #
 # run on the passive node, activate this HA node.
 # 
@@ -220,29 +220,8 @@ message "Kill Local Appserver"
 service appdcontroller stop | log 2>&1
 
 #
-# persistently break replication
-#
-if $break_replication ; then
-	message "Disable local slave autostart"
-
-	#
-	# disable automatic start of replication slave
-	# edit the db.cnf to remove any redundant entries for skip-slave-start
-	# this is to ensure that replication does not get turned on by a reboot
-	#
-	dbcnf_unset skip-slave-start
-	dbcnf_set skip-slave-start true
-
-	#
-	# now stop the replication slave
-	#
-	message "Stop local slave"
-	sql localhost "stop slave IO_THREAD;"
-fi
-
-#
 # if the primary is up, mark it passive, and stop the appserver
-# also, if the old primary is not reachable, ha.controller.type will be changed by the assassin when it finally makes contact.
+# if the primary is not reachable, the assassin will eventually change ha.controller.type
 #
 if [ "$primary_up" = "true" ] ; then
 	if $remote ; then
@@ -261,14 +240,38 @@ if [ "$primary_up" = "true" ] ; then
 		fi
 		message "Stop primary appserver"
 		remservice -tq $primary appdcontroller stop
-		if $break_replication ; then
-			primary_up=false
-			message "Stop secondary database"
-			remservice -tq $primary appdcontroller-db stop
-			dbcnf_unset skip-slave-start $primary
-			dbcnf_set skip-slave-start true $primary
-		fi
 	fi
+fi
+
+#
+# persistently break replication
+#
+if $break_replication ; then
+	#
+	# we can get here if we could not mark the remote database passive
+	#
+	if [ "$primary_up" = "true" ] ; then
+		message "Stop secondary database"
+		remservice -tq $primary appdcontroller-db stop
+		dbcnf_unset skip-slave-start $primary
+		dbcnf_set skip-slave-start true $primary
+	fi
+
+	#
+	# now stop the replication slave
+	#
+	message "Stop local slave"
+	sql localhost "stop slave IO_THREAD;"
+
+	message "Disable local slave autostart"
+
+	#
+	# disable automatic start of replication slave
+	# edit the db.cnf to remove any redundant entries for skip-slave-start
+	# this is to ensure that replication does not get turned on by a reboot
+	#
+	dbcnf_unset skip-slave-start
+	dbcnf_set skip-slave-start true
 fi
 
 #
