@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.32 2018-05-16 21:15:14 cmayer $
+# $Id: replicate.sh 3.33 2018-05-17 13:28:43 cmayer $
 #
 # install HA to a controller pair
 #
@@ -310,6 +310,7 @@ function usage()
 	echo "    [ -U ] unencrypted rsync"
 	echo "    [ -z ] enable rsync compression"
 #	echo "    [ -u ] upgrade fixup"
+	echo "    [ -M ] inhibit ssh connectivity check
 	echo "    [ -E ] unbreak replication"
 	echo "    [ -n ] no appserver start"
 	echo "    [ -S ] enable SSL for replication traffic"
@@ -351,7 +352,7 @@ message "hostname: " `hostname`
 message "appd root: $APPD_ROOT"
 message "appdynamics run user: $RUNUSER"
 
-while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS7X flag; do
+while getopts :s:e:m:a:i:dfhjut:nwzEFHMWUS7X flag; do
 	case $flag in
 	7)
 		mysql_57=true
@@ -380,6 +381,9 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHWUS7X flag; do
 	    	;;
 	n)
 		start_appserver=false
+		;;
+	M)
+		touch NO_SSH_CHECK
 		;;
 	w)
 		watchdog_enable=true
@@ -1396,6 +1400,13 @@ done
 #
 message "setting up secondary slave"
 cat $tmpdir/ha.secondary | $SSH $secondary $APPD_ROOT/HA/mysqlclient.sh
+
+#
+# close the loop.  make sure the secondary actually got the update
+#
+if [ "$(get_replication_mode $secondary)" != passive ] ; then
+	fatal 18 "secondary set mode failed"
+fi
 
 message "removing skip-slave-start from primary"
 dbcnf_unset skip-slave-start

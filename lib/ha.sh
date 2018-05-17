@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.32 2018-05-16 21:15:14 cmayer $
+# $Id: lib/ha.sh 3.33 2018-05-17 13:28:43 cmayer $
 #
 # ha.sh
 # this file generally contains functions and definitions that are not included in the
@@ -210,6 +210,12 @@ export -f get_names
 #  check_ssh_setup $secondary
 #
 function check_ssh_setup {
+   # this gross hack is for those systems that don't have the ability to have reasonable hosts files
+   # that depend on dns for everything.
+   if [ -f NO_SSH_CHECK ] ; then
+      return 0
+   fi
+
    (( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <otherhostname>"
    local myhost=$(hostname) otherhost=$1 i j OUT=/tmp/.out.$$ ERR=/tmp/.errs.$$
 

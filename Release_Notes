@@ -754,3 +754,11 @@ Release notes for version 3.32
 
 3) a missing redirection caused the file pruning code in version 3.31 to not work
 
+--------------------------------------
+Release notes for version 3.33
+
+1) we now verify that the secondary database has indeed been marked passive before completing the
+   HA setup.   this greatly narrows a race condition that could cause a split brain.
+
+2) we add a means of disabling the bidirectional ssh checks for installations that cannot install the
+   primary and secondary hosts into the host files.
