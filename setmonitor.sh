@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: setmonitor.sh 3.20 2017-10-21 00:47:23 rob.navarro $
+# $Id: setmonitor.sh 3.32 2018-05-16 21:15:14 cmayer $
 #
 # instrument controller and machine agents to a monitoring host
 #
@@ -124,7 +124,7 @@ while getopts "s:m:a:i:h" flag; do
 		machine_agent=$OPTARG
 		;;
 	s)
-		secondary=$(ssh $OPTARG hostname)
+		secondary=$($SSH $OPTARG hostname)
 		;;
 	m)
 		parse_monitor_def "$OPTARG"
@@ -338,7 +338,7 @@ for info in ${controller_infos[*]} ; do
 		message "copy $info to secondary"
 		cp $info $ci_tmp
 		controller_info_set $ci_tmp node-name $sec_short
-		scp -q $ci_tmp $secondary:$info
+		$SCP -q $ci_tmp $secondary:$info
 		rm -f $ci_tmp
 	fi
 done
@@ -348,10 +348,10 @@ done
 #
 if [ -n "$secondary" ] ; then
 	message "copy domain.xml to secondary"
-	scp -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
+	$SCP -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 	if [ -f MONITOR ] ; then
 		message "copy MONITOR to secondary"
-		scp -q -p $APPD_ROOT/HA/MONITOR $secondary:$APPD_ROOT/HA/MONITOR
+		$SCP -q -p $APPD_ROOT/HA/MONITOR $secondary:$APPD_ROOT/HA/MONITOR
 	fi
 fi
 

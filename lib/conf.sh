@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.27 2018-02-16 20:00:24 rob.navarro $
+# $Id: lib/conf.sh 3.32 2018-05-16 21:15:14 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -304,7 +304,7 @@ function dbcnf_set {
 		CP="cp"
 	else
 		DBCNF=$remotehost:$DB_CONF
-		CP="scp -q"
+		CP="$SCP -q"
 	fi
 	runuser $CP $DBCNF $IN
 	cp $IN $OUT
@@ -347,7 +347,7 @@ function dbcnf_unset {
 		CP=cp
 	else
 		DBCNF=$remotehost:$DB_CONF
-		CP="scp -q"
+		CP="$SCP -q"
 	fi
 	runuser $CP $DBCNF $IN
 	cp $IN $OUT

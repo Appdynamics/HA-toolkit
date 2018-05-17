@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.31 2018-05-04 16:16:14 cmayer $
+# $Id: replicate.sh 3.32 2018-05-16 21:15:14 cmayer $
 #
 # install HA to a controller pair
 #
@@ -125,16 +125,16 @@ function remote_check_installed_service {
 
    	local host=$1
    	local svc_name=$2
-   	local chkconfig=$(ssh -q $host "which /sbin/chkconfig" 2>/dev/null)
+   	local chkconfig=$($SSH -q $host "which /sbin/chkconfig" 2>/dev/null)
    	local lservice=$service_bin
 
-   	ssh -q $host bash -c "test -f /etc/init.d/$svc_name" || return 1
+   	$SSH -q $host bash -c "test -f /etc/init.d/$svc_name" || return 1
 
    	if [[ -n "$chkconfig" ]] ; then
-      		return $(ssh -q $host "$chkconfig --list $svc_name >/dev/null 2>&1")
+      		return $($SSH -q $host "$chkconfig --list $svc_name >/dev/null 2>&1")
    	fi
 
-   	return $(ssh -q $host "$lservice --status-all 2>/dev/null" | grep -qw "$svc_name")
+   	return $($SSH -q $host "$lservice --status-all 2>/dev/null" | grep -qw "$svc_name")
 }
 
 # verify that a required executable / package is installed
@@ -153,12 +153,12 @@ function require() {
 		fi
 		ret=1
 	fi
-	if ! ssh -q $secondary which $1 2>&1 >/dev/null ; then
+	if ! $SSH -q $secondary which $1 2>&1 >/dev/null ; then
 		echo "Unable to find $1 in $PATH on $secondary"
 		echo "Please install with:"
-		if ssh $secondary which apt-get 2>&1 >/dev/null ; then
+		if $SSH $secondary which apt-get 2>&1 >/dev/null ; then
 			echo "apt-get update && apt-get install $3"
-		elif ssh $secondary which yum 2>&1 >/dev/null ; then
+		elif $SSH $secondary which yum 2>&1 >/dev/null ; then
 			echo "yum install $2"
 		fi
 		ret=1
@@ -187,7 +187,7 @@ function verify_init_scripts()
 		return 0
 	fi
 	local host=$1
-	local ssh=`[ -n "$host" ] && echo "ssh -q"`
+	local ssh=`[ -n "$host" ] && echo "$SSH -q"`
 	local errors=0
 	local NEWMD5=
 	for s in ${appdynamics_service_list[@]}
@@ -214,7 +214,7 @@ before proceeding."
 
 function get_privilege_escalation(){
 	local host=$1
-	local ssh=`[ -n "$host" ] && echo "ssh -q"`
+	local ssh=`[ -n "$host" ] && echo "$SSH -q"`
 	local escalation_type=
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
@@ -285,9 +285,9 @@ function secondary_set_node_name() {
 	rm -f $ci_tmp
 	message "setting up controller agent on secondary"
 	for ci in ${controller_infos[*]} ; do
-		scp $secondary:$ci $ci_tmp
+		$SCP $secondary:$ci $ci_tmp
 		controller_info_set $ci_tmp node-name $secondary
-		scp $ci_tmp $secondary:$ci
+		$SCP $ci_tmp $secondary:$ci
 	done
 	rm -f $ci_tmp
 }
@@ -538,11 +538,11 @@ fi
 # kill a remote rsyncd if we have one
 #
 function kill_rsyncd() {
-	rsyncd_pid=`ssh $secondary cat /tmp/replicate.rsync.pid 2>/dev/null`
+	rsyncd_pid=`$SSH $secondary cat /tmp/replicate.rsync.pid 2>/dev/null`
 	if [ ! -z "$rsyncd_pid" ] ; then
-		ssh $secondary kill -9 $rsyncd_pid
+		$SSH $secondary kill -9 $rsyncd_pid
 	fi
-	ssh $secondary rm -f /tmp/replicate.rsync.pid
+	$SSH $secondary rm -f /tmp/replicate.rsync.pid
 }
 
 function cleanup() {
@@ -595,16 +595,16 @@ fi
 # find a compatible cipher - important for speed
 #
 for ssh_crypto in aes128-gcm@openssh.com aes128-ctr aes128-cbc arcfour128 3des-cbc lose ; do
-	if ssh -c $ssh_crypto $secondary true >/dev/null 2>&1 ; then
+	if $SSH -c $ssh_crypto $secondary true >/dev/null 2>&1 ; then
 		break;
 	fi
 done
 if [ "$ssh_crypto" = "lose" ] ; then
 	message "default crypto"
-	export RSYNC_RSH=ssh
+	export RSYNC_RSH=$SSH
 else
 	message "using $ssh_crypto crypto"
-	export RSYNC_RSH="ssh -c $ssh_crypto"
+	export RSYNC_RSH="$SSH -c $ssh_crypto"
 fi
 
 #
@@ -616,7 +616,7 @@ controller_infos=($(find $APPD_ROOT/appserver/glassfish/domains/domain1/appagent
 # make sure we aren't replicating to ourselves!
 #
 myhostname=`hostname`
-themhostname=`ssh $secondary hostname 2>/dev/null`
+themhostname=`$SSH $secondary hostname 2>/dev/null`
 
 if [ "$myhostname" = "$themhostname" ] ; then
 	fatal 14 "self-replication meaningless"
@@ -626,7 +626,7 @@ fi
 # unbreak replication: only if both sides are kinda happy
 #
 if $unbreak ; then
-	scp $APPD_ROOT/bin/controller.sh $secondary:$APPD_ROOT/bin	
+	$SCP $APPD_ROOT/bin/controller.sh $secondary:$APPD_ROOT/bin	
 
 	sql $secondary \
 		"update global_configuration_local set value='passive' where name = 'appserver.mode';"
@@ -651,7 +651,7 @@ if [ -z "$innodb_logdir" ] ; then
 fi
 
 if $unencrypted ; then
-	export RSYNC_RSH=ssh
+	export RSYNC_RSH=$SSH
 	RSYNC_PORT=10000
 	while echo "" | nc $secondary $RSYNC_PORT >/dev/null 2>&1 ; do
 		RSYNC_PORT=$((RSYNC_PORT+1))
@@ -661,10 +661,10 @@ if $unencrypted ; then
 	MADEST="rsync://$secondary:$RSYNC_PORT/default$machine_agent"
 	JAVADEST="rsync://$secondary:$RSYNC_PORT/default${JAVA%bin/java}"
 	kill_rsyncd
-	ssh $secondary mkdir -p $APPD_ROOT/HA
-	scp -q $APPD_ROOT/HA/rsyncd.conf $secondary:$APPD_ROOT/HA/rsyncd.conf
-	ssh $secondary rm -f /tmp/rsyncd.log
-	ssh $secondary rsync --daemon --config=$APPD_ROOT/HA/rsyncd.conf \
+	$SSH $secondary mkdir -p $APPD_ROOT/HA
+	$SCP -q $APPD_ROOT/HA/rsyncd.conf $secondary:$APPD_ROOT/HA/rsyncd.conf
+	$SSH $secondary rm -f /tmp/rsyncd.log
+	$SSH $secondary rsync --daemon --config=$APPD_ROOT/HA/rsyncd.conf \
 		--port=$RSYNC_PORT
 else
 	ROOTDEST=$secondary:$APPD_ROOT
@@ -724,14 +724,14 @@ if ! $appserver_only_sync ; then
 	# this may fail totally
 	#
 	message "stopping secondary db if present"
-	( stop_appdynamics_services $secondary || ssh $secondary bash -c "test -x $APPD_ROOT/bin/controller.sh && $APPD_ROOT/bin/controller.sh stop" ) | logonly 2>&1
+	( stop_appdynamics_services $secondary || $SSH $secondary bash -c "test -x $APPD_ROOT/bin/controller.sh && $APPD_ROOT/bin/controller.sh stop" ) | logonly 2>&1
 
 	#
 	# the secondary loses controller.sh until we are ready
 	# this inhibits starting an incomplete controller
 	#
 	message "inhibit running of secondary and delete mysql/innodb logfiles"
-	ssh $secondary rm -f $APPD_ROOT/bin/controller.sh \
+	$SSH $secondary rm -f $APPD_ROOT/bin/controller.sh \
 		"$innodb_logdir/ib_logfile*"
 		"$datadir/*log*" \
 		$datadir/ibdata1 2>&1 | logonly
@@ -750,7 +750,7 @@ if $final ; then
 	# make sure the latest init scripts are installed on both hosts
 	if $running_as_root ; then
 		$APPD_ROOT/HA/install-init.sh
-		ssh $secondary $APPD_ROOT/HA/install-init.sh
+		$SSH $secondary $APPD_ROOT/HA/install-init.sh
 	else
 		if ! verify_init_scripts; then
 			missing_init="true" 
@@ -853,22 +853,22 @@ dbcnf_set server-id 666
 # make an empty directory on the secondary if needed
 #
 message "mkdir if needed"
-runcmd ssh $secondary mkdir -p $APPD_ROOT
-runcmd ssh $secondary mkdir -p $datadir
+runcmd $SSH $secondary mkdir -p $APPD_ROOT
+runcmd $SSH $secondary mkdir -p $datadir
 
 #
 # do a permissive chmod on the entire destination
 #
 message "chmod destination"
-runcmd ssh $secondary "find $APPD_ROOT -type f -exec chmod u+wr {} +"
+runcmd $SSH $secondary "find $APPD_ROOT -type f -exec chmod u+wr {} +"
 
 #
 # check date on both nodes.  rsync is sensitive to skew
 #
 message "checking clocks"
 message "primary date: " `date`
-message "secondary date: " `ssh $secondary date`
-rmdate=`ssh $secondary date +%s`
+message "secondary date: " `$SSH $secondary date`
+rmdate=`$SSH $secondary date +%s`
 lodate=`date +%s`
 skew=$((rmdate-lodate))
 if [ $skew -gt 60 ] || [ $skew -lt -60 ]; then
@@ -888,9 +888,9 @@ if $appserver_only_sync ; then
 		message "Rsyncs complete"
 		secondary_set_node_name
 		message "removing osgi-cache and generated"
-		ssh $secondary rm -rf \
-		$APPD_ROOT/appserver/glassfish/domains/domain1/osgi-cache/\* \
-		$APPD_ROOT/appserver/glassfish/domains/domain1/generated/\*
+		$SSH $secondary rm -rf \
+			$APPD_ROOT/appserver/glassfish/domains/domain1/osgi-cache/\* \
+			$APPD_ROOT/appserver/glassfish/domains/domain1/generated/\*
 		message "App server only sync done"
 	exit 0
 fi
@@ -899,9 +899,9 @@ fi
 # clean out the old relay and bin-logs
 #
 message "Removing old replication logs"
-ssh $secondary "find $datadir -print | grep bin-log | xargs rm  -f"
-ssh $secondary "find $datadir -print | grep relay-log | xargs rm  -f"
-ssh $secondary rm -f $datadir/master.info
+$SSH $secondary "find $datadir -print | grep bin-log | xargs rm  -f"
+$SSH $secondary "find $datadir -print | grep relay-log | xargs rm  -f"
+$SSH $secondary rm -f $datadir/master.info
 
 if ! $hotsync ; then
 	runcmd rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info
@@ -930,16 +930,16 @@ if ! $hotsync ; then
 		-exec sh -c 'echo -n "{} " ; dd if={} count=32 status=none | md5sum -' \; \
 		> $tmpdir/ibdlist.large.local
 
-	ssh $secondary mkdir -p $datadir/controller
+	$SSH $secondary mkdir -p $datadir/controller
 
-	ssh $secondary "find $datadir/controller \
+	$SSH $secondary "find $datadir/controller \
 		\( -name \*.ibd -not -size +1M \) \
 		-or -name \*.par \
 		-or -name \*.frm \
 		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" \
 		> $tmpdir/ibdlist.small.remote
 
-	ssh $secondary "find $datadir/controller \
+	$SSH $secondary "find $datadir/controller \
 		-name \*.ibd -size +1M \
 		-exec sh -c 'echo -n \"{} \" ; dd if={} count=32 status=none | md5sum' \;" \
 		> $tmpdir/ibdlist.large.remote
@@ -950,14 +950,14 @@ if ! $hotsync ; then
 	cat $tmpdir/ibdlist.small.remote $tmpdir/ibdlist.large.remote | \
 		sort > $tmpdir/sums.remote
 
-	diff $tmpdir/sums.local $tmpdir/sums.remote | awk '/^[><]/ {print $2}' | sort -u $tmpdir/worklist
+	diff $tmpdir/sums.local $tmpdir/sums.remote | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/worklist
 
 	discrepancies=`wc -w $tmpdir/worklist | awk '{print $1}'`
 	if [ $discrepancies -gt 0 ] ; then
 		message "found $discrepancies discrepancies"
 		cat $tmpdir/worklist | logonly
-		scp -q $tmpdir/worklist $secondary:/tmp/replicate-prune-worklist
-		ssh $secondary "cat /tmp/replicate-prune-worklist | xargs rm -f"
+		$SCP -q $tmpdir/worklist $secondary:/tmp/replicate-prune-worklist
+		$SSH $secondary "cat /tmp/replicate-prune-worklist | xargs rm -f"
 	else
 		message "no discrepancies"
 	fi
@@ -970,7 +970,7 @@ fi
 message "Rsync'ing Controller: $APPD_ROOT"
 if ! echo $JAVA | grep -q $APPD_ROOT ; then
 	message "Rsync'ing java: $JAVA"
-	ssh $secondary mkdir -p	${JAVA%bin/java}
+	$SSH $secondary mkdir -p	${JAVA%bin/java}
 	logcmd rsync $rsync_opts \
 		$rsync_throttle $rsync_compression \
 		${JAVA%bin/java} $JAVADEST
@@ -1007,11 +1007,11 @@ if $hotsync ; then
 		--backup \
 		--user=root --password=secret \
 		--socket=/ssd/data/mysql.sock \
-		--stream=tar 2>/dev/null | ssh $secondary tar --extract --file=- --directory=$datadir
-	ssh $secondary rm -f $innodb_logdir/ib_logfile\* $datadir/ib_logfile\*
-	ssh $secondary $APPD_ROOT/HA/percona/bin/xtrabackup --prepare --target-dir=$datadir --innodb-log-group-home_dir=$innodb_logdir
+		--stream=tar 2>/dev/null | $SSH $secondary tar --extract --file=- --directory=$datadir
+	$SSH $secondary rm -f $innodb_logdir/ib_logfile\* $datadir/ib_logfile\*
+	$SSH $secondary $APPD_ROOT/HA/percona/bin/xtrabackup --prepare --target-dir=$datadir --innodb-log-group-home_dir=$innodb_logdir
 	if [ "$datadir" != "$innodb_logdir" ] ; then
-		ssh $secondary mv $datadir/ib_logfile\* $innodb_logdir
+		$SSH $secondary mv $datadir/ib_logfile\* $innodb_logdir
 	fi
 else
 	message "Rsync'ing Data: $datadir"
@@ -1032,7 +1032,7 @@ fi
 if $final ; then
 
 	if $running_as_root ; then
-		ssh $secondary $APPD_ROOT/HA/install-init.sh
+		$SSH $secondary $APPD_ROOT/HA/install-init.sh
 	fi
 
 fi
@@ -1099,7 +1099,7 @@ fi
 # send the domain.xml
 #
 message "copy domain.xml to secondary"
-runcmd scp -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
+runcmd $SCP -q -p $APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml $secondary:$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 
 if ! $hotsync ; then
 	#
@@ -1125,7 +1125,7 @@ fi
 if $debug ; then
 	message "building file lists"
 	ls -1 $datadir/controller/* | parallel md5sum | sort -k 2 --buffer-size=10M > $APPD_ROOT/logs/filelist.primary &
-	ssh $secondary 'ls -1 '$datadir'/controller/* | parallel md5sum' | sort -k 2 --buffer-size=10M > $APPD_ROOT/logs/filelist.secondary &
+	$SSH $secondary 'ls -1 '$datadir'/controller/* | parallel md5sum' | sort -k 2 --buffer-size=10M > $APPD_ROOT/logs/filelist.secondary &
 	wait
 fi
 
@@ -1147,7 +1147,7 @@ else
 		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"
 		grant_primary=$(hostname)
 	fi
-	grant_secondary=$(get_names $secondary <<< "$(ssh -o StrictHostKeyChecking=no $secondary getent hosts $secondary)")
+	grant_secondary=$(get_names $secondary <<< "$($SSH -o StrictHostKeyChecking=no $secondary getent hosts $secondary)")
 	if [[ -z "$grant_secondary" ]] ; then
 		gripe "Secondary /etc/hosts does not appear to contain an entry for its hostname: $secondary"
 		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"
@@ -1161,7 +1161,7 @@ else
 	primary1=`$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
 		/ERROR 1045/ { gsub("^.*@",""); print $1;}
 		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
-	secondary1=`ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
+	secondary1=`$SSH $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
 		/ERROR 1045/ { gsub("^.*@",""); print $1;}
 		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`
 
@@ -1174,7 +1174,7 @@ else
 		gripe "primary: $primary1"
 		gripe "secondary: $secondary1"
 		$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | log
-		ssh $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | log
+		$SSH $secondary $APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | log
 		fatal 5
 	fi
 	[[ "$primary1" == "localhost" ]] && primary1=""		# lose this contribution if just localhost
@@ -1219,7 +1219,7 @@ dbcnf_md5=`md5sum $APPD_ROOT/db/db.cnf | cut  -d " " -f 1`
 #
 rm -rf $CERTS
 mkdir -p $CERTS
-ssh $secondary rm -rf $CERTS
+$SSH $secondary rm -rf $CERTS
 
 dbcnf_unset ssl
 dbcnf_unset ssl-ca
@@ -1257,7 +1257,7 @@ if $ssl_replication ; then
 			-CA $CERTS/ca-cert.pem -CAkey $CERTS/ca-key.pem >/dev/null 2>&1
 	done
 
-	scp -q -r $CERTS $secondary:$CERTS
+	$SCP -q -r $CERTS $secondary:$CERTS
 
 	message "checking SSL configuration in db.cnf"
 
@@ -1343,20 +1343,20 @@ cat $tmpdir/ha.primary | $APPD_ROOT/HA/mysqlclient.sh | logonly
 # now we need a secondary controller.sh
 #
 message "copy controller.sh to secondary"
-runcmd scp -q -p $APPD_ROOT/bin/controller.sh $secondary:$APPD_ROOT/bin
+runcmd $SCP -q -p $APPD_ROOT/bin/controller.sh $secondary:$APPD_ROOT/bin
 
 #
 # but disable the appserver
 #
 message "disable secondary appserver"
-runcmd ssh $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE
+runcmd $SSH $secondary touch $APPD_ROOT/HA/APPSERVER_DISABLE
 
 #
 # make sure the master.info is not going to start replication yet, since it will be
 # a stale log position
 #
 message "remove secondary master.info"
-runcmd ssh $secondary rm -f $datadir/master.info
+runcmd $SSH $secondary rm -f $datadir/master.info
 
 #
 # if there is a secondary doublewrite file, remove it, since it will contain
@@ -1364,16 +1364,16 @@ runcmd ssh $secondary rm -f $datadir/master.info
 #
 doublewrite_file=$(dbcnf_get innodb_doublewrite_file)
 if [ -n $doublewrite_file ] ; then
-	runcmd ssh $secondary rm -f $doublewrite_file
+	runcmd $SSH $secondary rm -f $doublewrite_file
 fi
 
 #
 # start the secondary database
 #
 for logdir in $APPD_ROOT/logs $APPD_ROOT/db/logs ; do
-	if ssh $secondary test -f $logdir/database.log ; then
+	if $SSH $secondary test -f $logdir/database.log ; then
 		message "rename secondary database log file in $logdir"
-		ssh $secondary mv $logdir/database.log $logdir/database.log.`date +%F.%T`
+		$SSH $secondary mv $logdir/database.log $logdir/database.log.`date +%F.%T`
 	fi
 done
 
@@ -1395,7 +1395,7 @@ done
 # make all the changes on the secondary
 #
 message "setting up secondary slave"
-cat $tmpdir/ha.secondary | ssh $secondary $APPD_ROOT/HA/mysqlclient.sh
+cat $tmpdir/ha.secondary | $SSH $secondary $APPD_ROOT/HA/mysqlclient.sh
 
 message "removing skip-slave-start from primary"
 dbcnf_unset skip-slave-start
@@ -1407,7 +1407,7 @@ dbcnf_unset skip-slave-start $secondary
 # if hot sync, set the log position
 #
 if $hotsync ; then
-	read log_file log_offset <<< $(ssh $secondary cat $datadir/xtrabackup_binlog_info)
+	read log_file log_offset <<< $($SSH $secondary cat $datadir/xtrabackup_binlog_info)
 	sql $secondary "SET MASTER TO MASTER_LOG_FILE=$log_file, MASTER_LOG_POS=$log_offset'"
 	message "SET MASTER TO MASTER_LOG_FILE=$log_file, MASTER_LOG_POS=$log_offset'"
 fi
@@ -1455,10 +1455,10 @@ sql localhost "SHOW SLAVE STATUS" | awk \
 #
 if [ $watchdog_enable = "true" ] ; then
 	touch $WATCHDOG_ENABLE
-	ssh $secondary touch $WATCHDOG_ENABLE
+	$SSH $secondary touch $WATCHDOG_ENABLE
 else
 	rm -f $WATCHDOG_ENABLE
-	ssh $secondary rm -f $WATCHDOG_ENABLE
+	$SSH $secondary rm -f $WATCHDOG_ENABLE
 fi
 
 #
@@ -1467,8 +1467,8 @@ fi
 #
 remote_lic=0
 local_lic=0
-if ssh $secondary test -f $APPD_ROOT/license.lic ; then
-	remote_lic=`ssh $secondary grep creationDate $APPD_ROOT/license.lic | \
+if $SSH $secondary test -f $APPD_ROOT/license.lic ; then
+	remote_lic=`$SSH $secondary grep creationDate $APPD_ROOT/license.lic | \
 		 awk -F= '{print $2}'`
 fi
 if [ -f $APPD_ROOT/license.lic.$secondary ] ; then
@@ -1478,10 +1478,10 @@ fi
 
 if [ $local_lic -lt $remote_lic ] ; then
 	message "copying license file from secondary"
-	scp -q $secondary:$APPD_ROOT/license.lic $APPD_ROOT/license.lic.$secondary 
+	$SCP -q $secondary:$APPD_ROOT/license.lic $APPD_ROOT/license.lic.$secondary 
 elif [ $local_lic -ne 0 ] ; then
 	message "copying license file to  secondary"
-	scp -q $APPD_ROOT/license.lic.$secondary $secondary:$APPD_ROOT/license.lic
+	$SCP -q $APPD_ROOT/license.lic.$secondary $secondary:$APPD_ROOT/license.lic
 else
 	message "SECONDARY LICENSE FILE REQUIRED"
 fi
@@ -1510,13 +1510,13 @@ else
 fi
 
 message "sending primary license file"
-scp -q $APPD_ROOT/license.lic.$primary $secondary:$APPD_ROOT
+$SCP -q $APPD_ROOT/license.lic.$primary $secondary:$APPD_ROOT
 
 #
 # now enable the secondary appserver
 #
 message "enable secondary appserver"
-ssh $secondary rm -f $APPD_ROOT/HA/APPSERVER_DISABLE
+$SSH $secondary rm -f $APPD_ROOT/HA/APPSERVER_DISABLE
 
 #
 # restart the appserver

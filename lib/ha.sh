@@ -1,9 +1,13 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.29 2017-11-14 20:51:13 rob.navarro $
+# $Id: lib/ha.sh 3.32 2018-05-16 21:15:14 cmayer $
 #
 # ha.sh
-# contains common code used by the HA toolkit
+# this file generally contains functions and definitions that are not included in the
+# init scripts. it is the closest to the generic subroutine library for the HA package.
+# as such, it is the natural place to put code that is shared by most of the HA functional
+# programs
+#
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -19,6 +23,20 @@
 #   See the License for the specific language governing permissions and
 #   limitations under the License.
 # 
+
+#
+# defaults that can be overridden
+#
+SSH=ssh
+SCP=scp
+
+#
+# if this file exists, source it to set any local customizations to the execution environment
+# specifically, if you have a local ssh, point to it in here
+#
+if [ -x HA_ENVIRONMENT ] ; then
+. HA_ENVIRONMENT
+fi
 
 if ! declare -f abend &> /dev/null ; then
 	echo "ERROR: ${BASH_SOURCE[0]}: lib/log.sh not included. This is a coding error! " >&2
@@ -107,7 +125,7 @@ if [[ `id -u` == 0 ]] ; then
 	}   
         
 	function remservice {
-		ssh $1 $2 $service_bin $3 $4
+		$SSH $1 $2 $service_bin $3 $4
 	}
 else
 	if [ -f $APPD_ROOT/HA/NOROOT ] ; then
@@ -115,21 +133,21 @@ else
 			$APPD_ROOT/HA/appdservice-noroot.sh $1 $2
 		}
 		function remservice {
-			ssh $1 $2 $APPD_ROOT/HA/appdservice-noroot.sh $3 $4
+			$SSH $1 $2 $APPD_ROOT/HA/appdservice-noroot.sh $3 $4
 		}
 	elif [ -x /sbin/appdservice ] ; then
 		function service {
 			/sbin/appdservice $1 $2
 		}
 		function remservice {
-			ssh $1 $2 /sbin/appdservice $3 $4
+			$SSH $1 $2 /sbin/appdservice $3 $4
 		}
 	else
 		function service {
 			sudo $service_bin $1 $2
 		}
 		function remservice {
-			ssh $1 $2 sudo -n $service_bin $3 $4
+			$SSH $1 $2 sudo -n $service_bin $3 $4
 		}
     fi
 fi
@@ -201,7 +219,7 @@ function check_ssh_setup {
    # suffers a slight chicken and egg problem as we need /etc/hosts of $otherhost
    # but have not established that ssh to secondary works yet... hence initial
    # test
-   timeout 9s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' pwd' >$OUT 2>$ERR
+   timeout 9s bash -c "$SSH -o StrictHostKeyChecking=no $otherhost pwd" >$OUT 2>$ERR
    retc=$?
    if (( $retc != 0 )) ; then
       gripe "ssh Test-0: $myhost unable to reach $otherhost: $(<$ERR)"
@@ -227,7 +245,7 @@ function check_ssh_setup {
       return 0
    fi
 
-   local otherhosts=$(ssh -o StrictHostKeyChecking=no $otherhost cat /etc/hosts)
+   local otherhosts=$($SSH -o StrictHostKeyChecking=no $otherhost cat /etc/hosts)
    if [[ -z "$otherhosts" ]] ; then
       gripe "ssh Test-0: $myhost unable to cat /etc/hosts on $otherhost. Please fix and re-try"
       return 4
@@ -260,7 +278,7 @@ function do_check_ssh_setup {
    touch $ERR && [[ -w $ERR ]] || abend "${FUNCNAME[0]}: unable to write to $ERR"
 
    # Test-1: check whether possible to reach $otherhost with ssh - fingerprint known or not
-   timeout 9s bash -c 'ssh -o StrictHostKeyChecking=no '$otherhost' echo $(id -un):$(id -gn)' >$OUT 2>$ERR
+   timeout 9s bash -c "$SSH -o StrictHostKeyChecking=no $otherhost echo '$(id -un):$(id -gn)'" >$OUT 2>$ERR
    retc=$?
    if (( $retc != 0 )) ; then
       message "ssh Test-1: $myhost unable to reach $otherhost: $(<$ERR)"
@@ -272,7 +290,7 @@ function do_check_ssh_setup {
    fi
 
    # Test-3: check whether otherhost can reach me with ssh - fingerprint known or not
-   timeout 9s bash -c 'ssh '$otherhost' ssh -o StrictHostKeyChecking=no '$myhost' id -un' &> $ERR
+   timeout 9s bash -c "$SSH $otherhost $SSH -o StrictHostKeyChecking=no $myhost id -un" &> $ERR
    retc=$?
    if (( $retc != 0 )) ; then
       message "ssh Test-3: $otherhost unable to reach $myhost: $(<$ERR)"

@@ -1,5 +1,5 @@
 #
-# $Id: lib/sql.sh 3.21 2017-10-30 15:23:44 rob.navarro $
+# $Id: lib/sql.sh 3.32 2018-05-16 21:15:14 cmayer $
 #
 # run sql statements
 # potentially logging, potentially with timeouts,
@@ -80,7 +80,7 @@ function sql {
 	if [ "$1" == localhost ] ; then
 		COMMAND=($MYSQL -BE --host=localhost "${CONNECT[@]}" controller)
 	else
-		COMMAND=(ssh $1 $APPD_ROOT/HA/mysqlclient.sh)
+		COMMAND=($SSH $1 $APPD_ROOT/HA/mysqlclient.sh)
 	fi
 
 	if [ $# -lt 3 ] ; then

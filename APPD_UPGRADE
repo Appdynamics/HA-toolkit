@@ -1,4 +1,4 @@
-$Id: APPD_UPGRADE 3.26 2017-08-09 14:44:58 cmayer Exp $
+$Id: APPD_UPGRADE 3.32 2018-05-16 21:15:14 cmayer Exp $
 
 This document describes the best practice workflow for upgrading the
 controllers in an HA cluster.  In the below workflow, the distinction
@@ -30,62 +30,71 @@ use a different privilege escalation method, replace the invocations of
 7) now secondary is unaffected by changes on primary so it is a good backup 
    in case upgrade fails. Secondary is up to the minute copy of primary.
 
-8) on primary: upgrade controller
+8) on primary: stop the database
+   the controller installer cannot run with the database running
+
+9) on primary: upgrade controller
    this updates the database schema and controller binaries only on the
    primary, since mysql replication is paused by the stopping of the mysql
    instance on the secondary.
 
-9) on primary: stop controller appserver and database
+10) on primary: stop controller appserver and database
     sudo service appdcontroller-db stop
 
-10) on primary: compare pre & post upgraded domain.xml & db.cnf configs and 
+11) on primary: compare pre & post upgraded domain.xml & db.cnf configs and 
     add in any local changes that were not preserved during upgrade. The
     secondary will contain the pre-upgrade files.
 
-11) on primary: start the controller
+12) reinstall the enciphered mysql password
+    the installer may remove this, and the HA toolkit must use it to connect
+    to the mysql instance.
+    
+    cd to HA and run ./save_mysql_passwd.s
+
+13) on primary: start the controller
     sudo service appdcontroller start
 
-12) validate installation
+14) validate installation
     Once Glassfish up, login to UI via browser directly to server, 
     if all looks good logout. Verify that curl 
        <controller>:<port>/controller/rest/serverstatus returns 
     updated version and <available>true<available>. 
 
-13) if upgrade is deemed unsuccessful on the primary, proceed to step FAIL 1
+15) if upgrade is deemed unsuccessful on the primary, proceed to step FAIL 1
     debug of the upgrade may be profitable if small configuration steps were
     incorrectly performed; the installer may be run repeatedly to repair the
     upgrade if needed.
 
 --------- PROCEED HERE ONLY IF UPGRADE GOOD --------------
 
-14) on secondary: start database 
+16) on secondary: start database 
     sudo service appdcontroller-db start
 
-15) on secondary: wait for database to apply schema and other changes
+17) on secondary: wait for database to apply schema and other changes
     monitor HA/appdstatus.sh until it reports Seconds_Behind_Master: 0
 
-16) on secondary: stop MySQL
+18) on secondary: stop MySQL
     sudo service appdcontroller-db stop
 
-17) on secondary: upgrade controller
+19) on secondary: upgrade controller
     since the database is marked passive, no changes are applied to the
     database
 
-18) on secondary: stop controller and database
+20) on secondary: stop controller and database
     sudo service appdcontroller-db stop
 
-19) on secondary: apply changes to domain.xml and db.cnf
+21) on secondary: apply changes to domain.xml and db.cnf
     domain.xml may be copied from the primary, db.cnf can but must have a unique server-id value
 
-20) on secondary: start the database and controller
+22) on secondary: start the database and controller
     sudo service appdcontroller-db start
     bin/controller.sh start-appserver
 
-21) on secondary: verify appserver startup
+23) on secondary: verify appserver startup
     verify that curl <controller>:<port>/controller/rest/serverstatus 
     returns updated version and <available>false<available>.
 
-22) on secondary; stop secondary appserver
+24) on secondary; stop secondary appserver
     bin/controller.sh stop-appserver
 
 --------- PROCEED HERE ONLY IF UPGRADE BAD --------------

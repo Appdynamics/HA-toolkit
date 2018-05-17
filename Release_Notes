@@ -740,3 +740,17 @@ Release notes for version 3.31
    not an unusual thing if the primary is corrupt and in a crash-restart loop.
 
 3) appdservice-noroot.sh now reports when the assassin is being started
+
+--------------------------------------
+Release notes for version 3.32
+
+1) the APPD_UPGRADE document now more accurately describes the steps that must be undertaken to
+   upgrade the controller.  specifically, added a halt to the primary database and installation
+   of the obfuscated mysql password.
+
+2) certain installations require a hook to modify the execution path for ssh/scp.   
+   this is now explicitly done via the addition of a optional configuration file, HA_ENVIRONMENT.   
+   this config file is sourced by the package automatically.
+
+3) a missing redirection caused the file pruning code in version 3.31 to not work
+

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: assassin.sh 3.25 2017-06-29 17:19:20 cmayer $
+# $Id: assassin.sh 3.32 2018-05-16 21:15:14 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -95,7 +95,7 @@ while true ; do
 	# load balancer.  this cannot wait.
 	# 
 	message "killing appserver unconditionally on $primary"
-	ssh $primary pkill -9 -f ".*java .*appserver/glassfish"
+	$SSH $primary pkill -9 -f ".*java .*appserver/glassfish"
 
 	#
 	# if the local database becomes primary, we don't need to run anymore.
@@ -109,7 +109,7 @@ while true ; do
 	#
 	# if we can't get through, no point doing real work for now. loop
 	#
-	if ! ssh $primary date >/dev/null 2>&1 ; then
+	if ! $SSH $primary date >/dev/null 2>&1 ; then
 		continue;
 	fi
 
@@ -134,9 +134,9 @@ while true ; do
 	# re-run replication to allow startup.
 	#
 	message "persistently disabling appserver on $primary"
-	ssh $primary mv -f $APPD_ROOT/bin/controller.sh \
+	$SSH $primary mv -f $APPD_ROOT/bin/controller.sh \
 		$APPD_ROOT/bin/controller.sh-disabled | logonly 2>&1
-	ssh $primary chmod 0 $APPD_ROOT/bin/controller.sh-disabled | logonly 2>&1
+	$SSH $primary chmod 0 $APPD_ROOT/bin/controller.sh-disabled | logonly 2>&1
 
 	# 
 	# now mark our job done
