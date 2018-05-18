@@ -310,7 +310,7 @@ function usage()
 	echo "    [ -U ] unencrypted rsync"
 	echo "    [ -z ] enable rsync compression"
 #	echo "    [ -u ] upgrade fixup"
-	echo "    [ -M ] inhibit ssh connectivity check
+	echo "    [ -M ] inhibit ssh connectivity check"
 	echo "    [ -E ] unbreak replication"
 	echo "    [ -n ] no appserver start"
 	echo "    [ -S ] enable SSL for replication traffic"
