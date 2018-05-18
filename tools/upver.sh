@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# $Id: ./upver.sh 3.35 2018-05-18 13:33:57 cmayer Exp $
+# $Id: tools/upver.sh 3.33 2018-05-18 13:36:05 cmayer Exp $
 
 function usage() {
 	echo usage: $0 [filenames]

@@ -1,6 +1,6 @@
 #
 # makefile for HA script distro
-# $Id: Makefile 3.26 2017-10-21 00:44:18 rob.navarro $
+# $Id: Makefile 3.33 2018-05-18 13:36:05 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -105,6 +105,9 @@ install: HA.shar
 		done ; \
 		wait ; \
 	fi
+
+upver:
+	tools/upver.sh `git ls-files -m`
 
 #
 # not used normally, as the install-init.sh compiles it in an installation
