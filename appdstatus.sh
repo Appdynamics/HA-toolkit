@@ -2,7 +2,7 @@
 #
 # print out the status of the appdynamics controller on this node
 #
-# $Id: appdstatus.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: appdstatus.sh 3.34 2018-06-01 15:50:06 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -140,7 +140,7 @@ case $? in
 esac
 
 if [ -f $APPD_ROOT/HA/numa.settings ] ; then
-	numastat mysqld java
+	numastat $(pgrep -u $(get_runuser) 'mysqld|java')
 fi
 
 exit 0 

@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: numa-patch-controller.sh 3.13 2017-10-21 00:47:23 rob.navarro $
+# $Id: numa-patch-controller.sh 3.34 2018-06-01 15:50:06 cmayer $
 #
 # patch the controller.sh script to enable numa support
 #
@@ -91,6 +91,46 @@ if grep "start-domain" $CONTR_TMP | grep -qv NUMA_JAVA ; then
 	w
 	q
 ADDSTARTDOMAIN
+	err=$?
+fi
+
+#
+# check if controller.sh has reporting service numa-ized
+#
+if grep "reports-service.sh start" $CONTR_TMP | grep -qv NUMA_JAVA ; then
+	ex -s $CONTR_TMP <<- ADDSTARTREPT
+	/reports-service.sh start/
+	i
+	#### edited by numa-patch-controller.sh ####
+	.
+	+
+	s,^,\$NUMA_JAVA,
+	a
+	#### end edit ####
+	.
+	w
+	q
+ADDSTARTREPT
+	err=$?
+fi
+
+#
+# check if controller.sh has events service numa-ized
+#
+if grep "events-service.sh start" $CONTR_TMP | grep -qv NUMA_JAVA ; then
+	ex -s $CONTR_TMP <<- ADDSTARTEVT
+	/events-service.sh start/
+	i
+	#### edited by numa-patch-controller.sh ####
+	.
+	+
+	s,nohup,nohup \$NUMA_JAVA,
+	a
+	#### end edit ####
+	.
+	w
+	q
+ADDSTARTEVT
 	err=$?
 fi
 

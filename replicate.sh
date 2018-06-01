@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.33 2018-05-17 13:28:43 cmayer $
+# $Id: replicate.sh 3.34 2018-06-01 15:50:06 cmayer $
 #
 # install HA to a controller pair
 #
@@ -299,7 +299,7 @@ function usage()
 	fi
 	echo "usage: $0 <options>"
 	echo "    -s <secondary hostname>"
-#	echo "    [ -j ] Synchronize controller app server configurations and related binaries"
+	echo "    [ -j ] Synchronize controller app server configurations and related binaries"
 	echo "    [ -e [protocol://]<external vip>[:port] ]"
 	echo "    [ -i [protocol://]<internal vip>[:port] ]"
 	echo "    [ -m <monitoring descriptor> see setmonitor.sh -h"

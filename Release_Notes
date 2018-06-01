@@ -762,3 +762,14 @@ Release notes for version 3.33
 
 2) we add a means of disabling the bidirectional ssh checks for installations that cannot install the
    primary and secondary hosts into the host files.
+
+--------------------------------------
+Release notes for version 3.34
+
+1) numa-patch-controller.sh now also patches the events and reporting services
+   to run on the java node
+
+2) appdstatus.sh now does not attempt to get the numastat of non-runuser 
+   processes.
+
+3) replicate -j now added to replicate help.
