@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.34 2018-06-01 15:50:06 cmayer $
+# $Id: replicate.sh 3.35 2018-07-06 22:51:53 cmayer $
 #
 # install HA to a controller pair
 #
@@ -534,10 +534,6 @@ fi
 require "ex" "vim-minimal" "vim-tiny" || exit 1
 require "rsync" "rsync" "rsync" || exit 1
 
-if $debug ; then
-	require "parallel" "moreutils-parallel" "parallel" || exit 1
-fi
-
 #
 # kill a remote rsyncd if we have one
 #
@@ -550,12 +546,18 @@ function kill_rsyncd() {
 }
 
 function cleanup() {
+	if [ -n "$secondary" ] ; then
+		ssh $secondary rm -rf $tmpdir
+	fi
 	rm -rf $tmpdir
 	kill_rsyncd
 	rm -f $INTERLOCK
 }
 
-trap cleanup EXIT
+if ! $debug ; then
+	trap cleanup EXIT
+fi
+
 cleanup
 mkdir -p $tmpdir
 
@@ -910,51 +912,35 @@ $SSH $secondary rm -f $datadir/master.info
 if ! $hotsync ; then
 	runcmd rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info
 	#
-	# maximum paranoia:  build space ID maps of each of the innodb data files and 
+	# maximum paranoia:  build md5 summaries for the data files and 
 	# prune differences
 	# caution: gnarly quoting
 	#
-	# buld 3 lists:
-	# for ibd files <= 1M or .par or .frm, md5 of the whole thing
-	# for .par and .frm files, md5
-	# for ibd file > 1M, md5 of the first 16k
+	# md5 the first 1M if it is there
 	#
-	message "Building innodb file maps"
-	rm -f $tmpdir/ibdlist.local $tmpdir/ibdlist.remote
+	message "Building data file maps"
 
-	find $datadir/controller \
-		\( -name \*.ibd -not -size +1M \) \
-		-or -name \*.par \
-		-or -name \*.frm \
-		-exec sh -c 'echo -n "{} " ; cat {} | md5sum -' \; \
-		> $tmpdir/ibdlist.small.local
+	rm -f $tmpdir/ha.makemap \
+		$tmpdir/map.local $tmpdir/map.remote \
+		$tmpdir/worklist $tmpdir/difflist
 
-	find $datadir/controller \
-		-name \*.ibd -size +1M \
-		-exec sh -c 'echo -n "{} " ; dd if={} count=32 status=none | md5sum -' \; \
-		> $tmpdir/ibdlist.large.local
+cat <<- MAPPROG >$tmpdir/ha.makemap
+	find $datadir -type f -print | awk '
+	{ system("echo -n " \$1 "\" \"; dd if=" \$1 " status=none count=32 | md5sum -")}
+	' | sort -u > $tmpdir/map.local
+MAPPROG
 
-	$SSH $secondary mkdir -p $datadir/controller
+	$SSH $secondary mkdir -p $datadir $tmpdir
+	$SCP $tmpdir/ha.makemap $secondary:$tmpdir
 
-	$SSH $secondary "find $datadir/controller \
-		\( -name \*.ibd -not -size +1M \) \
-		-or -name \*.par \
-		-or -name \*.frm \
-		-exec sh -c 'echo -n \"{} \" ; cat {} | md5sum' \;" \
-		> $tmpdir/ibdlist.small.remote
+	bash $tmpdir/ha.makemap
+	$SSH $secondary bash $tmpdir/ha.makemap
+	$SCP $secondary:$tmpdir/map.local $tmpdir/map.remote
 
-	$SSH $secondary "find $datadir/controller \
-		-name \*.ibd -size +1M \
-		-exec sh -c 'echo -n \"{} \" ; dd if={} count=32 status=none | md5sum' \;" \
-		> $tmpdir/ibdlist.large.remote
-
-	cat $tmpdir/ibdlist.small.local $tmpdir/ibdlist.large.local | \
-		sort > $tmpdir/sums.local
-
-	cat $tmpdir/ibdlist.small.remote $tmpdir/ibdlist.large.remote | \
-		sort > $tmpdir/sums.remote
-
-	diff $tmpdir/sums.local $tmpdir/sums.remote | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/worklist
+	# the difflist is all files different md5's or non-existent on one
+	diff $tmpdir/map.local $tmpdir/map.remote | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/difflist
+	# the worklist is all files that are different that exist on remote
+	fgrep -f $tmpdir/difflist $tmpdir/map.remote | awk '{print $1}' > $tmpdir/worklist
 
 	discrepancies=`wc -w $tmpdir/worklist | awk '{print $1}'`
 	if [ $discrepancies -gt 0 ] ; then
@@ -1125,13 +1111,6 @@ if [ -n "$machine_agent" ] ; then
 	ma_def="$machine_agent"
 fi
 ./setmonitor.sh -s $secondary -i $internal_vip "$monitor_def_flag" "$monitor_def" "$ma_def_flag" "$ma_def"
-
-if $debug ; then
-	message "building file lists"
-	ls -1 $datadir/controller/* | parallel md5sum | sort -k 2 --buffer-size=10M > $APPD_ROOT/logs/filelist.primary &
-	$SSH $secondary 'ls -1 '$datadir'/controller/* | parallel md5sum' | sort -k 2 --buffer-size=10M > $APPD_ROOT/logs/filelist.secondary &
-	wait
-fi
 
 if $wildcard ; then
 	grant_primary='%'

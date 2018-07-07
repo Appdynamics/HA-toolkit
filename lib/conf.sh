@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/conf.sh 3.32 2018-05-16 21:15:14 cmayer $
+# $Id: lib/conf.sh 3.35 2018-07-06 22:51:53 cmayer $
 #
 # contains common code used to extract and set information in the
 # config files.
@@ -44,6 +44,13 @@ WATCHDOG_ERROR=$APPD_ROOT/logs/watchdog.error
 DOMAIN_XML=$APPD_ROOT/appserver/glassfish/domains/domain1/config/domain.xml
 CONTROLLER_SH=$APPD_ROOT/bin/controller.sh
 MYSQLCLIENT=$APPD_ROOT/HA/mysqlclient.sh
+
+# must have accessible db.cnf
+if ! [ -f $DB_CONF ] ; then
+	echo $DB_CONF not readable
+	exit 1
+fi
+
 
 # requires gnu sed
 if ! sed --version >/dev/null 2>&1 ; then

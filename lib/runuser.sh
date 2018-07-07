@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/runuser.sh 3.20 2018-01-21 22:10:49 rob.navarro $
+# $Id: lib/runuser.sh 3.35 2018-07-06 22:51:53 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -55,6 +55,10 @@
 function get_runuser {
 	if [[ -z "$APPD_ROOT" ]] ; then
 		echo "ERROR: ${FUNCNAME[0]}: APPD_ROOT is not set. This is a coding bug! " >&2
+		exit 1
+	fi
+	if ! [ -f $APPD_ROOT/db/db.cnf ] ; then
+		echo "ERROR: ${FUNCNAME[0]}: $APPD_ROOT/db.cnf not readable" >&2
 		exit 1
 	fi
 	local euser RETC
