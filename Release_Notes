@@ -784,3 +784,10 @@ Release notes for version 3.35
 2) some vestigial testing code was removed
 
 3) the init scripts now fail quickly if the db.cnf is missing
+
+--------------------------------------
+Release notes for version 3.36
+
+1) older versions of /usr/bin/dd do not support the status=none option. this broke the replication
+   file pruning code.  I added the trivial fix of redirecting stderr to /dev/null.
+

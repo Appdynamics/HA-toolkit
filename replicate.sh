@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.35 2018-07-06 22:51:53 cmayer $
+# $Id: replicate.sh 3.36 2018-07-10 10:37:44 cmayer $
 #
 # install HA to a controller pair
 #
@@ -926,7 +926,7 @@ if ! $hotsync ; then
 
 cat <<- MAPPROG >$tmpdir/ha.makemap
 	find $datadir -type f -print | awk '
-	{ system("echo -n " \$1 "\" \"; dd if=" \$1 " status=none count=32 | md5sum -")}
+	{ system("echo -n " \$1 "\" \"; dd if=" \$1 " count=32 2>/dev/null | md5sum -")}
 	' | sort -u > $tmpdir/map.local
 MAPPROG
 
