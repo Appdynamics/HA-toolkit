@@ -791,3 +791,8 @@ Release notes for version 3.36
 1) older versions of /usr/bin/dd do not support the status=none option. this broke the replication
    file pruning code.  I added the trivial fix of redirecting stderr to /dev/null.
 
+--------------------------------------
+Release notes for version 3.37
+
+1) a dependency on locale makes the pruning code collation order dependent.   I eliminate the problem
+   by sorting only on the primary.   this fixes an excessive pruning problem.

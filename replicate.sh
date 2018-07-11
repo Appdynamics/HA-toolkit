@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.36 2018-07-10 10:37:44 cmayer $
+# $Id: replicate.sh 3.37 2018-07-11 14:44:43 cmayer $
 #
 # install HA to a controller pair
 #
@@ -927,18 +927,22 @@ if ! $hotsync ; then
 cat <<- MAPPROG >$tmpdir/ha.makemap
 	find $datadir -type f -print | awk '
 	{ system("echo -n " \$1 "\" \"; dd if=" \$1 " count=32 2>/dev/null | md5sum -")}
-	' | sort -u > $tmpdir/map.local
+	' > $tmpdir/map.local
 MAPPROG
 
 	$SSH $secondary mkdir -p $datadir $tmpdir
 	$SCP $tmpdir/ha.makemap $secondary:$tmpdir
-
+	
 	bash $tmpdir/ha.makemap
+	sort -u $tmpdir/map.local > $tmpdir/map.local.sort
+
 	$SSH $secondary bash $tmpdir/ha.makemap
 	$SCP $secondary:$tmpdir/map.local $tmpdir/map.remote
+	sort -u $tmpdir/map.remote > $tmpdir/map.remote.sort
 
 	# the difflist is all files different md5's or non-existent on one
-	diff $tmpdir/map.local $tmpdir/map.remote | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/difflist
+	diff $tmpdir/map.local.sort $tmpdir/map.remote.sort | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/difflist
+
 	# the worklist is all files that are different that exist on remote
 	fgrep -f $tmpdir/difflist $tmpdir/map.remote | awk '{print $1}' > $tmpdir/worklist
 
