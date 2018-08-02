@@ -796,3 +796,17 @@ Release notes for version 3.37
 
 1) a dependency on locale makes the pruning code collation order dependent.   I eliminate the problem
    by sorting only on the primary.   this fixes an excessive pruning problem.
+
+--------------------------------------
+Release notes for version 3.38
+
+1) false negatives in the pruning process cause replication failures.  I checksum now 256K unconditionally.
+
+--------------------------------------
+Release notes for version 3.39
+
+1) the HA_ENVIRONMENT file did not need the execute bit
+
+2) ssh was directly invoked in the cleanup function.  it should use $SSH.
+
+
