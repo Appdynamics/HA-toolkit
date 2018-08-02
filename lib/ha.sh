@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/ha.sh 3.33 2018-05-17 13:28:43 cmayer $
+# $Id: ha.sh 3.34 2018-08-02 12:28:23 cmayer $
 #
 # ha.sh
 # this file generally contains functions and definitions that are not included in the
@@ -34,7 +34,7 @@ SCP=scp
 # if this file exists, source it to set any local customizations to the execution environment
 # specifically, if you have a local ssh, point to it in here
 #
-if [ -x HA_ENVIRONMENT ] ; then
+if [ -s HA_ENVIRONMENT ] ; then
 . HA_ENVIRONMENT
 fi
 
