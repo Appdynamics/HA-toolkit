@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.38 2018-07-18 18:59:18 cmayer $
+# $Id: replicate.sh 3.39 2018-08-02 12:27:33 cmayer $
 #
 # install HA to a controller pair
 #
@@ -547,7 +547,7 @@ function kill_rsyncd() {
 
 function cleanup() {
 	if [ -n "$secondary" ] ; then
-		ssh $secondary rm -rf $tmpdir
+		$SSH $secondary rm -rf $tmpdir
 	fi
 	rm -rf $tmpdir
 	kill_rsyncd
