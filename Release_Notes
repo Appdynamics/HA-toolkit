@@ -809,4 +809,12 @@ Release notes for version 3.39
 
 2) ssh was directly invoked in the cleanup function.  it should use $SSH.
 
+--------------------------------------
+Release notes for version 3.40
+
+1) a missed line continuation caused the secondary to not remove ibdata1 and 
+   logs from the secondary when replicating.   in addition to being a source
+   of noise, this could cause a bad replicate in some rare situations.
+
+
 

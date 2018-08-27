@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.39 2018-08-02 12:27:33 cmayer $
+# $Id: replicate.sh 3.40 2018-08-27 13:48:31 cmayer $
 #
 # install HA to a controller pair
 #
@@ -738,7 +738,7 @@ if ! $appserver_only_sync ; then
 	#
 	message "inhibit running of secondary and delete mysql/innodb logfiles"
 	$SSH $secondary rm -f $APPD_ROOT/bin/controller.sh \
-		"$innodb_logdir/ib_logfile*"
+		"$innodb_logdir/ib_logfile*" \
 		"$datadir/*log*" \
 		$datadir/ibdata1 2>&1 | logonly
 	
