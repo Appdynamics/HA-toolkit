@@ -1,0 +1,60 @@
+$Id: PATCHING 3.40 2018-09-06 08:25:20 cmayer Exp $
+
+This document describes best practices for system patching of an HA
+pair.  this can be accomplished without significant data loss if a
+load balancer has been properly configured. it assumes a HA toolkit
+version of >= 3.41.  the process may be run with earlier versions with
+appropriate modification of the service start and stop procedure.
+
+the process at a high level is essentially to do orderly shutdowns in turn,
+with a failover between to absorb the metric load.  the total time to patch
+the systems will be extended by the amount of needed to allow the mysql
+instance on the secondary to catch up.
+
+in the below description, please substitute your controller install directory
+for $APPD_ROOT
+
+the detailed flow:
+
+on the secondary host: 
+1) stop the mysql instance using:
+   $APPD_ROOT/HA/appdservice.sh appdcontroller-db stop
+   this will automatically stop the watchdog process as well if it present.
+
+2) uninstall the init scripts.  this is to prevent the patching process
+   from inadvertently starting the database without a clean shutdown
+
+   HA/uninstall-init.sh
+
+3) patch the secondary machine.  upgrade the OS, libraries, security policies,
+   etc.  bring up the machine multi-user.
+
+4) log in as the root user and reinstall the init scripts using the
+   install-init.sh script using the options that were previously used.
+   this can be found by running the following command:
+
+   grep "command line options" $APPD_ROOT/logs/install-init.log | tail -1
+
+   $APPD_ROOT/HA/install-init.sh  <options from above>
+
+5) start the appdynamics services
+   $APPD_ROOT/HA/appdservice.sh appdcontroller-db start
+   $APPD_ROOT/HA/appdservice.sh appdynamics-machine-agent start
+
+
+6) wait for seconds behind master to equal 0.  if the status shows broken
+   replication by reporting NULL for seconds behind persistently, STOP and
+   fix replication.  DO NOT PROCEED with a broken database.  inspect the
+   logs/database.log to determine the cause.
+
+   $APPD_ROOT/HA/appdstatus.sh
+
+7) fail over to the secondary node.
+
+   $APPD_ROOT/HA/failover.sh
+
+8) once the new primary controller has been validated to work and is accepting
+   metrics, proceed on the former primary with steps 1 - 6.  at this point,
+   both systems have been patched and you may fail over to the original node
+   if desired.
+   
