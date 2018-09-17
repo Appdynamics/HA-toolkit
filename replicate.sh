@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.40 2018-08-27 13:48:31 cmayer $
+# $Id: replicate.sh 3.41 2018-09-17 15:50:30 cmayer $
 #
 # install HA to a controller pair
 #
@@ -494,6 +494,11 @@ if [ -z "$machine_agent" ] ; then
 		usage
 		exit 1
 	fi
+fi
+
+if [ -f NO_MACHINE_AGENT ] ; then
+	message "suppressing machine agent processing"
+	machine_agent=""
 fi
 
 if [ -n "$machine_agent" ] ; then

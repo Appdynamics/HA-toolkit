@@ -1,4 +1,4 @@
-$Id: PATCHING 3.40 2018-09-06 08:25:20 cmayer Exp $
+$Id: PATCHING 3.41 2018-09-17 15:50:30 cmayer Exp $
 
 This document describes best practices for system patching of an HA
 pair.  this can be accomplished without significant data loss if a

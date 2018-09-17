@@ -816,5 +816,18 @@ Release notes for version 3.40
    logs from the secondary when replicating.   in addition to being a source
    of noise, this could cause a bad replicate in some rare situations.
 
+--------------------------------------
+Release notes for version 3.41
 
+1) the new marker file NO_MACHINE_AGENT suppresses all processing related
+   to the machine agent; the machine agent is not started, stopped, or 
+   configured by this package if this file is present.   if your replicate
+   or other logs mention "machine agent suppressed", then this file exists
+   in your HA directory.
 
+2) a new script, appdservice.sh, is a one-size-fits-all wrapper for service
+   changes.  whatever flavor of service invocation your system is configured
+   for, appdservice.sh <service> <action> should do the right thing.
+
+3) a new document, PATCHING, now describes the best practices for managing
+   system patching or system maintenance of an HA pair.

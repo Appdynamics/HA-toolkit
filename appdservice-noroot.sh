@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.31 2018-05-04 16:09:14 cmayer $
+# $Id: appdservice-noroot.sh 3.41 2018-09-17 15:50:30 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -76,6 +76,10 @@ fi
 
 service=$1
 verb=$2
+
+if [ -f NO_MACHINE_AGENT -a "$service" == appdynamics-machine-agent ] ; then
+	exit 0
+fi
 
 case "$service:$verb" in
 

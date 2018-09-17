@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-xuser.sh 3.12 2017-03-07 17:04:25 cmayer $
+# $Id: appdservice-xuser.sh 3.41 2018-09-17 15:50:30 cmayer $
 #
 # user defined shell wrapper for appdynamics service changes
 #
@@ -46,6 +46,10 @@ case $2 in
 		usage
 		;;
 esac
+
+if [ -f NO_MACHINE_AGENT -a "$service" == appdynamics-machine-agent ] ; then
+       exit 0
+fi
 
 #
 # insert user state change handler code

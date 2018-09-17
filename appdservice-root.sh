@@ -47,5 +47,9 @@ case $2 in
 		;;
 esac
 
+if [ -f NO_MACHINE_AGENT -a "$service" == appdynamics-machine-agent ] ; then
+       exit 0
+fi
+
 /sbin/service $service $action
 exit 0

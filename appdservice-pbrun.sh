@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-pbrun.sh 3.25 2017-06-29 19:27:55 cmayer $
+# $Id: appdservice-pbrun.sh 3.41 2018-09-17 15:50:30 cmayer $
 #
 # shell wrapper around pbrun for appdynamics service changes
 #
@@ -59,6 +59,10 @@ case $2 in
 		usage
 		;;
 esac
+
+if [ -f NO_MACHINE_AGENT -a "$service" == appdynamics-machine-agent ] ; then
+       exit 0
+fi
 
 $PBRUN -p -b /sbin/service $service $action
 exit 0

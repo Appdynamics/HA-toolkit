@@ -173,6 +173,11 @@ if [ -z "$machine_agent" ] ; then
 	fi
 fi
 
+if [ -f NO_MACHINE_AGENT ] ; then
+        message "suppressing machine agent processing"
+        machine_agent=""
+fi
+
 if [ -n "$machine_agent" ] ; then
 	ma_conf="$machine_agent/conf"
 	message "found machine agent in $machine_agent"

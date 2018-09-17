@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: install-init.sh 3.26 2017-10-21 00:45:29 rob.navarro $
+# $Id: install-init.sh 3.41 2018-09-17 15:53:42 cmayer $
 #
 # install init scripts, including the machine agent.
 #
@@ -123,6 +123,12 @@ if [ -z "$machine_agent" ] ; then
 		exit 1
 	fi
 fi
+
+if [ -f NO_MACHINE_AGENT ] ; then
+        message "suppressing machine agent processing"
+        machine_agent=""
+fi
+
 if [ -n "$machine_agent" ] ; then
 	machine_agent_service=appdynamics-machine-agent
 	echo "found machine agent in $machine_agent"
