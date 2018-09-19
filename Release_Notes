@@ -831,3 +831,20 @@ Release notes for version 3.41
 
 3) a new document, PATCHING, now describes the best practices for managing
    system patching or system maintenance of an HA pair.
+
+--------------------------------------
+Release notes for version 3.42
+
+1) A longstanding bug allowed replication from a broken secondary onto
+   a good primary if the user tried to do so with the secondary database
+   stopped.   This is now much more definitive.
+
+2) a detailed analysis of the innodb file pruning code exposed an issue
+   that sometimes did not detect when the primary and secondary files
+   were not identical.   this caused the secondary database to either
+   not start, or entered into a crash-restart loop.   the new pruner
+   now calculates a sha1 of all the innodb file extent maps and insert 
+   buffer bitmaps.  in combination with the payload in the file header,
+   log sequence numbers, and so on, any stale files on the secondary will
+   be detected and pruned before the rsync.
+

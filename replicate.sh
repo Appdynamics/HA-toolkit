@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.41 2018-09-17 15:50:30 cmayer $
+# $Id: replicate.sh 3.42 2018-09-19 02:34:30 cmayer $
 #
 # install HA to a controller pair
 #
@@ -710,10 +710,12 @@ if ! $appserver_only_sync ; then
 
 	#
 	# sanity check: make sure we are not the passive side. replicating the
-	# broken half of an HA will be a disaster!
+	# broken half of an HA will be a disaster!  
+	# this requires the database to be running on the active side.
+	#
 	message "assert active side"
-	if [ "`get_replication_mode localhost`" = passive ] ; then
-		fatal 3 "copying from passive controller - BOGUS!"
+	if [ "`get_replication_mode localhost`" != active ] ; then
+		fatal 3 "copying from non-active controller - BOGUS!"
 	fi
 
 	#
@@ -917,11 +919,22 @@ $SSH $secondary rm -f $datadir/master.info
 if ! $hotsync ; then
 	runcmd rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info
 	#
-	# maximum paranoia:  build md5 summaries for the data files and 
+	# maximum paranoia:  build summaries for the data files and 
 	# prune differences
 	# caution: gnarly quoting
 	#
-	# md5 the first 1M if it is there
+	# ibd files only do the 32kb at 256MB boundaries
+	# innodb files have the following gross structure: 
+	#
+	# 16k file space header block - contains space id and extent map
+	# 16k insert buffer bit map
+	# <256MB - 32kb> data                
+	#
+	# 16k extent map                     | optional repeats
+	# 16k insert buffer bit map          |
+	# <256MB - 32kb> data                |
+	#
+	# all other files, the whole thing
 	#
 	message "Building data file maps"
 
@@ -930,9 +943,31 @@ if ! $hotsync ; then
 		$tmpdir/worklist $tmpdir/difflist
 
 cat <<- MAPPROG >$tmpdir/ha.makemap
-	find $datadir -type f -print | awk '
-	{ system("echo -n " \$1 "\" \"; dd if=" \$1 " count=512 2>/dev/null | md5sum -")}
-	' > $tmpdir/map.local
+find $datadir -type f -print | awk '
+BEGIN {
+	hunksize = (256 * 1024 * 1024);
+}
+{
+        file = \$1;
+        if (match(file, ".ibd\$")) {
+        	stat = "stat --format=%s "file;
+        	stat | getline size;
+        	close(stat);
+                cmd = "(";
+                hunks = int(size / hunksize) + 1;
+                for (hunk = 0; hunk < hunks; hunk++) {
+                        skip = (hunk * hunksize) / 16384;
+                        cmd = cmd"dd if="file" bs=16k count=2 skip="skip";";
+                }
+                cmd = cmd")";
+        } else {
+                cmd = "dd if="file
+        }
+        cmd = cmd" 2> /dev/null | sha1sum -";
+        cmd | getline sha1;
+        close(cmd);
+        print file, sha1;
+}' > $tmpdir/map.local
 MAPPROG
 
 	$SSH $secondary mkdir -p $datadir $tmpdir
