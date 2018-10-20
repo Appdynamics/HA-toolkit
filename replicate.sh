@@ -1208,8 +1208,9 @@ else
 	[[ "$secondary1" == "localhost" ]] && secondary1=""	# lose this contribution if just localhost
 
 	# unique list of hostnames - they might not be reachable though...
-	grant_primary_unique_hosts=$(sort -u <<< "$(printf '%s\n' $grant_primary $primary1)")
-	grant_secondary_unique_hosts=$(sort -u <<< "$(printf '%s\n' $grant_secondary $secondary1)")
+	# Exempt special 'loghost' alias as it can appear on separate IP row for each HA server
+	grant_primary_unique_hosts=$(sort -u <<< "$(printf '%s\n' $grant_primary $primary1 | fgrep -vw loghost)")
+	grant_secondary_unique_hosts=$(sort -u <<< "$(printf '%s\n' $grant_secondary $secondary1 | fgrep -vw loghost)")
 
 	# verify_no_shared_names "$grant_primary_unique_hosts" "$grant_secondary_unique_hosts" || exit 1
 	for i in $grant_primary_unique_hosts ; do

@@ -329,7 +329,7 @@ function poll {
 		#
 		# then, is the primary database up listening
 		# (use <<< "$dbpasswd" to allow for spaces in password)
-		if $SSH $primary $MYSQLADMIN "${ACONNECT[@]}" ping <<< "$dbpasswd" &>/dev/null; then
+		if $SSH $primary $MYSQLADMIN "${ACONNECT[@]}" ping <<< "$dbpasswd" 2>&1 | fgrep 'mysqld is alive' ; then
 			dbfail=0
 		else
 			dbopfail=0

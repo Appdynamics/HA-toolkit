@@ -429,7 +429,8 @@ FILE_RUNUSER=$(dbcnf_get user)
 #
 if [ -n "$RUNUSER" ] ; then
 	if [ $FILE_RUNUSER != $RUNUSER ] ; then
-		echo "runuser inconsistent: sysconfig: $RUNUSER db.cnf: $FILE_RUNUSER"
+		echo "runuser inconsistent: previously installed Linux services refer to user: $RUNUSER whereas $DB_CONF contains: user=$FILE_RUNUSER" 1>&2
+		echo "ensure runuser values consistent - maybe by correcting db.cnf and re-installing Linux services with install-init.sh" 1>&2
 	fi
 fi
 RUNUSER=$FILE_RUNUSER

@@ -83,7 +83,7 @@ if [ -f $APPD_ROOT/HA/LOG_SQL ] ; then
 	cat $ERR $RESULT >> $LOGFILE
 fi
 
-[[ -s "$ERR" ]] && cat $ERR
+[[ -s "$ERR" ]] && cat $ERR 1>&2
 [[ -s "$RESULT" ]] && cat $RESULT
 
 rm -f $RESULT $SQL $ERR

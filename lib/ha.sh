@@ -238,22 +238,16 @@ function check_ssh_setup {
    fi
    rm -f $OUT $ERR
 
-   local myhosts=$(< /etc/hosts)
-   if [[ -z "$myhosts" ]] ; then
-      gripe "ssh Test-0: $myhost unable to read /etc/hosts. Please fix and re-try"
-      return 4
-   fi
-
-   local mynames=$(get_names $myhost <<< "$myhosts" | sort -ur)
+   local mynames=$(get_names $myhost <<< "$(getent hosts $myhost)")
    if [[ -z "$mynames" ]] ; then
       gripe "ssh Test-0: $myhost unable to find any /etc/hosts entries for itself."
       gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...Skipping test"
       return 0
    fi
 
-   local otherhosts=$($SSH -o StrictHostKeyChecking=no $otherhost cat /etc/hosts)
+   local otherhosts=$($SSH -o StrictHostKeyChecking=no $otherhost getent hosts $otherhost)
    if [[ -z "$otherhosts" ]] ; then
-      gripe "ssh Test-0: $myhost unable to cat /etc/hosts on $otherhost. Please fix and re-try"
+      gripe "ssh Test-0: $myhost unable to 'getent hosts $otherhost' on $otherhost. Please fix and re-try"
       return 4
    fi
 
@@ -266,8 +260,8 @@ function check_ssh_setup {
 
    # now check that all names for current hostname can make passwordless ssh call to all names
    # for $otherhost and vice-versa
-   for i in $(sort -u <<< "$(printf '%s\n' $mynames)") ; do
-      for j in $(sort -u <<< "$(printf '%s\n' $othernames)") ; do
+   for i in $(sort -u <<< "$(printf '%s\n' $mynames | fgrep -vw loghost)") ; do
+      for j in $(sort -u <<< "$(printf '%s\n' $othernames | fgrep -vw loghost)") ; do
          do_check_ssh_setup $i $j || return $?
       done
    done

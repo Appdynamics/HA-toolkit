@@ -848,3 +848,12 @@ Release notes for version 3.42
    log sequence numbers, and so on, any stale files on the secondary will
    be detected and pruned before the rsync.
 
+--------------------------------------
+Release notes for version 3.43
+
+1) Fixed 'Access denied' message in primary's database.log caused by watchdog.sh 
+   failing to call mysqladmin ping via ssh. This issue only appears with v5.7
+   MySQL.
+
+2) Tidied up few small issues and enhanced some error messages to be easier to 
+   self remediate.

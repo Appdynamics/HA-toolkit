@@ -178,11 +178,11 @@ function get_mysql_passwd {
 			fatal 2 "unable to deobfuscate passwd from $rootpw_obf"
 		echo $clear
 	elif [[ -s $mysqlpw && -n "$MYSQL_TEST_LOGIN_FILE" ]] ; then
-		clear=$(awk -F= '$1 ~ "word" {print $2}' <<< "$(../db/bin/my_print_defaults -s client)")
+		clear=$(awk -F= '$1 ~ "word" {print $2}' <<< "$($APPD_ROOT/db/bin/my_print_defaults -s client)")
 		[[ -n "$clear" ]] || fatal 3 "unable to get passwd from $mysqlpw"
 		echo $clear
 	else
-		fatal 3 "no password in MYSQL_ROOT_PASSWORD, db/.rootpw, db/.rootpw.obf or db/.mylogin.cnf please run save_mysql_passwd.sh"
+		fatal 3 "no password in MYSQL_ROOT_PASSWD, db/.rootpw, db/.rootpw.obf or db/.mylogin.cnf please run save_mysql_passwd.sh"
 	fi
 }
 export -f get_mysql_passwd
