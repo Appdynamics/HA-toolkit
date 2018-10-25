@@ -2,7 +2,7 @@
 #
 # Monitors INNODB
 #
-# $Id: mysql-stat.sh 3.4 2018-04-27 14:17:35 cmayer $
+# $Id: mysql-stat.sh 3.42 2018-10-25 16:52:52 cmayer $
 #
 # Copyright 2016 AppDynamics, Inc
 #
