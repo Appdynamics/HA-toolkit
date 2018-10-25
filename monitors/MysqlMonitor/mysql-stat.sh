@@ -152,6 +152,16 @@ echo "select max(time) as hiwat, count(*) as xcount from information_schema.proc
 	}
 '
 
+mysql_pid=$(cat $(echo "select @@pid_file;" | $MYSQLCLIENT | awk '/@@pid_file:/ { print $2 }'))
+cat /proc/$mysql_pid/status | awk '
+/^Threads:/ { printf("name=Custom Metrics|Mysql|Threads,aggregator=OBSERVATION,value=%d\n", $2); }
+/^VmData:/ { printf("name=Custom Metrics|Mysql|VmData,aggregator=OBSERVATION,value=%d\n", int($2 / 1024)); }
+/^VmPeak:/ { printf("name=Custom Metrics|Mysql|VmPeak,aggregator=OBSERVATION,value=%d\n", int($2 / 1024)); }
+/^VmSize:/ { printf("name=Custom Metrics|Mysql|VmSize,aggregator=OBSERVATION,value=%d\n", int($2 / 1024)); }
+/^VmSwap:/ { printf("name=Custom Metrics|Mysql|VmSwap,aggregator=OBSERVATION,value=%d\n", int($2 / 1024)); }
+'
+
+
 SLEEPTIME=`date +"$NEXTSECONDS %s" | awk '{if ($1 > $2) print $1 - $2; else print 0;}'`
 sleep $SLEEPTIME
 done
