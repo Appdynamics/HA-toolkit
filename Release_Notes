@@ -857,3 +857,10 @@ Release notes for version 3.43
 
 2) Tidied up few small issues and enhanced some error messages to be easier to 
    self remediate.
+
+--------------------------------------
+Release notes for version 3.43.1
+
+1) Fixed bug within replicate.sh -E facility to re-enable replication after primary 
+   was turned off and assassin.sh had then disabled it upon finding it back up.
+   Secondary DB will now be started.

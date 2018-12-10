@@ -639,6 +639,11 @@ fi
 if $unbreak ; then
 	$SCP $APPD_ROOT/bin/controller.sh $secondary:$APPD_ROOT/bin	
 
+      	message "start secondary database"
+      	if ! remservice -t $secondary appdcontroller-db start | logonly 2>&1 ; then
+		fatal 10 "could not start secondary database"
+      	fi
+
 	sql $secondary \
 		"update global_configuration_local set value='passive' where name = 'appserver.mode';"
 	sql $secondary \
