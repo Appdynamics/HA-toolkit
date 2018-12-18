@@ -864,3 +864,13 @@ Release notes for version 3.43.1
 1) Fixed bug within replicate.sh -E facility to re-enable replication after primary 
    was turned off and assassin.sh had then disabled it upon finding it back up.
    Secondary DB will now be started.
+
+--------------------------------------
+Release notes for version 3.44
+
+1) better descriptive message in replicate startup.
+
+2) file map processing now checksums 32k at eof
+
+3) improved the code in appdservice-noroot.sh to handle machine agent and server
+   configuration.

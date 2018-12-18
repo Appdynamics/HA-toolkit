@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.41 2018-09-17 15:50:30 cmayer $
+# $Id: appdservice-noroot.sh 3.44 2018-12-18 13:52:59 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -49,20 +49,36 @@ fi
 . lib/conf.sh
 . lib/status.sh
 
-# find the java
-if ! export JAVA=$(find_java) ; then
-	echo cannot find java
-	exit 2
+# look for the service config file in the usual places
+# and load it.  sanity check it.
+APPD_ROOT_TMP=$APPD_ROOT
+conf=
+for cf in /etc/sysconfig/$service /etc/default/$service ./$service.sysconfig ; do
+	if [ -f $cf ] ; then
+		conf=$cf
+		break;
+	fi
+done
+if [ "$conf" ] ; then
+	. $conf
+else
+	echo "no $service config file found"
+fi
+if [ "$APPD_ROOT" != "$APPD_ROOT_TMP" ] ; then
+	echo "APPD_ROOT setting inconsistent $APPD_ROOT $APPD_ROOT_TMP"
+fi
+if [ "$RUNUSER" != "$(id -un)" ] ; then
+	echo "runuser inconsistent $RUNUSER $(id -un)"
 fi
 
-#
-# load in customized sysconfig files if present
-#
-if [ -f appdynamics-machine-agent.sysconfig ] ; then
-	. appdynamics-machine-agent.sysconfig
+# use the java in the config file, else find the java
+if [ -z "$JAVA" ] ; then
+	JAVA=$(find_java)
 fi
-if [ -f appdcontroller.sysconfig ] ; then
-	. appdcontroller.sysconfig
+if [ "$JAVA" ] ; then
+	export JAVA=$JAVA
+else
+	echo "java not found"
 fi
 
 function usage {
@@ -82,7 +98,6 @@ if [ -f NO_MACHINE_AGENT -a "$service" == appdynamics-machine-agent ] ; then
 fi
 
 case "$service:$verb" in
-
 appdcontroller:status|appdcontroller-db:status|appdynamics-machine-agent:status)
 	./appdstatus.sh
 	;;
@@ -163,8 +178,13 @@ appdcontroller-db:stop)
 	;;
 
 appdynamics-machine-agent:start)
-	ma_dir=`find_machine_agent`
-	if [ ! -d "$ma_dir" ] ; then
+	if [ "$MACHINE_AGENT_HOME" ] ; then
+		ma_dir=$MACHINE_AGENT_HOME
+	else
+		ma_dir=`find_machine_agent`
+	fi
+	if [ ! -f "$ma_dir/machine_agent.jar" ] ; then
+		echo "cannot find machine agent"
 		exit 0
 	fi
 	nohup $JAVA $JAVA_OPTS -jar $ma_dir/machineagent.jar >/dev/null 2>&1 &
