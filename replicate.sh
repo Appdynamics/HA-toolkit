@@ -694,7 +694,7 @@ if ! $appserver_only_sync ; then
 	#
 	# sanity check: make sure we don't have the controller.sh interlock active.
 	# if there's no controller.sh file, we are the target of an incremental!
-	message "assert non-incremental"
+	message "assert executable controller.sh"
 	if ! [ -x $APPD_ROOT/bin/controller.sh ] ; then
 		fatal 15 "copying from disabled controller - BOGUS!"
 	fi
@@ -939,6 +939,8 @@ if ! $hotsync ; then
 	# 16k insert buffer bit map          |
 	# <256MB - 32kb> data                |
 	#
+	# to detect incomplete rsync's, do the 32k at eof too.
+	#
 	# all other files, the whole thing
 	#
 	message "Building data file maps"
@@ -964,7 +966,9 @@ BEGIN {
                         skip = (hunk * hunksize) / 16384;
                         cmd = cmd"dd if="file" bs=16k count=2 skip="skip";";
                 }
-                cmd = cmd")";
+		skip = int(size / 16384) - 2;
+		if (skip < 0) { skip = 0; }
+                cmd = cmd"dd if="file" bs=16k count=2 skip="skip")";
         } else {
                 cmd = "dd if="file
         }
