@@ -148,6 +148,7 @@ appdcontroller:start)
 	;;
 
 appdcontroller:stop)
+	export AD_SHUTDOWN_TIMEOUT_IN_MIN=10
 	$APPD_ROOT/bin/controller.sh stop-appserver
 	controllerrunning
 	if [ $? -lt 3 ] ; then
