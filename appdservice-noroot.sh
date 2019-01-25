@@ -49,6 +49,18 @@ fi
 . lib/conf.sh
 . lib/status.sh
 
+function usage {
+	echo usage: "$0 [appdcontroller appdcontroller-db appdynamics-machine-agent] [start stop status]"
+	exit 1
+}
+
+if [ $# -ne 2 ] ; then
+	usage
+fi
+
+service=$1
+verb=$2
+
 # look for the service config file in the usual places
 # and load it.  sanity check it.
 APPD_ROOT_TMP=$APPD_ROOT
@@ -61,8 +73,6 @@ for cf in /etc/sysconfig/$service /etc/default/$service ./$service.sysconfig ; d
 done
 if [ "$conf" ] ; then
 	. $conf
-else
-	echo "no $service config file found"
 fi
 if [ "$APPD_ROOT" != "$APPD_ROOT_TMP" ] ; then
 	echo "APPD_ROOT setting inconsistent $APPD_ROOT $APPD_ROOT_TMP"
@@ -80,18 +90,6 @@ if [ "$JAVA" ] ; then
 else
 	echo "java not found"
 fi
-
-function usage {
-	echo usage: "$0 [appdcontroller appdcontroller-db appdynamics-machine-agent] [start stop status]"
-	exit 1
-}
-
-if [ $# -ne 2 ] ; then
-	usage
-fi
-
-service=$1
-verb=$2
 
 if [ -f NO_MACHINE_AGENT -a "$service" == appdynamics-machine-agent ] ; then
 	exit 0
