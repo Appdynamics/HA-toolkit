@@ -874,3 +874,6 @@ Release notes for version 3.44
 
 3) improved the code in appdservice-noroot.sh to handle machine agent and server
    configuration.
+
+4) added code to appdservice-noroot.sh to forcibly kill appserver if it won't 
+   stop normally.

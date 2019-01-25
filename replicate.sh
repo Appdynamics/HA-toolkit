@@ -943,6 +943,14 @@ if ! $hotsync ; then
 	#
 	# all other files, the whole thing
 	#
+	# XXX - this can be slow with a lot of files, and one case in
+	# particular, where the secondary is mostly empty, a bit stupid
+	# the right thing to do is to build the remote file list, and only
+	# sum those on the primary.  also, these can and should be run in
+	# parallel on the secondary and primary, arguably using multiple
+	# processes on each node; to the extent that this is i/o limited,
+	# might not be a win.
+	#
 	message "Building data file maps"
 
 	rm -f $tmpdir/ha.makemap \

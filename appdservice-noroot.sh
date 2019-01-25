@@ -149,6 +149,13 @@ appdcontroller:start)
 
 appdcontroller:stop)
 	$APPD_ROOT/bin/controller.sh stop-appserver
+	controllerrunning
+	if [ $? -lt 3 ] ; then
+		echo "forcibly killing appserver"
+		pkill -9 -f "$APPD_ROOT/appserver/glassfish/domains/domain1"
+		echo "truncate ejb__timer__tbl;" | run_mysql
+	fi
+
 	if [ -d "$APPD_ROOT/events_service" ] ; then
 		$APPD_ROOT/bin/controller.sh stop-events-service
 	fi
