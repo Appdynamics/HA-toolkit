@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.44 2018-12-18 13:52:59 cmayer $
+# $Id: appdservice-noroot.sh 3.45 2019-02-18 14:44:19 cmayer $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -189,7 +189,7 @@ appdynamics-machine-agent:start)
 	else
 		ma_dir=`find_machine_agent`
 	fi
-	if [ ! -f "$ma_dir/machine_agent.jar" ] ; then
+	if [ ! -f "$ma_dir/machineagent.jar" ] ; then
 		echo "cannot find machine agent"
 		exit 0
 	fi

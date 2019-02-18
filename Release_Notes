@@ -877,3 +877,10 @@ Release notes for version 3.44
 
 4) added code to appdservice-noroot.sh to forcibly kill appserver if it won't 
    stop normally.
+
+--------------------------------------
+Release notes for version 3.45
+
+1) appdservice-noroot.sh did not properly detect the machine agent jar file.
+   the symptom is that it complained, even though the file exists.
+
