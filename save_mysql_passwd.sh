@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: save_mysql_passwd.sh 3.13 2017-10-21 00:47:23 rob.navarro $
+# $Id: save_mysql_passwd.sh 3.14 2019-03-04 18:10:00 robnav $
 #
 # a simple wrapper around the obfuscated password saver function
 #
@@ -29,8 +29,19 @@ LOGFNAME=save_mysql_passwd.log
 . lib/password.sh
 
 if [ -x $APPD_ROOT/db/bin/mysql_config_editor ] ; then
+
+	# MySQL bug: https://bugs.mysql.com/bug.php?id=74691 that silently accepts less
+	# characters than entered by user after '#' character.
+	# Note MySQL bug report shows delimiting single quote work-around
+	# Note getpass source code: https://code.woboq.org/userspace/glibc/misc/getpass.c.html
+	#  shows stdin opened if no /dev/tty available. Will use this.
+	# Work-around with:
+	# - separate and reliable password collection into a variable
+	# - use setsid to disconnect controlling TTY from sub-process
+	# - use Here string to setsid with single quotes around variable
+	getpw _XYZ
 	$APPD_ROOT/db/bin/mysql_config_editor reset
-	$APPD_ROOT/db/bin/mysql_config_editor set --user=root -p
+	setsid bash -c "$APPD_ROOT/db/bin/mysql_config_editor set --user=root -p 2>$LOGFNAME" <<< "'$_XYZ'"
 else
 	save_mysql_passwd $APPD_ROOT
 fi

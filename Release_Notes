@@ -884,3 +884,8 @@ Release notes for version 3.45
 1) appdservice-noroot.sh did not properly detect the machine agent jar file.
    the symptom is that it complained, even though the file exists.
 
+--------------------------------------
+Release notes for version 3.45.1
+
+1) Fix for HA Toolkit issue #99 i.e. https://bugs.mysql.com/bug.php?id=74691
+   which loses user entered password characters with v5.7 MySQL that follow #
