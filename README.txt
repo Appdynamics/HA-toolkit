@@ -51,6 +51,16 @@ Contents:
 	appdstatus.sh: a script to replace 'service appdcontroller status' on 
 		systemd machines
 
+	mysqlclient.sh: a script that uses the built-in authentication mechanism to
+		allow the user to execute mysql commands
+	
+	failover_pre_hook.sh
+	failover_hook.sh:	these files may be created to put site-specific commands
+		that get executed before and after a secondary becomes the new primary.
+		this would be, for example, a place to do a REST call to change a CNAME
+		record in a DNS server if using that mechanism to route traffic to the active
+		node.
+
 Installation notes:
 This software is intended to connect the appdynamics controller into linux's
 service machinery.  This optionally includes a watchdog process running on the
@@ -303,15 +313,19 @@ of the HA controller pair. Getting to this state involves:
 
 If a remote controller monitor has been configured, include that '-m' option in the 
 replicate.sh command to ensure the machine agents report there also. For example:
-		./replicate.sh -s <secondary> -m url=http://cmonitor:8090,access_key="ac-ce-ss-key",account_name=customer1,app_name='Prod HA pair' -a /opt/appdyn/machine-agent/3.9.0.0 -f
+		./replicate.sh -s <secondary> 
+	-m url=http://cmonitor:8090,access_key="ac-ce-ss-key",account_name=customer1,app_name='Prod HA pair' 
+		-a /opt/appdyn/machine-agent/3.9.0.0 -f
 	 5. please note that the machine agent will be run as the same user as
         the mysql database.
 
 NUMA
 ----
-on a numa machine, it may be useful, for performance reasons,  to statically partition the machine to run mysqld on 
-one set of nodes and the java appserver on another set of nodes.  this can be easily done by running numa-patch-controller.sh
-from the HA directory, and copying the numa.settings.template to numa.settings.  edit numa.settings as needed.
+on a numa machine, it may be useful, for performance reasons,  to statically 
+partition the machine to run mysqld on one set of nodes and the java appserver on 
+another set of nodes.  this can be easily done by running numa-patch-controller.sh
+from the HA directory, and copying the numa.settings.template to numa.settings.  
+edit numa.settings as needed.
 
 Best Practices:
 ---------------
@@ -325,17 +339,18 @@ be incremental or complete, depending on the reliability of your solution.
 when the backup is done, simply start the service; replication will catch up
 and guarantee the integrity of your data.
 
-A load balancer can probe http://<controller>:<port>/rest/serverstatus
+A load balancer should do a GET to 
+http://<controller>:<port>/controller/rest/serverstatus
 to determine which of the two controllers is active. the active node will
-return a HTTP 200.
+return a HTTP 200, and the response will contain <available>true</available>.
 
 should it be necessary to have a hook in the failover process, for example to update 
-a dynamics DNS service or to notify a load balancer or proxy, the failover.sh script 
-is the place to add code.
+a dynamics DNS service or to notify a load balancer or proxy, the failover.sh script calls 
+failover_pre_hook.sh and/or failover_hook.sh if they exist and are executable.
 
 Version and Copyright
 ---------------------
-$Id: README.txt 3.8 2017-01-11 03:36:03 cmayer Exp $
+$Id: README.txt 3.46 2019-03-12 07:01:50 cmayer Exp $
 
  Copyright 2016 AppDynamics, Inc
 

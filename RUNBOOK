@@ -132,6 +132,25 @@ to fix:
 	/sbin/appdservice appdcontroller start
 
 ---------
+REPLICATION BROKEN:
+The HA package was installed, replication was healthy at some point, and the secondary
+has become corrupted or the secondary was disconnected from the primary for longer than
+expire_logs_days.  it is no longer possible to restore replication by starting the secondary
+replication slave.
+
+diagnosis:
+	on the primary:
+        service appdcontroller-db status shows
+                "Seconds_Behind_Master: <some integer>"
+
+	on the secondary:
+        service appdcontroller-db status shows
+                "Seconds_Behind_Master: NULL"
+
+to fix:
+	re-replicate from the primary using the formula for UNREPLICATED
+
+---------
 FAILED OVER, old primary broken
 The current active node has become active because of a failover.  the prior
 active node's database is inaccessible.  the assassin is running on the new
@@ -206,7 +225,7 @@ to-fix:
 
 Version and Copyright:
 ----------------------
-$Id: RUNBOOK 3.0 2016-08-04 03:09:49 cmayer Exp $
+$Id: RUNBOOK 3.46 2019-03-12 07:14:56 cmayer Exp $
 
  Copyright 2016 AppDynamics, Inc
 
