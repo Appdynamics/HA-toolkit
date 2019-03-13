@@ -889,3 +889,13 @@ Release notes for version 3.45.1
 
 1) Fix for HA Toolkit issue #99 i.e. https://bugs.mysql.com/bug.php?id=74691
    which loses user entered password characters with v5.7 MySQL that follow #
+
+--------------------------------------
+Release notes for version 3.46
+
+1) documentation fixes README.txt, correcting the URL for the health rule,
+   adding a description of the failover hooks, and minor formatting.
+
+2) documentation addition in RUNBOOK describing the process for detecting and
+   fixing the REPLICATION BROKEN state.
+
