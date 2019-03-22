@@ -10,7 +10,7 @@
 #                    Database, appserver, and HA components.
 ### END INIT INFO
 #
-# $Id: appdcontroller.sh 3.26 2017-10-21 00:45:29 rob.navarro $
+# $Id: appdcontroller.sh 3.47 2019-03-22 16:05:00 saradhip $
 # 
 # Copyright 2016 AppDynamics, Inc
 #
@@ -99,6 +99,8 @@ start)
 		ldconfig            
 	fi
 	if [ "`controller_mode`" == "active" ] ; then
+		rm -rf $APPD_ROOT/appserver/glassfish/domains/domain1/osgi-cache/
+		rm -rf $APPD_ROOT/appserver/glassfish/domains/domain1/generated/
 		bg_runuser $CONTROLLER_SH start-appserver >/dev/null
 		if replication_disabled ; then
 			if assassin_running ; then

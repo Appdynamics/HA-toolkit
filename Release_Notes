@@ -899,3 +899,9 @@ Release notes for version 3.46
 2) documentation addition in RUNBOOK describing the process for detecting and
    fixing the REPLICATION BROKEN state.
 
+--------------------------------------
+Release notes for version 3.47
+
+1) Fix to ignore mds_license.enterprise_license from list of tables being replicated
+
+2) Fix to delete contents of osgi-cache and generated directories before starting appserver, both for service and NOROOT options

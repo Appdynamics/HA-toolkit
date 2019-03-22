@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.45 2019-02-18 14:44:19 cmayer $
+# $Id: appdservice-noroot.sh 3.47 2019-03-22 16:05:00 saradhip $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -103,6 +103,8 @@ appdcontroller:status|appdcontroller-db:status|appdynamics-machine-agent:status)
 appdcontroller:start)
 	./appdservice-noroot.sh appdcontroller-db start
 	if [ $(controller_mode) == 'active' ] ; then
+	    rm -rf $APPD_ROOT/appserver/glassfish/domains/domain1/osgi-cache/
+		rm -rf $APPD_ROOT/appserver/glassfish/domains/domain1/generated/
 		nohup $APPD_ROOT/bin/controller.sh start-appserver >/dev/null 2>&1 &
 		if [ -d "$APPD_ROOT/events_service" ] ; then
 			nohup $APPD_ROOT/bin/controller.sh start-events-service >/dev/null 2>&1 &

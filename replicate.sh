@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.44 2018-12-18 13:53:13 cmayer $
+# $Id: replicate.sh 3.47 2019-03-22 16:05:00 saradhip $
 #
 # install HA to a controller pair
 #
@@ -842,6 +842,7 @@ else
 	replicate_ignore_table=controller.ejb__timer__tbl
 	replicate_ignore_table=controller.connection_validation
 	replicate_ignore_table=controller.global_configuration_local
+	replicate_ignore_table=mds_license.enterprise_license
 	replicate_wild_ignore_table=controller.mq%
 	replicate_wild_ignore_table=mysql.%
 	slave-skip-errors=1507,1517,1062,1032,1451
