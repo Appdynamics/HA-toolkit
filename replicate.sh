@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.47 2019-03-22 16:05:00 saradhip $
+# $Id: replicate.sh 3.48 2019-04-17 14:57:04 robnav $
 #
 # install HA to a controller pair
 #
@@ -843,9 +843,10 @@ else
 	replicate_ignore_table=controller.connection_validation
 	replicate_ignore_table=controller.global_configuration_local
 	replicate_ignore_table=mds_license.enterprise_license
-	replicate_wild_ignore_table=controller.mq%
+	replicate_wild_ignore_table=controller.mq%41s1
+	replicate_wild_ignore_table=controller.cssys%
 	replicate_wild_ignore_table=mysql.%
-	slave-skip-errors=1507,1517,1062,1032,1451
+	slave-skip-errors=1507,1517,1062,1032,1451,1237
 	# added to speed up startup
 	innodb_stats_sample_pages=1
 	ADDITIONS
