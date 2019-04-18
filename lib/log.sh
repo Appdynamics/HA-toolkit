@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: log.sh 3.6 2019-04-11 14:33:15 cmayer $
+# $Id: lib/log.sh 3.49 2019-04-18 11:23:36 cmayer $
 #
 # logging code for the HA toolkit - include this first
 #

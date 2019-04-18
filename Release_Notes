@@ -912,3 +912,11 @@ Release notes for version 3.48
 1) update replicate table ignore settings to be consistent with new v4.5.6 controller.mqs_* tables
 
 2) Added replicate error 1237 to ignore list to suppress: "Slave SQL thread ignored the query because of replicate-*-table rules" type messages
+
+--------------------------------------
+Release notes for version 3.49
+
+1) added a call to date to logmsg.  this will tag every log with a timestamp
+   useful for correlating with system changes, like reboots, bad guy logins,
+   and so on.
+
