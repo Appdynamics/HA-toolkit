@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: lib/log.sh 3.5 2017-11-21 10:21:04 rob.navarro $
+# $Id: log.sh 3.6 2019-04-11 14:33:15 cmayer $
 #
 # logging code for the HA toolkit - include this first
 #
@@ -85,7 +85,7 @@ function gripe {
 }
 
 function logmsg {
-	echo "  -- " "$@" >> $LOGFILE
+	echo $(date "+%T %D -- ") "$@" >> $LOGFILE
 }
 
 function message {
