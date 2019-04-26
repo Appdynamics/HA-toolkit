@@ -178,6 +178,7 @@ function stop_appdynamics_services()
 			remservice -tq $host $s stop || ((errors++))
 		fi
 	done
+	pgrep -f $APPD_ROOT/db/bin/mysqld && ((errors++))
 	return $errors;
 }
 
