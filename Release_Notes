@@ -920,3 +920,13 @@ Release notes for version 3.49
    useful for correlating with system changes, like reboots, bad guy logins,
    and so on.
 
+--------------------------------------
+Release notes for version 3.50
+
+1) added initial scalability support for MySQL datadir file difference checking (discrepency counting).
+   Default now is to split file checksumming into as many pieces as there are CPUs and run in parallel
+   on both HA servers at same time. Control more finely with -P x,y replicate.sh option. 
+   See 'while getopts' section in replicate.sh for parameter description.
+
+2) fixed lack of checking of /etc/{default,sysconfig}/app* for currency. This permitted Toolkit to
+   be updated and then fail later because the APPD_ROOT or RUNUSER values had changed.

@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.48 2019-04-17 14:57:04 robnav $
+# $Id: replicate.sh 3.50 2019-05-29 12:40:00 robnav $
 #
 # install HA to a controller pair
 #
@@ -88,6 +88,10 @@ final_rsync_opts="-PavpW --del --inplace"
 machine_agent=""
 ma_conf=""
 mysql_57=false
+CHECKSUM_RUN=ha.run_checksum
+PAR_ACROSS_SERVERS=1
+REQUESTED_SPLIT=1
+ACTUAL_SPLIT=1
 
 #
 # make sure that we are running as the appdynamics user in db.cnf
@@ -188,7 +192,7 @@ function verify_init_scripts()
 	fi
 	local host=$1
 	local ssh=`[ -n "$host" ] && echo "$SSH -q"`
-	local errors=0
+	local errors=0 i VAL
 	local NEWMD5=
 	for s in ${appdynamics_service_list[@]}
 	do 
@@ -196,6 +200,14 @@ function verify_init_scripts()
 		if [[ "$NEWMD5" != `$ssh $host md5sum /etc/init.d/$s|cut -d " " -f 1` ]] ; then
 			((errors++))
 		fi
+		for i in default sysconfig ; do
+			if [[ -s "/etc/$i/$s" ]] ; then
+				VAL=$($ssh $host cat "/etc/$i/$s" | awk -F= '$1=="APPD_ROOT" {print $2}')
+				[[ -n "$VAL" && "$APPD_ROOT" == "$VAL" ]] || (( ++errors ))
+				VAL=$($ssh $host cat "/etc/$i/$s" | awk -F= '$1=="RUNUSER" {print $2}')
+				[[ -n "$VAL" && "$RUNUSER" == "$VAL" ]] || (( ++errors ))
+			fi
+		done
 	done
 	if [ $errors -gt 0 ] ; then
 		if [ -z $host ] ; then
@@ -319,6 +331,7 @@ function usage()
 	echo "    [ -7 ] enable parallel replication for mysql 5.7"
 	echo "    [ -h ] print help"
 	echo "    [ -X ] use backup for hot sync"
+	echo "    [ -P <job-split-factor>[,0|1] ] where applicable parallelise work within a server and optionally across servers"
 	exit 1
 }
 
@@ -352,7 +365,176 @@ message "hostname: " `hostname`
 message "appd root: $APPD_ROOT"
 message "appdynamics run user: $RUNUSER"
 
-while getopts :s:e:m:a:i:dfhjut:nwzEFHMWUS7X flag; do
+#
+# determine default job split/parallelisation level - within a host
+#
+p=$(wc -l < <(lscpu -be 2> /dev/null))
+if (( p > 0 )) ; then
+	REQUESTED_SPLIT=$(( p-1 ))	# ignore header row
+else
+	REQUESTED_SPLIT=1		# assume 1 CPU if lscpu -be does not work
+fi
+
+#
+# using files fetched from secondary, prepare a checksum script to be run in parallel across
+# primary and secondary (and also in parallel on each node if enabled)
+#
+function prepare_checksum_work {
+	(( $# == 1 )) || fatal 1 "prepare_checksum_work needs single integer arg"
+	local split=$1
+	local i sofar sz fn allibds=${tmpdir}/secondary.ibds
+
+	[[ -f "${allibds}" ]] || fatal 1 "unable to open ${allibds}"
+	if [[ -s "$tmpdir/secondary.ibds" ]] ; then
+		rm -f ${tmpdir}/split*.txt ${tmpdir}/split*.out
+
+		# get total storage of .ibd files
+		local total=$(awk '{s+= $1} END {print s}' ${allibds})
+		(( total > 0 )) || fatal 1 "unable to size .ibd files from secondary"
+		local limit=$((total / split))
+	
+		# send files to each of splitXX.txt files in turn until each has ~ 1/$split
+		# of total storage. Expect threads to be balanced with roughly same volumes
+		# of .ibd data to seek & sha1sum
+		for i in $(seq 1 $split); do
+			sofar=0
+			(( i == split )) && limit=total			# avoid rounding issues, last file gets all remainder
+			while (( sofar < limit )) ; do
+				IFS=$' ' read -r sz fn || break		# no more input
+				echo "$sz $fn" >> ${tmpdir}/split.${i}.txt
+				(( sofar += sz ))
+				ACTUAL_SPLIT=$i
+			done
+		done < ${allibds}
+
+		$SCP -q $tmpdir/split*.txt $secondary:$tmpdir
+	fi
+
+	cat <<- 'EOT' > ${tmpdir}/$CHECKSUM_RUN
+(( $# >= 3 )) || { echo "ERROR: ha.run_checksum needs at least 3 args on $(hostname)" 1>&2; exit 1; }
+split=$1
+pattern='^[[:digit:]]+$'
+[[ "$split" =~ $pattern ]] || { echo "ERROR: split arg1 is not numeric on $(hostname)" 1>&2; exit 1; }
+tmpdir=$2
+[[ -d "$tmpdir" ]] || { echo "ERROR: tmpdir does not already exist on $(hostname): $tmpdir" 1>&2; exit 1; }
+datadir=$3
+[[ -d "$datadir"/controller ]] || { echo "ERROR: unable to find $datadir/controller on $(hostname) - wrong datadir?" 1>&2; exit 1; }
+sequence=${4:-0}
+[[ "$sequence" =~ $pattern ]] || { echo "ERROR: sequence arg is not numeric on $(hostname)" 1>&2; exit 1; }
+
+function checksum_ibd {
+	local sequence=${1:-0}
+
+	awk '
+	BEGIN {
+        	hunksize = (256 * 1024 * 1024);
+	}
+	{
+		size = $1;
+		file = $2;
+        	if (match(file, ".ibd$")) {
+                	cmd = "(";
+                	hunks = int(size / hunksize) + 1;
+                	for (hunk = 0; hunk < hunks; hunk++) {
+                        	skip = (hunk * hunksize) / 16384;
+                        	cmd = cmd"dd if="file" bs=16k count=2 skip="skip";";
+                	}
+                	skip = int(size / 16384) - 2;
+                	if (skip < 0) { skip = 0; }
+                	cmd = cmd"dd if="file" bs=16k count=2 skip="skip")";
+        		cmd = cmd" 2> /dev/null | sha1sum -";
+        		cmd | getline sha1;
+        		close(cmd);
+        		print file, sha1;
+        	}
+	}'
+}
+
+# older 3.2.57 Bash shells do not support references for array name passing - so use globals
+function wait_for_pids {
+	local i retc
+	
+	(( ${#pids[*]} > 0 )) || { echo "ERROR: wait_for_pids: pids array empty" 1>&2; exit 1; }
+	(( ${#status[*]} == ${#pids[*]} )) || { echo "ERROR: wait_for_pids: status(${#status[*]}) & pids(${#pids[*]}) arrays not same size" 1>&2; }
+	for i in ${pids[*]} ; do
+   		wait $i
+		retc=$?
+		(( retc == 0 )) || { echo "${status[$i]} exited with non-zero $retc" 1>&2; return $retc; }
+	done
+	return 0
+}
+
+if [[ -s "$tmpdir/secondary.ibds" ]] ; then
+	# checksum bulk .ibd files
+	for i in $(seq 1 $split); do
+		[[ -f "${tmpdir}"/split.${i}.txt ]] || { echo "ERROR: unable to find ${tmpdir}/split.${i}.txt on $(hostname)" 1>&2; exit 1; }
+	done
+	for i in $(seq 1 $split); do
+		checksum_ibd $i < ${tmpdir}/split.${i}.txt > ${tmpdir}/split.${i}.out &
+		pids+=($!)
+		status[$!]="split $i of $split on $(hostname)"	# help narrow down failing sub-task
+	done
+
+	wait_for_pids || exit $?
+
+	for i in $(seq 1 $split); do 				# assemble outputs in known location
+		cat ${tmpdir}/split.${i}.out >> ${tmpdir}/map.local
+	done
+fi
+
+if [[ -s "$tmpdir/secondary.nonibds" ]] ; then
+	# Checksum smaller files i.e. everything else relevant in $datadir
+	# Do not check return code of xargs because there may be many files on $secondary that do not exist on primary
+	xargs sha1sum < $tmpdir/secondary.nonibds > >(awk '{print $2" "$1}' > ${tmpdir}/nonibds.out) 2> /dev/null
+
+	# instead just check that xargs output file is non-zero in size
+	[[ -s "${tmpdir}"/nonibds.out ]] || { echo "ERROR: unable to checksum non-ibd files on $(hostname)" 1>&2; exit 1; }
+
+	# assemble all output in known location
+	cat ${tmpdir}/nonibds.out >> ${tmpdir}/map.local
+fi
+
+[[ -s "${tmpdir}"/map.local ]] || { echo "ERROR: empty ${tmpdir}/map.local found on $(hostname)" 1>&2; exit 1; }
+sort -u -k 1 ${tmpdir}/map.local > ${tmpdir}/map.local.sort
+	EOT
+
+	$SCP -q ${tmpdir}/$CHECKSUM_RUN $secondary:$tmpdir
+	# now both primary and secondary should have all they need to run checksums over same filenames at same time
+}
+
+#
+# run same checksum script on both local and remote node at same time if PAR_ACROSS_SERVERS == 1
+#
+function run_checksums {
+	(( $# == 1 )) || fatal 1 "run_checksums needs single integer arg"
+	[[ -f "$tmpdir"/$CHECKSUM_RUN ]] || fatal 1 "checksum prepare file does not exist: $tmpdir/$CHECKSUM_RUN"
+	local split=$1 i startsecs endsecs pid_prim pid_sec retc=0
+
+	[[ -f "${tmpdir}/$CHECKSUM_RUN" ]] || fatal 1 "ERROR: no ${tmpdir}/$CHECKSUM_RUN found on $(hostname)"
+	ssh $secondary "bash -c '[[ -f ${tmpdir}/$CHECKSUM_RUN ]]'" || fatal 1 "ERROR: no ${tmpdir}/$CHECKSUM_RUN found on $secondary"
+	
+	startsecs=$(date +%s)
+	if (( PAR_ACROSS_SERVERS > 0 )) ; then
+		/bin/bash ${tmpdir}/$CHECKSUM_RUN $split $tmpdir $datadir 1 &
+		pid_prim=$!
+		$SSH -n $secondary /bin/bash ${tmpdir}/$CHECKSUM_RUN $split $tmpdir $datadir 2 &
+		pid_sec=$!
+		wait $pid_prim || retc=$?
+		wait $pid_sec  || retc=$?	# wait for all children to finish regardless
+		(( retc == 0 )) || exit $retc	# return latest error code to shell
+	else
+		/bin/bash ${tmpdir}/$CHECKSUM_RUN $split $tmpdir $datadir || exit $?
+		$SSH -n $secondary /bin/bash ${tmpdir}/$CHECKSUM_RUN $split $tmpdir $datadir || exit $?
+	fi
+	endsecs=$(date +%s)
+
+	message "checksumming files ($split,$PAR_ACROSS_SERVERS) took: $(( endsecs-startsecs )) seconds"
+
+	$SCP -q $secondary:$tmpdir/map.local $tmpdir/map.remote
+	$SCP -q $secondary:$tmpdir/map.local.sort $tmpdir/map.remote.sort
+}
+
+while getopts :s:e:m:a:i:dfhjut:P:nwzEFHMWUS7X flag; do
 	case $flag in
 	7)
 		mysql_57=true
@@ -461,6 +643,28 @@ while getopts :s:e:m:a:i:dfhjut:nwzEFHMWUS7X flag; do
 		fi
 		usage
 		;;
+	P)	# parallelisation required: <within a server's workload>[,<1 to parallelise across servers, 0 for serial>]
+		# For example: 25,0 <=> split a server's workload 25 ways but run in series with other servers
+		# x,y        <=> x,(y in (0,1))? y : 1
+		# x          <=> x,1 if x >= 0
+		# 0	     <=> 1
+		# <DEFAULT>  <=> <# CPUs>,1
+		# <DISABLED> <=> 0,0
+		pattern='^[[:digit:]]+$'
+		IFS=, read -r REQUESTED_SPLIT PAR_ACROSS_SERVERS <<< "$OPTARG"
+		if [[ "$REQUESTED_SPLIT" =~ $pattern ]] ; then
+			(( REQUESTED_SPLIT == 0 )) && REQUESTED_SPLIT=1
+		else
+			usage
+		fi
+		if [[ -z "$PAR_ACROSS_SERVERS" ]] ; then
+			PAR_ACROSS_SERVERS=1
+		elif [[ "$PAR_ACROSS_SERVERS" =~ $pattern ]] ; then
+			(( PAR_ACROSS_SERVERS <= 1 )) || PAR_ACROSS_SERVERS=1
+		else
+			usage
+		fi
+		;;
 	H|*)
 		if [ $flag != H ] ; then
 			echo "unknown option flag $OPTARG"
@@ -538,6 +742,7 @@ fi
 
 require "ex" "vim-minimal" "vim-tiny" || exit 1
 require "rsync" "rsync" "rsync" || exit 1
+type awk &> /dev/null || fatal 1 "awk or gawk must be installed"
 
 #
 # kill a remote rsyncd if we have one
@@ -925,10 +1130,10 @@ $SSH $secondary rm -f $datadir/master.info
 
 if ! $hotsync ; then
 	runcmd rm -f $datadir/bin-log* $datadir/relay-log* $datadir/master.info
+
 	#
 	# maximum paranoia:  build summaries for the data files and 
 	# prune differences
-	# caution: gnarly quoting
 	#
 	# ibd files only do the 32kb at 256MB boundaries
 	# innodb files have the following gross structure: 
@@ -943,76 +1148,45 @@ if ! $hotsync ; then
 	#
 	# to detect incomplete rsync's, do the 32k at eof too.
 	#
-	# all other files, the whole thing
+	# all other datadir files, the whole thing
 	#
-	# XXX - this can be slow with a lot of files, and one case in
-	# particular, where the secondary is mostly empty, a bit stupid
-	# the right thing to do is to build the remote file list, and only
-	# sum those on the primary.  also, these can and should be run in
-	# parallel on the secondary and primary, arguably using multiple
-	# processes on each node; to the extent that this is i/o limited,
-	# might not be a win.
-	#
-	message "Building data file maps"
+	message "Building data file maps ( with -P $REQUESTED_SPLIT,$PAR_ACROSS_SERVERS )"
 
-	rm -f $tmpdir/ha.makemap \
-		$tmpdir/map.local $tmpdir/map.remote \
-		$tmpdir/worklist $tmpdir/difflist
+	$SSH $secondary mkdir -p $tmpdir
+	$SSH $secondary find $datadir  -type f ! -name "auto.cnf" ! -name "relay-log*" ! -name "bin-log*" ! -name "*".ibd -print > $tmpdir/secondary.nonibds
+        $SSH $secondary find $datadir  -type f ! -name "relay-log*" ! -name "bin-log*" -name "*".ibd -ls  | awk '{print $7" "$11}' > $tmpdir/secondary.ibds
+        $SCP -q $tmpdir/secondary.nonibds $tmpdir/secondary.ibds $secondary:$tmpdir		# ensure same filenames from secondary are compared on both hosts
 
-cat <<- MAPPROG >$tmpdir/ha.makemap
-find $datadir -type f -print | awk '
-BEGIN {
-	hunksize = (256 * 1024 * 1024);
-}
-{
-        file = \$1;
-        if (match(file, ".ibd\$")) {
-        	stat = "stat --format=%s "file;
-        	stat | getline size;
-        	close(stat);
-                cmd = "(";
-                hunks = int(size / hunksize) + 1;
-                for (hunk = 0; hunk < hunks; hunk++) {
-                        skip = (hunk * hunksize) / 16384;
-                        cmd = cmd"dd if="file" bs=16k count=2 skip="skip";";
-                }
-		skip = int(size / 16384) - 2;
-		if (skip < 0) { skip = 0; }
-                cmd = cmd"dd if="file" bs=16k count=2 skip="skip")";
-        } else {
-                cmd = "dd if="file
-        }
-        cmd = cmd" 2> /dev/null | sha1sum -";
-        cmd | getline sha1;
-        close(cmd);
-        print file, sha1;
-}' > $tmpdir/map.local
-MAPPROG
+	if [[ -s "$tmpdir/secondary.nonibds" || -s "$tmpdir/secondary.ibds" ]] ; then
+		rm -f $tmpdir/ha.makemap \
+			$tmpdir/map.local $tmpdir/map.remote \
+			$tmpdir/worklist $tmpdir/difflist
 
-	$SSH $secondary mkdir -p $datadir $tmpdir
-	$SCP $tmpdir/ha.makemap $secondary:$tmpdir
-	
-	bash $tmpdir/ha.makemap
-	sort -u $tmpdir/map.local > $tmpdir/map.local.sort
+		prepare_checksum_work $REQUESTED_SPLIT		# function sets ACTUAL_SPLIT
+		echo "...using REQUESTED_SPLIT=$REQUESTED_SPLIT ACTUAL_SPLIT=$ACTUAL_SPLIT PAR_ACROSS_SERVERS=$PAR_ACROSS_SERVERS" | logonly
+		run_checksums $ACTUAL_SPLIT
 
-	$SSH $secondary bash $tmpdir/ha.makemap
-	$SCP $secondary:$tmpdir/map.local $tmpdir/map.remote
-	sort -u $tmpdir/map.remote > $tmpdir/map.remote.sort
+		# the worklist is all filenames from secondary with different local checksums
+		diff $tmpdir/map.local.sort $tmpdir/map.remote.sort | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/worklist
 
-	# the difflist is all files different md5's or non-existent on one
-	diff $tmpdir/map.local.sort $tmpdir/map.remote.sort | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/difflist
-
-	# the worklist is all files that are different that exist on remote
-	fgrep -f $tmpdir/difflist $tmpdir/map.remote | awk '{print $1}' > $tmpdir/worklist
-
-	discrepancies=`wc -w $tmpdir/worklist | awk '{print $1}'`
-	if [ $discrepancies -gt 0 ] ; then
-		message "found $discrepancies discrepancies"
-		cat $tmpdir/worklist | logonly
-		$SCP -q $tmpdir/worklist $secondary:/tmp/replicate-prune-worklist
-		$SSH $secondary "cat /tmp/replicate-prune-worklist | xargs rm -f"
+		discrepancies=$(cat $tmpdir/worklist | wc -l)		# reliably returns 0 for missing files also
+		# .ibd and non-ibd files are checked separately, so either class absent on secondary can lead to undercounting discrepencies
+		if [ $discrepancies -gt 0 ] ; then
+			MSG=""
+			[[ -s "$tmpdir/secondary.nonibds" ]] || MSG=" + all non .ibd files missing on secondary"
+			[[ -s "$tmpdir/secondary.ibds" ]] || MSG=" + all .ibd files missing on secondary"
+			message "found $discrepancies datadir discrepancies$MSG"
+			cat $tmpdir/worklist | logonly
+			$SCP -q $tmpdir/worklist $secondary:/tmp/replicate-prune-worklist
+			$SSH $secondary "cat /tmp/replicate-prune-worklist | xargs rm -f"
+		else	
+			MSG="no datadir discrepancies"
+			[[ -s "$tmpdir/secondary.nonibds" ]] || MSG="many datadir discrepencies - only .ibd files present on secondary"
+			[[ -s "$tmpdir/secondary.ibds" ]] || MSG="many datadir discrepencies - all .ibd files missing on secondary"
+			message "$MSG"
+		fi
 	else
-		message "no discrepancies"
+		message "empty secondary - so everything needs to be copied over"
 	fi
 fi
 
