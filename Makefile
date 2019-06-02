@@ -31,7 +31,7 @@ BASH_SRC= assassin.sh failover.sh watchdog.sh \
 	appdcontroller-db.sysconfig.template \
 	numa.settings.template numa-patch-controller.sh \
 	userid-patch-controller.sh check_for_root_files.sh \
-	save_mysql_passwd.sh rsyncd.conf
+	save_mysql_passwd.sh rsyncd.conf check_breaking_changes.sh
 
 BASH_LIBS= lib/password.sh lib/ha.sh lib/sql.sh lib/log.sh lib/conf.sh \
 	lib/runuser.sh lib/init.sh lib/status.sh

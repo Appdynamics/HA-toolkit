@@ -930,3 +930,11 @@ Release notes for version 3.50
 
 2) fixed lack of checking of /etc/{default,sysconfig}/app* for currency. This permitted Toolkit to
    be updated and then fail later because the APPD_ROOT or RUNUSER values had changed.
+
+--------------------------------------
+Release notes for version 3.51
+
+1) v4.5.6+ controllers require updated 'replication ignore' configs to ensure they replicate *all* tables.
+   This release includes a check for that condition, an automated attempt to make the update else it prints
+   the manual instructions to screen and logs. Check called within replicate.sh or directly via:
+   check_breaking_changes.sh

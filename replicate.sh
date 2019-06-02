@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.50 2019-05-29 12:40:00 robnav $
+# $Id: replicate.sh 3.51 2019-06-01 14:51:20 robnav $
 #
 # install HA to a controller pair
 #
@@ -1000,6 +1000,10 @@ if $final ; then
 	if [[ -x userid-patch-controller.sh ]] ; then
 		message "patching controller.sh to avoid userid startup/shutdown issues"
 		./userid-patch-controller.sh
+	fi
+	if [[ -x check_breaking_changes.sh ]] ; then
+		message "checking for version issues"
+		./check_breaking_changes.sh 1
 	fi
 
 	if $hotsync ; then
