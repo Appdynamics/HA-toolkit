@@ -45,7 +45,7 @@ fi
 # Vamshi B says (31-May-2019) version scheme may change into date style: YY.MM.DD
 # Goal here is to produce integer from version number that permits <=, =, >= comparisons
 function get_controller_version {
-	awk -F. '{printf "%01.1s%01.1s%02.2s\n", $1, $2, $3}' <(awk -F= '$1=="version" {print $2}' $APPD_ROOT/appserver/glassfish/domains/domain1/applications/controller/controller-web_war/version.properties)
+	awk -F. '{printf "%01.1d%01.1d%02.2d\n", $1, $2, $3}' <(awk -F= '$1=="version" {print $2}' $APPD_ROOT/appserver/glassfish/domains/domain1/applications/controller/controller-web_war/version.properties)
 }
 
 # return 0 if all replicate ignore configs are present exactly once as required for v4.5.6+ controllers, else 1
@@ -75,9 +75,9 @@ function dbcnf_ignore_ok_post_4506 {
 
 # backup and attempt to edit db.cnf into currently understood correct form, else print manual instructions
 function verify_repl_ignore_post_4506 {
-	local version backup=$APPD_ROOT/db/db.cnf.$(date +%s) new
+	local version backup=$APPD_ROOT/db/db.cnf.$(date +%s) new pattern='^[[:digit:]]+$'
 
-	version=$(get_controller_version) || { warn "${FUNCNAME[0]}: failed to get controller version...skipping"; return 1; }
+	version=$(get_controller_version) && [[ "$version" =~ $pattern ]] || { warn "${FUNCNAME[0]}: failed to get recognisable controller version ($version)...skipping"; return 1; }
 	if (( version >= 4506 )) ; then
 		dbcnf_ignore_ok_post_4506 && return 0		# nothing to do
 

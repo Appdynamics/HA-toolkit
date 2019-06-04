@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.51 2019-06-01 14:51:20 robnav $
+# $Id: replicate.sh 3.52 2019-06-03 20:34:31 robnav $
 #
 # install HA to a controller pair
 #
@@ -197,14 +197,14 @@ function verify_init_scripts()
 	for s in ${appdynamics_service_list[@]}
 	do 
 		NEWMD5=$(md5sum $APPD_ROOT/HA/$s.sh | cut -d " " -f 1)
-		if [[ "$NEWMD5" != `$ssh $host md5sum /etc/init.d/$s|cut -d " " -f 1` ]] ; then
+		if [[ "$NEWMD5" != `$ssh $host md5sum /etc/init.d/$s 2>/dev/null|cut -d " " -f 1` ]] ; then
 			((errors++))
 		fi
 		for i in default sysconfig ; do
 			if [[ -s "/etc/$i/$s" ]] ; then
-				VAL=$($ssh $host cat "/etc/$i/$s" | awk -F= '$1=="APPD_ROOT" {print $2}')
+				VAL=$($ssh $host cat "/etc/$i/$s" 2>/dev/null | awk -F= '$1=="APPD_ROOT" {print $2}')
 				[[ -n "$VAL" && "$APPD_ROOT" == "$VAL" ]] || (( ++errors ))
-				VAL=$($ssh $host cat "/etc/$i/$s" | awk -F= '$1=="RUNUSER" {print $2}')
+				VAL=$($ssh $host cat "/etc/$i/$s" 2>/dev/null | awk -F= '$1=="RUNUSER" {print $2}')
 				[[ -n "$VAL" && "$RUNUSER" == "$VAL" ]] || (( ++errors ))
 			fi
 		done
@@ -368,11 +368,11 @@ message "appdynamics run user: $RUNUSER"
 #
 # determine default job split/parallelisation level - within a host
 #
-p=$(wc -l < <(lscpu -be 2> /dev/null))
+p=$(wc -l < <(lscpu -p 2>/dev/null | sed '/^#/d'))
 if (( p > 0 )) ; then
-	REQUESTED_SPLIT=$(( p-1 ))	# ignore header row
+	REQUESTED_SPLIT=$p
 else
-	REQUESTED_SPLIT=1		# assume 1 CPU if lscpu -be does not work
+	REQUESTED_SPLIT=1		# assume 1 CPU if lscpu -p does not work
 fi
 
 #

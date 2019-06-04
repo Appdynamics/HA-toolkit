@@ -938,3 +938,8 @@ Release notes for version 3.51
    This release includes a check for that condition, an automated attempt to make the update else it prints
    the manual instructions to screen and logs. Check called within replicate.sh or directly via:
    check_breaking_changes.sh
+
+--------------------------------------
+Release notes for version 3.52
+
+1) Fixed minor Debian compatibility issues
