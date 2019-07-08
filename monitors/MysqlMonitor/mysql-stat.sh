@@ -2,7 +2,7 @@
 #
 # Monitors INNODB
 #
-# $Id: mysql-stat.sh 3.42 2018-10-25 16:52:52 cmayer $
+# $Id: mysql-stat.sh 3.43 2019-06-21 16:57:30 cm68 $
 #
 # Copyright 2016 AppDynamics, Inc
 #
@@ -129,7 +129,7 @@ echo "show engine innodb status\G" | $MYSQLCLIENT | awk '
 
 echo "show slave status\G" | $MYSQLCLIENT | awk '
 
-	/Seconds_Behind_Master:/ { spm = $2; }
+	/Seconds_Behind_Master:/ { if ($2 == "NULL") { spm = 999999; } else { spm = $2;} }
 
 	END { 
 		printf("name=Custom Metrics|Mysql|Slave Seconds Behind Master,aggregator=OBSERVATION,value=%d\n", spm);
