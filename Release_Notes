@@ -943,3 +943,9 @@ Release notes for version 3.51
 Release notes for version 3.52
 
 1) Fixed minor Debian compatibility issues
+
+--------------------------------------
+Release notes for version 3.53
+
+1) redefined seconds behind master custom metric to have 999999 be the value
+   that denotes broken replication.  this is a hack, but a reasonable one.
