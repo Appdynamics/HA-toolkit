@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.54 2019-08-05 22:04:42 robnav $
+# $Id: replicate.sh 3.55 2019-08-06 09:20:46 cm68 $
 #
 # install HA to a controller pair
 #
@@ -1328,6 +1328,7 @@ if $appserver_only_sync ; then
 	message "Rsync'ing controller app server only: $APPD_ROOT"
 	rsync $rsync_opts $rsync_throttle $rsync_compression               \
 	    --exclude=app_agent_operation_logs/\*                          \
+		--exclude=$datadir						\
 		--exclude=db/\*                                                \
 		--exclude=logs/\*                                              \
 		--exclude=tmp\*                                                \
@@ -1436,6 +1437,7 @@ logcmd rsync $rsync_opts \
 	--exclude=HA/\*.pid \
 	--exclude=db/\*.pid \
 	--exclude=logs/\* \
+	--exclude=$datadir \
 	--exclude=db/data \
 	--exclude=db/bin/.status \
 	--exclude=app_agent_operation_logs \

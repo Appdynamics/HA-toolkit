@@ -960,3 +960,11 @@ Release notes for version 3.54
    If you observe 'ssh_exchange_identification' errors then increase secondary/both ssh server's 
    /etc/ssh/sshd_config:MaxStartups config value so the first colon separated value is at least as big as the
    desired rsync parallel level.
+
+--------------------------------------
+Release notes for version 3.54
+
+1) a subtle bug prevented the replication with mysql 5.7 from activating if the datadir was contained in the 
+   controller subdirectory, but not in the db subdirectory.  for example, if datadir was installed as 
+   <controller root>/data, replication failed to provision.  this is because the auto.cnf file was copied as
+   part of the appserver rsync.  now the appserver sync explicitly excludes $datadir.
