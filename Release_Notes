@@ -949,3 +949,11 @@ Release notes for version 3.53
 
 1) redefined seconds behind master custom metric to have 999999 be the value
    that denotes broken replication.  this is a hack, but a reasonable one.
+
+--------------------------------------
+Release notes for version 3.54
+
+1) Added incremental and finalise replicate parallel rsync facility for just MySQL datadir. Defaults to no
+   rsync parallelism. Enable with "./replicate.sh ... -P r6" to get 6 parallel rsyncs running for datadir only.
+   Separate parameterisation for parallel running of checksum and rsync e.g. -P c10,r5 to get 10-way parallel 
+   checksum and 5-way parallel rsync.

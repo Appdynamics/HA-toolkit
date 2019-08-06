@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.52 2019-06-03 20:34:31 robnav $
+# $Id: replicate.sh 3.54 2019-08-05 22:04:42 robnav $
 #
 # install HA to a controller pair
 #
@@ -89,9 +89,9 @@ machine_agent=""
 ma_conf=""
 mysql_57=false
 CHECKSUM_RUN=ha.run_checksum
-PAR_ACROSS_SERVERS=1
-REQUESTED_SPLIT=1
-ACTUAL_SPLIT=1
+DEFAULT_CHECK_PAR_ACROSS_SERVERS=1
+DEFAULT_CHECK_REQUESTED_SPLIT=1		# default currently updated below
+DEFAULT_RSYNC_REQUESTED_SPLIT=1
 
 #
 # make sure that we are running as the appdynamics user in db.cnf
@@ -331,7 +331,7 @@ function usage()
 	echo "    [ -7 ] enable parallel replication for mysql 5.7"
 	echo "    [ -h ] print help"
 	echo "    [ -X ] use backup for hot sync"
-	echo "    [ -P <job-split-factor>[,0|1] ] where applicable parallelise work within a server and optionally across servers"
+	echo "    [ -P 'c(x,y),r(z)' ] where 'c' is for checksum parallelism, 'r' for rsync parallelism e.g. c10,r4"
 	exit 1
 }
 
@@ -367,13 +367,203 @@ message "appdynamics run user: $RUNUSER"
 
 #
 # determine default job split/parallelisation level - within a host
+# (assuming that sha1sum1 mostly consumes CPU and then disk I/O and that available CPU
+# is approximated by the number of available CPUs)
 #
 p=$(wc -l < <(lscpu -p 2>/dev/null | sed '/^#/d'))
 if (( p > 0 )) ; then
-	REQUESTED_SPLIT=$p
+	DEFAULT_CHECK_REQUESTED_SPLIT=$p
 else
-	REQUESTED_SPLIT=1		# assume 1 CPU if lscpu -p does not work
+	DEFAULT_CHECK_REQUESTED_SPLIT=1		# assume 1 CPU if lscpu -p does not work
 fi
+# Currently have no clear way to determine available rsync network bandwidth and therefore
+# unable to determine whether parallelism > 1 is likely to slow current serial implementation.
+# Hence currently leaving DEFAULT_RSYNC_REQUESTED_SPLIT=1
+
+# helper function: ensure that if incoming variable == 0 then it is set to 1
+function zero_to_one {
+	(( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <integer>" 
+	(( ${!1} == 0 )) && printf -v "$1" %s 1
+}
+# helper function: ensure incoming variable remains zero else is set to 1
+function zero_else_one {
+	(( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <integer>"
+	(( ${!1} == 0 )) || printf -v "$1" %s 1
+}
+
+# logic to hide the parameter precedence internals and simply echo the correct value
+#  CHECK_REQUESTED_SPLIT overrides
+#  GLOBAL_REQUESTED_SPLIT overrides
+#  DEFAULT_CHECK_REQUESTED_SPLIT
+# And
+#  CHECK_PAR_ACROSS_SERVERS overrides
+#  GLOBAL_PAR_ACROSS_SERVERS overrides
+#  DEFAULT_CHECK_PAR_ACROSS_SERVERS
+# e.g. 
+#  DEFAULT_CHECK_REQUESTED_SPLIT=1 
+#  GLOBAL_REQUESTED_SPLIT=12 
+#  CHECK_REQUESTED_SPLIT=
+# then REQUESTED_SPLIT inside the Checksum component needs to see: 12
+# With:
+#  DEFAULT_CHECK_REQUESTED_SPLIT=1 
+#  GLOBAL_REQUESTED_SPLIT= 
+#  CHECK_REQUESTED_SPLIT=
+# then REQUESTED_SPLIT inside the Checksum component needs to see: 1
+# With:
+#  DEFAULT_CHECK_REQUESTED_SPLIT=1 
+#  GLOBAL_REQUESTED_SPLIT=
+#  CHECK_REQUESTED_SPLIT=19
+# then REQUESTED_SPLIT inside the Checksum component needs to see: 19
+function get_value {
+	(( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <variable name>"
+	# assumes variable name: <MODULE NAME>_<VARIABLE NAME> 
+	# where module name cannot contain '_'
+	local module=${1%%_*} var=${1#*_} arg=$1 lval
+	
+	if [[ -n "${!1}" ]] ; then 
+		echo ${!1}
+	elif lval="GLOBAL_$var" && [[ -n "${!lval}" ]] ; then
+		echo "${!lval}"
+	elif lval="DEFAULT_${module}_$var" && [[ -n "${!lval}" ]] ; then
+		echo "${!lval}"
+	else
+		echo "get_value: unable to fetch value for: $arg" 1>&2
+		return 1
+	fi
+}
+
+# encapsulate the complex command line parametrization for parallelisation specification
+# Sets the global variables:
+# GLOBAL_REQUESTED_SPLIT
+# GLOBAL_PAR_ACROSS_SERVERS
+# CHECK_REQUESTED_SPLIT
+# CHECK_PAR_ACROSS_SERVERS
+# RSYNC_REQUESTED_SPLIT
+#
+# Concept is that there is default parametrization for parallelism (no -P command line option)
+# which can be overridden from command line either globally for all HA Toolkit components that want 
+# to use parallelism else specific Toolkit components can override with tailored parameters.
+# The long form for specific component parameters currently looks like:
+# -P c(m,n),r(x) which can be shortened to -P c(m,n),rx
+# Simply specifying the same level of parametrization for all components is:
+# -P (x,y) which can be shortened to -P x,y
+# Not specifying the parameters for a component will leave them at their defaults
+# -P r(9) which can be shortened to -P r9 sets rsync, r, parallelism at 9 and leaves 
+# checksum, c, at its default parallelisation
+#
+# parallelisation required: <within a server's workload>[,<1 to parallelise across servers, 0 for serial>]
+# For example: 25,0 <=> globally split a server's workload 25 ways but run in series with other servers
+# x,y        <=> x,(y in (0,1))? y : 1
+# x          <=> x,1 if x >= 0
+# 0          <=> 1
+# <DEFAULT>  <=> c(<# CPUs>,1),r(1)
+# <DISABLED> <=> 0,0
+#
+function parse_parallel_opts {
+	(( $# == 1 )) || abend "Usage: ${FUNCNAME[0]} <-P arg>"
+	# Global parallelisation parameters
+	# -P x OR -P x,y OR -P (x,y)
+	global_pattern1='^([[:digit:]]+)(,([[:digit:]]+))?$'
+	global_pattern2='^\(([[:digit:]]+)(,([[:digit:]]+))?\)$'
+	# component specific parameters
+	# -P cx OR -P cx,ry OR c(x,y) OR -P c(x,y),r(m)
+	cfirst_all_pattern1='^c([[:digit:]]+)(,r([[:digit:]]+))?$'
+	cfirst_all_pattern2='^c\(([[:digit:]]+)(,([[:digit:]]+))?\)(,r\(([[:digit:]]+)\))?$'
+	# -P rx OR -P rx,cy OR -P r(x) OR -P r(x),c(m)
+	rfirst_all_pattern1='^r([[:digit:]]+)(,c([[:digit:]]+))?$'
+	rfirst_all_pattern2='^r\(([[:digit:]]+)\)(,c\(([[:digit:]]+)(,([[:digit:]]+))?\))?$'
+	local arg=$1
+	if [[ $arg =~ $global_pattern1 || $arg =~ $global_pattern2 ]] ; then
+		GLOBAL_REQUESTED_SPLIT=${BASH_REMATCH[1]}
+		zero_to_one GLOBAL_REQUESTED_SPLIT
+		if [[ -n "${BASH_REMATCH[3]}" ]] ; then
+			GLOBAL_PAR_ACROSS_SERVERS=${BASH_REMATCH[3]}
+			zero_else_one GLOBAL_PAR_ACROSS_SERVERS
+		fi
+	elif [[ $arg =~ $cfirst_all_pattern1 ]] ; then
+		CHECK_REQUESTED_SPLIT=${BASH_REMATCH[1]}
+		zero_to_one CHECK_REQUESTED_SPLIT
+		if [[ -n "${BASH_REMATCH[3]}" ]] ; then
+			RSYNC_REQUESTED_SPLIT=${BASH_REMATCH[3]}
+			zero_to_one RSYNC_REQUESTED_SPLIT
+		fi
+	elif [[ $arg =~ $cfirst_all_pattern2 ]] ; then
+		CHECK_REQUESTED_SPLIT=${BASH_REMATCH[1]}
+		zero_to_one CHECK_REQUESTED_SPLIT
+		if [[ -n "${BASH_REMATCH[3]}" ]] ; then
+			CHECK_PAR_ACROSS_SERVERS=${BASH_REMATCH[3]}
+			zero_else_one CHECK_PAR_ACROSS_SERVERS
+		fi
+		if [[ -n "${BASH_REMATCH[5]}" ]] ; then
+			RSYNC_REQUESTED_SPLIT=${BASH_REMATCH[5]}
+			zero_to_one RSYNC_REQUESTED_SPLIT
+		fi
+	elif [[ $arg =~ $rfirst_all_pattern1 ]] ; then
+		RSYNC_REQUESTED_SPLIT=${BASH_REMATCH[1]}
+		zero_to_one RSYNC_REQUESTED_SPLIT
+		if [[ -n "${BASH_REMATCH[3]}" ]] ; then
+			CHECK_REQUESTED_SPLIT=${BASH_REMATCH[3]}
+			zero_to_one CHECK_REQUESTED_SPLIT
+		fi
+	elif [[ $arg =~ $rfirst_all_pattern2 ]] ; then
+		RSYNC_REQUESTED_SPLIT=${BASH_REMATCH[1]}
+		zero_to_one RSYNC_REQUESTED_SPLIT
+		if [[ -n "${BASH_REMATCH[3]}" ]] ; then
+			CHECK_REQUESTED_SPLIT=${BASH_REMATCH[3]}
+			zero_to_one CHECK_REQUESTED_SPLIT
+		fi
+		if [[ -n "${BASH_REMATCH[5]}" ]] ; then
+			CHECK_PAR_ACROSS_SERVERS=${BASH_REMATCH[5]}
+			zero_else_one CHECK_PAR_ACROSS_SERVERS
+		fi
+	else
+		usage
+		exit 1
+	fi
+}
+
+# quick way to take a file of 'file-size filename' and a split factor and then create "split" 
+# output files each containing roughly 1/split of total disk volume in file names.
+# Output 'file-size filename' is written to /tmp/split.N.txt - which are removed to begin with.
+# The idea here is to use the output for various parallel tasks each wanting about
+# the same amount of work to do.
+#
+# Assigns to variable named as third parameter.
+#
+# Some tasks, like rsync, are not perfectly balanced with similar amounts of bytes. There
+# appears to be a per-file cost that makes processing many small files slower than fewer
+# larger files. This militates for more sophisticated job-split logic in future.
+#
+# Call as:
+#  split_file <file of 'size filename'> <split factor> <local_actual_split_variable_name>
+function split_file {
+	(( $# == 3 )) || abend "Usage: ${FUNCNAME[0]} <file of 'size filename'> <split factor> <variable to assign ACTUAL_SPLIT to>"
+	[[ -f $1 ]] && ( [[ -s $1 ]] || fatal 1 "empty file: $1" )
+	local allfiles=$(<$1) 		# local copy in case 1st arg is FIFO
+	local pattern='^[[:digit:]]+$' split limit total i sofar sz fn actual_split=$3
+	[[ "$2" =~ $pattern ]] || fatal 1 "non numeric arg: $2"
+	split=$2
+
+	rm -f ${tmpdir}/split.*.txt
+	# get total storage of .ibd files
+	total=$(awk '{s+= $1} END {print s}' <<< "${allfiles}")
+	(( total > 0 )) || { echo "unable to size input files within $1" 1>&2; exit 1; }
+	limit=$((total / split))
+
+	# send files to each of split.X.txt files in turn until each has ~ 1/$split
+	# of total storage. Expect threads to be balanced with roughly same volumes
+	# of .ibd data (for seek & sha1sum process)
+	for i in $(seq 1 $split); do
+   		sofar=0
+   		(( i == split )) && limit=total                 # avoid rounding issues, last file gets all remainder
+   		while (( sofar < limit )) ; do
+      			IFS=$' ' read -r sz fn || break         # no more input
+      			echo "$sz $fn" >> ${tmpdir}/split.${i}.txt
+      			(( sofar += sz ))
+			printf -v "${actual_split}" %s $i	# assigns to variable supplied as 3rd function arg
+   		done
+	done <<< "${allfiles}"
+}
 
 #
 # using files fetched from secondary, prepare a checksum script to be run in parallel across
@@ -382,31 +572,11 @@ fi
 function prepare_checksum_work {
 	(( $# == 1 )) || fatal 1 "prepare_checksum_work needs single integer arg"
 	local split=$1
-	local i sofar sz fn allibds=${tmpdir}/secondary.ibds
+	local allibds=${tmpdir}/secondary.ibds
 
 	[[ -f "${allibds}" ]] || fatal 1 "unable to open ${allibds}"
 	if [[ -s "$tmpdir/secondary.ibds" ]] ; then
-		rm -f ${tmpdir}/split*.txt ${tmpdir}/split*.out
-
-		# get total storage of .ibd files
-		local total=$(awk '{s+= $1} END {print s}' ${allibds})
-		(( total > 0 )) || fatal 1 "unable to size .ibd files from secondary"
-		local limit=$((total / split))
-	
-		# send files to each of splitXX.txt files in turn until each has ~ 1/$split
-		# of total storage. Expect threads to be balanced with roughly same volumes
-		# of .ibd data to seek & sha1sum
-		for i in $(seq 1 $split); do
-			sofar=0
-			(( i == split )) && limit=total			# avoid rounding issues, last file gets all remainder
-			while (( sofar < limit )) ; do
-				IFS=$' ' read -r sz fn || break		# no more input
-				echo "$sz $fn" >> ${tmpdir}/split.${i}.txt
-				(( sofar += sz ))
-				ACTUAL_SPLIT=$i
-			done
-		done < ${allibds}
-
+		split_file ${allibds} ${split} CHECK_ACTUAL_SPLIT	# assigns CHECK_ACTUAL_SPLIT
 		$SCP -q $tmpdir/split*.txt $secondary:$tmpdir
 	fi
 
@@ -454,8 +624,8 @@ function checksum_ibd {
 function wait_for_pids {
 	local i retc
 	
-	(( ${#pids[*]} > 0 )) || { echo "ERROR: wait_for_pids: pids array empty" 1>&2; exit 1; }
-	(( ${#status[*]} == ${#pids[*]} )) || { echo "ERROR: wait_for_pids: status(${#status[*]}) & pids(${#pids[*]}) arrays not same size" 1>&2; }
+	(( ${#pids[*]} > 0 )) || { echo "ERROR: ${FUNCNAME[0]}: pids array empty" 1>&2; exit 1; }
+	(( ${#status[*]} == ${#pids[*]} )) || { echo "ERROR: ${FUNCNAME[0]}: status(${#status[*]}) & pids(${#pids[*]}) arrays not same size" 1>&2; }
 	for i in ${pids[*]} ; do
    		wait $i
 		retc=$?
@@ -503,7 +673,7 @@ sort -u -k 1 ${tmpdir}/map.local > ${tmpdir}/map.local.sort
 }
 
 #
-# run same checksum script on both local and remote node at same time if PAR_ACROSS_SERVERS == 1
+# run same checksum script on both local and remote node at same time if CHECK_PAR_ACROSS_SERVERS == 1
 #
 function run_checksums {
 	(( $# == 1 )) || fatal 1 "run_checksums needs single integer arg"
@@ -514,7 +684,7 @@ function run_checksums {
 	ssh $secondary "bash -c '[[ -f ${tmpdir}/$CHECKSUM_RUN ]]'" || fatal 1 "ERROR: no ${tmpdir}/$CHECKSUM_RUN found on $secondary"
 	
 	startsecs=$(date +%s)
-	if (( PAR_ACROSS_SERVERS > 0 )) ; then
+	if (( CHECK_PAR_ACROSS_SERVERS > 0 )) ; then
 		/bin/bash ${tmpdir}/$CHECKSUM_RUN $split $tmpdir $datadir 1 &
 		pid_prim=$!
 		$SSH -n $secondary /bin/bash ${tmpdir}/$CHECKSUM_RUN $split $tmpdir $datadir 2 &
@@ -528,10 +698,72 @@ function run_checksums {
 	fi
 	endsecs=$(date +%s)
 
-	message "checksumming files ($split,$PAR_ACROSS_SERVERS) took: $(( endsecs-startsecs )) seconds"
+	message "checksumming files ($split,$CHECK_PAR_ACROSS_SERVERS) took: $(( endsecs-startsecs )) seconds"
 
 	$SCP -q $secondary:$tmpdir/map.local $tmpdir/map.remote
 	$SCP -q $secondary:$tmpdir/map.local.sort $tmpdir/map.remote.sort
+}
+
+# older 3.2.57 Bash shells do not support references for array name passing - so use globals
+# assumes existence of external arrays: pids status
+function wait_for_pids {
+	local i retc
+	
+	(( ${#pids[*]} > 0 )) || abend "pids array empty"
+	(( ${#status[*]} == ${#pids[*]} )) || abend "status(${#status[*]}) & pids(${#pids[*]}) arrays not same size"
+	for i in ${pids[*]} ; do
+   		wait $i
+		retc=$?
+		(( retc == 0 )) || fatal 1 "${status[$i]} exited with non-zero return code: $retc"
+	done
+	return 0
+}
+
+#
+# Uses existing static workload split logic and available parallelism varaiables to implement a parallel
+# rsync with each thread running on a partition of the total files to be considered (--files-from arg).
+# Interestingly, the parallel rsync threads all output to same replicate.log file to provide 
+# real-time progress by thread.
+#
+# prsync does not currently work with controller install directory as --files-from overrides existing --exclude 
+# options fixing this seems to currently imply either a customised find based on rsync --exclude options or a 
+# rewrite of the --exclude option syntax. Otherwise an embedded db/data is also copied and this prevents 
+# later replication from working (duplicate UUID etc). 
+function prsync {
+	(( $# >=2 )) || abend "${FUNCNAME[0]} needs at least 2 args"
+	local srcdir=${@: -2:1}		# second last arg is src directory
+	local -a pids status
+	local startsecs endsecs i cmd fifo RSYNC_ACTUAL_SPLIT local_requested_split
+
+	# get appropriate parallelism value from parameter hierarchy
+	local_requested_split=$(get_value RSYNC_REQUESTED_SPLIT) || fatal 1 "get_value error"
+	# collect list of files to be rsync'd and then partition them in some way into ${tmpdir}/split.*.txt
+	# split_file() assigns local: RSYNC_ACTUAL_SPLIT
+	split_file <(cd $srcdir; find . -type f -ls | awk '{print $7" "$11}') $local_requested_split RSYNC_ACTUAL_SPLIT
+
+	startsecs=$(date +%s)
+	if (( RSYNC_ACTUAL_SPLIT > 1 )) ; then
+		message "  starting parallel ${RSYNC_ACTUAL_SPLIT}-way rsync of $srcdir"
+
+		for i in $(seq 1 $RSYNC_ACTUAL_SPLIT) ; do
+			# duplicate code here because want to log exact syntax but shell interpretation of <(...) 
+			# happens before "..." expansion AND need output to go to unbuffered sed pipe
+			logonly <<< "rsync --files-from=<(awk '{print \$2}' ${tmpdir}/split.$i.txt) $@ | sed -u 's/^/Thread'$i': /"
+			# will lose rsync return code unless 'set -o pipefail' in sub-shell
+			( set -o pipefail; rsync --files-from=<(awk '{print $2}' ${tmpdir}/split.$i.txt) "$@" | sed -u 's/^/Thread'$i': /' >> >(logonly) ) &
+			pids+=($!)
+			status[$!]="rsync partition $i of $RSYNC_ACTUAL_SPLIT"  # help narrow down failing sub-task
+		done
+
+		wait_for_pids || exit $?
+	elif (( RSYNC_ACTUAL_SPLIT == 1 )) ; then
+		logcmd rsync "$@" || exit 1
+	else
+		fatal 1 "unexpected value: $RSYNC_ACTUAL_SPLIT for RSYNC_ACTUAL_SPLIT"
+	fi
+	endsecs=$(date +%s)
+
+	message "  rsync of $srcdir completed in $(( endsecs-startsecs )) seconds"
 }
 
 while getopts :s:e:m:a:i:dfhjut:P:nwzEFHMWUS7X flag; do
@@ -643,27 +875,14 @@ while getopts :s:e:m:a:i:dfhjut:P:nwzEFHMWUS7X flag; do
 		fi
 		usage
 		;;
-	P)	# parallelisation required: <within a server's workload>[,<1 to parallelise across servers, 0 for serial>]
-		# For example: 25,0 <=> split a server's workload 25 ways but run in series with other servers
-		# x,y        <=> x,(y in (0,1))? y : 1
-		# x          <=> x,1 if x >= 0
-		# 0	     <=> 1
-		# <DEFAULT>  <=> <# CPUs>,1
-		# <DISABLED> <=> 0,0
-		pattern='^[[:digit:]]+$'
-		IFS=, read -r REQUESTED_SPLIT PAR_ACROSS_SERVERS <<< "$OPTARG"
-		if [[ "$REQUESTED_SPLIT" =~ $pattern ]] ; then
-			(( REQUESTED_SPLIT == 0 )) && REQUESTED_SPLIT=1
-		else
-			usage
-		fi
-		if [[ -z "$PAR_ACROSS_SERVERS" ]] ; then
-			PAR_ACROSS_SERVERS=1
-		elif [[ "$PAR_ACROSS_SERVERS" =~ $pattern ]] ; then
-			(( PAR_ACROSS_SERVERS <= 1 )) || PAR_ACROSS_SERVERS=1
-		else
-			usage
-		fi
+	P)	# <DEFAULT> <=> -P 'c(<# CPUs>,1),r(1)'
+		# <ALL PARALLELISM DISABLED> <=> -P 0,0
+		# Global settings:
+		# -P x OR -P x,y OR -P (x,y)
+		# Component specific settings:
+		# -P cx OR -P cx,ry OR c(x,y) OR -P c(x,y),r(m)
+		# -P rx OR -P rx,cy OR -P r(x) OR -P r(x),c(m)
+		parse_parallel_opts $OPTARG
 		;;
 	H|*)
 		if [ $flag != H ] ; then
@@ -795,7 +1014,8 @@ function logcmd {
 	local cmd=($*)
 	# declare -p cmd
 	echo "${cmd[*]}" | logonly
-	${cmd[*]} | logonly 2>&1
+	( set -o pipefail; ${cmd[*]} | logonly 2>&1 )
+	return $?	# return with same return code of executed command before pipe
 }
 
 trap handle_interrupt INT
@@ -1154,7 +1374,9 @@ if ! $hotsync ; then
 	#
 	# all other datadir files, the whole thing
 	#
-	message "Building data file maps ( with -P $REQUESTED_SPLIT,$PAR_ACROSS_SERVERS )"
+	CHECK_REQUESTED_SPLIT=$(get_value CHECK_REQUESTED_SPLIT) || exit 1
+	CHECK_PAR_ACROSS_SERVERS=$(get_value CHECK_PAR_ACROSS_SERVERS) || exit 1
+	message "Building data file maps ( with -P 'c($CHECK_REQUESTED_SPLIT,$CHECK_PAR_ACROSS_SERVERS)' )"
 
 	$SSH $secondary mkdir -p $tmpdir
 	$SSH $secondary find $datadir  -type f ! -name "auto.cnf" ! -name "relay-log*" ! -name "bin-log*" ! -name "*".ibd -print > $tmpdir/secondary.nonibds
@@ -1166,9 +1388,9 @@ if ! $hotsync ; then
 			$tmpdir/map.local $tmpdir/map.remote \
 			$tmpdir/worklist $tmpdir/difflist
 
-		prepare_checksum_work $REQUESTED_SPLIT		# function sets ACTUAL_SPLIT
-		echo "...using REQUESTED_SPLIT=$REQUESTED_SPLIT ACTUAL_SPLIT=$ACTUAL_SPLIT PAR_ACROSS_SERVERS=$PAR_ACROSS_SERVERS" | logonly
-		run_checksums $ACTUAL_SPLIT
+		prepare_checksum_work $CHECK_REQUESTED_SPLIT		# function sets CHECK_ACTUAL_SPLIT
+		echo "...using CHECK_REQUESTED_SPLIT=$CHECK_REQUESTED_SPLIT CHECK_ACTUAL_SPLIT=$CHECK_ACTUAL_SPLIT CHECK_PAR_ACROSS_SERVERS=$CHECK_PAR_ACROSS_SERVERS" | logonly
+		run_checksums $CHECK_ACTUAL_SPLIT
 
 		# the worklist is all filenames from secondary with different local checksums
 		diff $tmpdir/map.local.sort $tmpdir/map.remote.sort | awk '/^[><]/ {print $2}' | sort -u > $tmpdir/worklist
@@ -1190,7 +1412,7 @@ if ! $hotsync ; then
 			message "$MSG"
 		fi
 	else
-		message "empty secondary - so everything needs to be copied over"
+		message "empty secondary datadir - so everything needs to be copied over"
 	fi
 fi
 
@@ -1245,8 +1467,8 @@ if $hotsync ; then
 		$SSH $secondary mv $datadir/ib_logfile\* $innodb_logdir
 	fi
 else
-	message "Rsync'ing Data: $datadir"
-	logcmd rsync $rsync_opts \
+	message "Rsync'ing Data: $datadir ( with -P 'r($(get_value RSYNC_REQUESTED_SPLIT))' )"
+	prsync $rsync_opts \
 		$rsync_throttle $rsync_compression \
 		--exclude=lost+found \
 		--exclude=ib_logfile\* \
@@ -1778,6 +2000,3 @@ if $start_appserver ; then
 	fi
 	message "HA setup complete."
 fi
-
-cleanup
-
