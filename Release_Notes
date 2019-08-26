@@ -968,3 +968,12 @@ Release notes for version 3.54
    controller subdirectory, but not in the db subdirectory.  for example, if datadir was installed as 
    <controller root>/data, replication failed to provision.  this is because the auto.cnf file was copied as
    part of the appserver rsync.  now the appserver sync explicitly excludes $datadir.
+
+--------------------------------------
+Release notes for version 3.55
+
+1) the pruning code was a little too lazy:  it turns out that the 2 blocks
+   at the start of the .ibd file is not enough to pick up changes that are
+   important.  the pruner is now a bit more intelligent about what is summed.
+
+2) the order of the controller rsyncing messages make a little more sense.
