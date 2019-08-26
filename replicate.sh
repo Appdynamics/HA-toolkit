@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.55 2019-08-06 09:20:46 cm68 $
+# $Id: replicate.sh 3.56 2019-08-26 14:33:39 cm68 $
 #
 # install HA to a controller pair
 #
@@ -598,21 +598,29 @@ function checksum_ibd {
 	awk '
 	BEGIN {
         	hunksize = (256 * 1024 * 1024);
+		first = 64;
+		later = 2;
 	}
 	{
 		size = $1;
 		file = $2;
+		blocks = int(size / 16384);
         	if (match(file, ".ibd$")) {
                 	cmd = "(";
                 	hunks = int(size / hunksize) + 1;
+			count = first;
+			if (blocks < first) { count = blocks; }
                 	for (hunk = 0; hunk < hunks; hunk++) {
                         	skip = (hunk * hunksize) / 16384;
-                        	cmd = cmd"dd if="file" bs=16k count=2 skip="skip";";
+                        	cmd = cmd"dd if="file" bs=16k count="count" skip="skip";";
+				count = later;
                 	}
-                	skip = int(size / 16384) - 2;
-                	if (skip < 0) { skip = 0; }
-                	cmd = cmd"dd if="file" bs=16k count=2 skip="skip")";
-        		cmd = cmd" 2> /dev/null | sha1sum -";
+			if (blocks > first) {
+				skip = blocks - 2;
+				if (skip < 0) { skip = 0; }
+				cmd = cmd"dd if="file" bs=16k count=2 skip="skip;
+			}
+        		cmd = cmd") 2> /dev/null | sha1sum -";
         		cmd | getline sha1;
         		close(cmd);
         		print file, sha1;
@@ -1420,7 +1428,6 @@ fi
 # copy the controller + data to the secondary
 #
 
-message "Rsync'ing Controller: $APPD_ROOT"
 if ! echo $JAVA | grep -q $APPD_ROOT ; then
 	message "Rsync'ing java: $JAVA"
 	$SSH $secondary mkdir -p	${JAVA%bin/java}
@@ -1429,6 +1436,7 @@ if ! echo $JAVA | grep -q $APPD_ROOT ; then
 		${JAVA%bin/java} $JAVADEST
 fi
 
+message "Rsync'ing Controller: $APPD_ROOT"
 logcmd rsync $rsync_opts \
 	$rsync_throttle $rsync_compression \
 	--exclude=lost+found \
