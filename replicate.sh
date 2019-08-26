@@ -331,7 +331,7 @@ function usage()
 	echo "    [ -7 ] enable parallel replication for mysql 5.7"
 	echo "    [ -h ] print help"
 	echo "    [ -X ] use backup for hot sync"
-	echo "    [ -P 'c(x,y),r(z)' ] where 'c' is for checksum parallelism, 'r' for rsync parallelism e.g. c10,r4"
+	echo "    [ -P 'c(x,y),r(z)' ] where 'c' is for checksum parallelism, 'r' for rsync parallelism e.g. 'c10,r4' or 'r2'"
 	exit 1
 }
 
@@ -345,8 +345,8 @@ if [ -f $INTERLOCK ] ; then
 	#
 	repl_pid=$(cat $INTERLOCK)
 	if [ -d /proc/$(cat $INTERLOCK) ] ; then
-		echo "only one replicate is allowed at a time; please check"
-		echo "pid $repl_pid, and remove $INTERLOCK only if it is not a replicate"
+		warn "only one replicate is allowed at a time; please check"
+		warn "pid $repl_pid, and remove $INTERLOCK only if it is not a replicate"
 		exit 1
 	fi
 	rm -f $INTERLOCK
@@ -547,7 +547,7 @@ function split_file {
 	rm -f ${tmpdir}/split.*.txt
 	# get total storage of .ibd files
 	total=$(awk '{s+= $1} END {print s}' <<< "${allfiles}")
-	(( total > 0 )) || { echo "unable to size input files within $1" 1>&2; exit 1; }
+	(( total > 0 )) || { warn "unable to size input files within $1"; exit 1; }
 	limit=$((total / split))
 
 	# send files to each of split.X.txt files in turn until each has ~ 1/$split
@@ -814,7 +814,7 @@ while getopts :s:e:m:a:i:dfhjut:P:nwzEFHMWUS7X flag; do
 		;;
 	u)
 		upgrade=true
-		echo "upgrade currently unsupported"
+		warn "upgrade currently unsupported"
 		exit 8
 		;;
 	:)
@@ -912,8 +912,7 @@ fi
 if [ -z "$machine_agent" ] ; then
 	machine_agent=(`find_machine_agent`)
 	if [ ${#machine_agent[@]} -gt 1 ] ; then
-		echo too many machine agents: ${machine_agent[@]}
-		echo select one, and specify it using -a
+		warn "too many machine agents: ${machine_agent[@]} select one, and specify it using -a"
 		usage
 		exit 1
 	fi
@@ -945,7 +944,7 @@ eval `parse_vip internal_vip $internal_vip`
 # sanity check - verify that the appd_user and the directory owner are the same
 check_sanity
 if [ `ls -ld .. | awk '{print $3}'` != `id -un` ] ; then
-	echo "Controller root directory not owned by current user"
+	warn "Controller root directory not owned by current user"
 	exit 1
 fi
 

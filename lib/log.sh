@@ -76,7 +76,7 @@ function logonly {
 # output to STDERR and to log file
 function warn {
 	echo "$@" >&2
-	logmsg "$@"
+	logmsg "ERROR: ""$@"
 }
 
 # output to STDERR only - no log file entry
