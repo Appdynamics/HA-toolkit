@@ -1596,13 +1596,13 @@ else
 	# host or other /etc/hosts inconsistencies between HA nodes
 	# Add to this list the FQDN that MySQL may be able to lookup.
 	#
-	grant_primary=$(get_names $(hostname) <<< "$(getent hosts $(hostname))" )
+	grant_primary=$(get_names $(hostname) <<< "$(getent hosts $(awk 'NR==1 {print $1;exit}' <<< "$(getent ahostsv4 $(hostname))"))" )
 	if [[ -z "$grant_primary" ]] ; then
 		gripe "Local /etc/hosts does not appear to contain an entry for current hostname: $(hostname)"
 		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"
 		grant_primary=$(hostname)
 	fi
-	grant_secondary=$(get_names $secondary <<< "$($SSH -o StrictHostKeyChecking=no $secondary getent hosts $secondary)")
+	grant_secondary=$(get_names $secondary <<< "$($SSH -o StrictHostKeyChecking=no $secondary getent hosts $(awk 'NR==1 {print $1;exit}' <<< "$(getent ahostsv4 $secondary)"))")
 	if [[ -z "$grant_secondary" ]] ; then
 		gripe "Secondary /etc/hosts does not appear to contain an entry for its hostname: $secondary"
 		gripe "Please ensure both primary and secondary servers list both servers in their /etc/hosts files...trying to continue"
