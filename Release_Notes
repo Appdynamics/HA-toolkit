@@ -977,3 +977,10 @@ Release notes for version 3.55
    important.  the pruner is now a bit more intelligent about what is summed.
 
 2) the order of the controller rsyncing messages make a little more sense.
+
+--------------------------------------
+Release notes for version 3.55a
+
+1) I'm breaking with the versioning scheme for a simple patch that will help us isolate a performance problem
+   seen at one site.  there is no great need to upgrade to this version.
+

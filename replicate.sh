@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.55 2019-08-26 14:41:36 cm68 $
+# $Id: replicate.sh 3.55a 2019-09-23 16:42:16 cm68 $
 #
 # install HA to a controller pair
 #
@@ -1142,8 +1142,14 @@ if ! $appserver_only_sync ; then
 	#
 	# make sure replication has stopped
 	#
-	message "stopping replication"
-	sql localhost "STOP SLAVE;RESET SLAVE ALL;RESET MASTER;" >/dev/null 2>&1
+	message "stopping local slave"
+	sql localhost "STOP SLAVE" >/dev/null 2>&1
+
+	message "delete relay logs"
+	sql localhost "RESET SLAVE ALL" >/dev/null 2>&1
+
+	message "delete bin logs"
+	sql localhost "RESET MASTER" >/dev/null 2>&1
 
 	#
 	# sanity check: make sure we are not the passive side. replicating the
