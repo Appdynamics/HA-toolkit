@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.55a 2019-09-23 16:42:16 cm68 $
+# $Id: replicate.sh 3.56 2019-10-28 13:31:37 robnav $
 #
 # install HA to a controller pair
 #
@@ -747,7 +747,7 @@ function prsync {
 	local_requested_split=$(get_value RSYNC_REQUESTED_SPLIT) || fatal 1 "get_value error"
 	# collect list of files to be rsync'd and then partition them in some way into ${tmpdir}/split.*.txt
 	# split_file() assigns local: RSYNC_ACTUAL_SPLIT
-	split_file <(cd $srcdir; find . -type f -ls | awk '{print $7" "$11}') $local_requested_split RSYNC_ACTUAL_SPLIT
+	split_file <(cd $srcdir; find . -type f -ls | shuf | awk '{print $7" "$11}') $local_requested_split RSYNC_ACTUAL_SPLIT
 
 	startsecs=$(date +%s)
 	if (( RSYNC_ACTUAL_SPLIT > 1 )) ; then
@@ -969,6 +969,7 @@ fi
 require "ex" "vim-minimal" "vim-tiny" || exit 1
 require "rsync" "rsync" "rsync" || exit 1
 type awk &> /dev/null || fatal 1 "awk or gawk must be installed"
+type shuf &> /dev/null || fatal 1 "GNU coreutils must be installed (for shuf)"
 
 #
 # kill a remote rsyncd if we have one

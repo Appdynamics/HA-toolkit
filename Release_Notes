@@ -984,3 +984,9 @@ Release notes for version 3.55a
 1) I'm breaking with the versioning scheme for a simple patch that will help us isolate a performance problem
    seen at one site.  there is no great need to upgrade to this version.
 
+--------------------------------------
+Release notes for version 3.56
+
+1) Parallel replicate patch that improves average performance. It does a better job of distributing 
+   work to each thread so that a worker thread is less often going to finish early.
+
