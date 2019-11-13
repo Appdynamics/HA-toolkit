@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.56 2019-10-28 13:31:37 robnav $
+# $Id: replicate.sh 3.57 2019-11-13 09:58:38 cm68 $
 #
 # install HA to a controller pair
 #
@@ -92,6 +92,7 @@ CHECKSUM_RUN=ha.run_checksum
 DEFAULT_CHECK_PAR_ACROSS_SERVERS=1
 DEFAULT_CHECK_REQUESTED_SPLIT=1		# default currently updated below
 DEFAULT_RSYNC_REQUESTED_SPLIT=1
+DB_START_WAIT=300
 
 #
 # make sure that we are running as the appdynamics user in db.cnf
@@ -1848,10 +1849,15 @@ fi
 #
 # ugly hack here - there seems to be a small timing problem
 #
+dbstartlimit=$(expr $(date +%s) + $DB_START_WAIT)
+
 message "wait for secondary to start"
 until sql $secondary "show databases" | grep -q "information_schema" ; do
 	message "waiting for mysql to start using $secondary" `date`
 	sleep 2
+	if [ $(date +%s) -gt $dbstartlimit ] ; then
+		message "mysql on $secondary failed to start"
+	fi
 done
 
 #
