@@ -1454,6 +1454,7 @@ logcmd rsync $rsync_opts \
 	--exclude=db/\*.pid \
 	--exclude=logs/\* \
 	--exclude=$datadir \
+	--exclude=backup \
 	--exclude=db/data \
 	--exclude=db/bin/.status \
 	--exclude=app_agent_operation_logs \
@@ -1485,6 +1486,7 @@ if $hotsync ; then
 	fi
 else
 	message "Rsync'ing Data: $datadir ( with -P 'r($(get_value RSYNC_REQUESTED_SPLIT))' )"
+	$SSH $secondary mkdir -p $datadir
 	prsync $rsync_opts \
 		$rsync_throttle $rsync_compression \
 		--exclude=lost+found \
@@ -1852,11 +1854,11 @@ fi
 dbstartlimit=$(expr $(date +%s) + $DB_START_WAIT)
 
 message "wait for secondary to start"
-until sql $secondary "show databases" | grep -q "information_schema" ; do
-	message "waiting for mysql to start using $secondary" `date`
+until sql $secondary "show databases" 2>/dev/null | grep -q "information_schema" ; do
+	message "waiting " $(expr $dbstartlimit - $(date +%s)) " more seconds for mysql on $secondary"
 	sleep 2
 	if [ $(date +%s) -gt $dbstartlimit ] ; then
-		message "mysql on $secondary failed to start"
+		fatal 10 "mysql on $secondary failed to start"
 	fi
 done
 

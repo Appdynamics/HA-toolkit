@@ -990,3 +990,12 @@ Release notes for version 3.56
 1) Parallel replicate patch that improves average performance. It does a better job of distributing 
    work to each thread so that a worker thread is less often going to finish early.
 
+--------------------------------------
+Release notes for version 3.57
+
+1) added a secondary database timeout of 5 minutes.   this will prevent replicate hangs if the secondary
+   has a system problem.  this timeout displays a running counter.
+
+2) the enterprise console creates a backup directory.  this should not be replicated.
+
+3) the secondary datadir complete path is constructed if needed.
