@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.57 2019-11-13 09:58:38 cm68 $
+# $Id: replicate.sh 3.58 2019-11-21 12:25:46 cm68 $
 #
 # install HA to a controller pair
 #
@@ -1623,6 +1623,7 @@ else
 	# let's probe the canonical hostnames from the local database in case this results in different
 	# hostname for MySQL to permit connections from
 	#
+	sql localhost "FLUSH HOSTS" >/dev/null 2>&1
 	primary1=`$APPD_ROOT/db/bin/mysql --host=$primary --port=$dbport --protocol=TCP --user=impossible 2>&1 | awk '
 		/ERROR 1045/ { gsub("^.*@",""); print $1;}
 		/ERROR 1130/ { gsub("^.*Host ",""); print $1;}' | tr -d \'`

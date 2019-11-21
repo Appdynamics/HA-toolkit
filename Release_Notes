@@ -999,3 +999,9 @@ Release notes for version 3.57
 2) the enterprise console creates a backup directory.  this should not be replicated.
 
 3) the secondary datadir complete path is constructed if needed.
+
+--------------------------------------
+Release notes for version 3.58
+
+1) added FLUSH HOSTS to code path that canonicalizes hostnames.
+
