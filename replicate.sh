@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.58 2019-11-21 12:25:46 cm68 $
+# $Id: replicate.sh 3.59 2019-12-02 14:37:35 robnav $
 #
 # install HA to a controller pair
 #
@@ -674,7 +674,7 @@ if [[ -s "$tmpdir/secondary.nonibds" ]] ; then
 fi
 
 [[ -s "${tmpdir}"/map.local ]] || { echo "ERROR: empty ${tmpdir}/map.local found on $(hostname)" 1>&2; exit 1; }
-sort -u -k 1 ${tmpdir}/map.local > ${tmpdir}/map.local.sort
+LC_ALL=C sort -u -k 1 ${tmpdir}/map.local > ${tmpdir}/map.local.sort
 	EOT
 
 	$SCP -q ${tmpdir}/$CHECKSUM_RUN $secondary:$tmpdir

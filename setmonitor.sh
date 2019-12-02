@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: setmonitor.sh 3.32 2018-05-16 21:15:14 cmayer $
+# $Id: setmonitor.sh 3.59 2019-12-02 14:37:57 robnav $
 #
 # instrument controller and machine agents to a monitoring host
 #
@@ -208,7 +208,7 @@ if [ -z "$monitor_account" ] ; then
 fi
 if [ -z "$monitor_application" ] ; then
 	if [ -n "$secondary" ] ; then
-		pair=`echo -e "$pri_short\n$sec_short" | sort | tr '\n' ':' | sed 's/:$//'`
+		pair=`echo -e "$pri_short\n$sec_short" | LC_ALL=C sort | tr '\n' ':' | sed 's/:$//'`
 		monitor_application="HA pair $pair"
 	else
 		monitor_application="$pri_short controller"

@@ -1005,3 +1005,11 @@ Release notes for version 3.58
 
 1) added FLUSH HOSTS to code path that canonicalizes hostnames.
 
+--------------------------------------
+Release notes for version 3.59
+
+1) Added explicit LOCALE setting for replicate sort calls to avoid rare cases that wrongly claim
+   differences/discrepencies in files between primary and secondary. Having HA servers with different
+   LOCALE's causes differences in sort order that lead to wasted effort with too many files being
+   transferred again. This issue does not affect correctness of the replication setup but can slow
+   the setup process down.
