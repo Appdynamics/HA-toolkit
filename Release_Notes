@@ -1013,3 +1013,11 @@ Release notes for version 3.59
    LOCALE's causes differences in sort order that lead to wasted effort with too many files being
    transferred again. This issue does not affect correctness of the replication setup but can slow
    the setup process down.
+
+--------------------------------------
+Release notes for version 3.60
+
+1) Fixed failure in replicate.sh if Linux group name of AppD user contained a space e.g. 'domain users'
+
+2) Fixed rare failure in replicate.sh if file to be rsync'd has been deleted by time rsync starts. 
+   Just the return code, 24, for vanished input file has been added to rsync's ignore list.

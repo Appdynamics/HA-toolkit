@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.59 2019-12-02 14:37:35 robnav $
+# $Id: replicate.sh 3.60 2019-12-12 20:03:41 robnav $
 #
 # install HA to a controller pair
 #
@@ -664,7 +664,7 @@ fi
 if [[ -s "$tmpdir/secondary.nonibds" ]] ; then
 	# Checksum smaller files i.e. everything else relevant in $datadir
 	# Do not check return code of xargs because there may be many files on $secondary that do not exist on primary
-	xargs sha1sum < $tmpdir/secondary.nonibds > >(awk '{print $2" "$1}' > ${tmpdir}/nonibds.out) 2> /dev/null
+	xargs sha1sum < $tmpdir/secondary.nonibds > >(awk 'NF == 2 { print $2" "$1 } NF > 2 {s=$1; $1=""; $(NF+1)=s; print substr($0,2)}' > ${tmpdir}/nonibds.out) 2> /dev/null
 
 	# instead just check that xargs output file is non-zero in size
 	[[ -s "${tmpdir}"/nonibds.out ]] || { echo "ERROR: unable to checksum non-ibd files on $(hostname)" 1>&2; exit 1; }
@@ -715,15 +715,31 @@ function run_checksums {
 
 # older 3.2.57 Bash shells do not support references for array name passing - so use globals
 # assumes existence of external arrays: pids status
+# ASSUMPTION:
+#  this wait_for_pids is assumed to be checking rsync return codes, hence 0, 24 are ignorable
+#  called with optional ignorable return codes
 function wait_for_pids {
 	local i retc
+
+	# simplifies the later stating of return codes that should be ignored
+	function ignorable {
+        	(( $# > 1 )) || abend "needs at least 2 parameters"
+        	local retc=$1
+        	local not_found=1 i
+
+        	shift
+        	for i in $@ ; do
+                	(( retc == i )) && not_found=0 && break
+        	done
+        	return $not_found
+	}
 	
 	(( ${#pids[*]} > 0 )) || abend "pids array empty"
 	(( ${#status[*]} == ${#pids[*]} )) || abend "status(${#status[*]}) & pids(${#pids[*]}) arrays not same size"
 	for i in ${pids[*]} ; do
    		wait $i
 		retc=$?
-		(( retc == 0 )) || fatal 1 "${status[$i]} exited with non-zero return code: $retc"
+		ignorable $retc 0 $@ || fatal 1 "${status[$i]} exited with non-zero return code: $retc"
 	done
 	return 0
 }
@@ -748,7 +764,7 @@ function prsync {
 	local_requested_split=$(get_value RSYNC_REQUESTED_SPLIT) || fatal 1 "get_value error"
 	# collect list of files to be rsync'd and then partition them in some way into ${tmpdir}/split.*.txt
 	# split_file() assigns local: RSYNC_ACTUAL_SPLIT
-	split_file <(cd $srcdir; find . -type f -ls | shuf | awk '{print $7" "$11}') $local_requested_split RSYNC_ACTUAL_SPLIT
+	split_file <(cd $srcdir; find . -type f -exec ls -n '{}' + | awk '{s=$5;$1=$2=$3=$4=$5=$6=$7=$8=""; print s,substr($0,9)}' | shuf) $local_requested_split RSYNC_ACTUAL_SPLIT
 
 	startsecs=$(date +%s)
 	if (( RSYNC_ACTUAL_SPLIT > 1 )) ; then
@@ -764,7 +780,7 @@ function prsync {
 			status[$!]="rsync partition $i of $RSYNC_ACTUAL_SPLIT"  # help narrow down failing sub-task
 		done
 
-		wait_for_pids || exit $?
+		wait_for_pids 24 || exit $?			# rsync retc==24 if src file has vanished
 	elif (( RSYNC_ACTUAL_SPLIT == 1 )) ; then
 		logcmd rsync "$@" || exit 1
 	else
@@ -1396,7 +1412,7 @@ if ! $hotsync ; then
 
 	$SSH $secondary mkdir -p $tmpdir
 	$SSH $secondary find $datadir  -type f ! -name "auto.cnf" ! -name "relay-log*" ! -name "bin-log*" ! -name "*".ibd -print > $tmpdir/secondary.nonibds
-        $SSH $secondary find $datadir  -type f ! -name "relay-log*" ! -name "bin-log*" -name "*".ibd -ls  | awk '{print $7" "$11}' > $tmpdir/secondary.ibds
+        $SSH $secondary find $datadir  -type f ! -name "relay-log*" ! -name "bin-log*" -name "*".ibd -exec ls -n '{}' + | awk '{s=$5;$1=$2=$3=$4=$5=$6=$7=$8=""; print s,substr($0,9)}' > $tmpdir/secondary.ibds
         $SCP -q $tmpdir/secondary.nonibds $tmpdir/secondary.ibds $secondary:$tmpdir		# ensure same filenames from secondary are compared on both hosts
 
 	if [[ -s "$tmpdir/secondary.nonibds" || -s "$tmpdir/secondary.ibds" ]] ; then
