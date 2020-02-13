@@ -1027,3 +1027,13 @@ Release notes for version 3.61
 
 1) Added warning message (that will not fail the replicate.sh) if either 'max processes' or 'max open files'
    are below values required within the Controller's Linux installation pre-requisites. 
+
+--------------------------------------
+Release notes for version 3.62
+
+1) the get_privilege_escalation has a path where ssh <host> sudo is run.  this requires that ssh be run with the
+   -t option to allocate a pty.
+
+2) replicate had a too-wide rm -f logs/*log*, intending to prune bin-logs and relay-logs.  this also hit a mds
+   database directory.
+

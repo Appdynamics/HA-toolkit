@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.61 2020-02-11 23:20:42 robnav $
+# $Id: replicate.sh 3.62 2020-02-13 11:43:37 cm68 $
 #
 # install HA to a controller pair
 #
@@ -227,7 +227,7 @@ before proceeding."
 
 function get_privilege_escalation(){
 	local host=$1
-	local ssh=`[ -n "$host" ] && echo "$SSH -q"`
+	local ssh=`[ -n "$host" ] && echo "$SSH -qt"`
 	local escalation_type=
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
@@ -1210,7 +1210,8 @@ if ! $appserver_only_sync ; then
 	message "inhibit running of secondary and delete mysql/innodb logfiles"
 	$SSH $secondary rm -f $APPD_ROOT/bin/controller.sh \
 		"$innodb_logdir/ib_logfile*" \
-		"$datadir/*log*" \
+		"$datadir/relay-log*" \
+		"$datadir/bin-log*" \
 		$datadir/ibdata1 2>&1 | logonly
 	
 	#
