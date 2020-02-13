@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: ha.sh 3.34 2018-08-02 12:28:23 cmayer $
+# $Id: lib/ha.sh 3.61 2020-02-11 23:20:21 robnav $
 #
 # ha.sh
 # this file generally contains functions and definitions that are not included in the
@@ -301,3 +301,32 @@ function do_check_ssh_setup {
    return 0
 }
 
+# Help prevent tickets due to inadequate shell resources for "Max processes" or "Max open files"
+# Will only return 1 if all tests worked and they show too-small resource values. 
+# Call errors etc should result in warning and return 0 so that caller is not troubled.
+function check_system_limits {
+	local proc nproc nopen retc pattern='^[[:digit:]]+$' userm=$(echo " for user $(id -un)")
+	local -a msg
+	local nproc_min=8192 nopen_min=65535
+	proc=$(cat /proc/$$/limits 2>/dev/null)
+	(( $? == 0 )) || { warn "${FUNCNAME[0]}: /proc/*/limits not readable"; return 0; }	# /proc not supported etc.
+
+	nproc=$(awk '$0 ~ /ax process/ {print $(NF-2)}' <<< "$proc")
+	nopen=$(awk '$0 ~ /pen files/ {print $(NF-2)}' <<< "$proc")
+	[[ "$nproc" =~ $pattern ]] || { warn "${FUNCNAME[0]}: no integer value found for nproc limit"; return 0; }	# headers unrecognised e.g. not Bash
+	[[ "$nopen" =~ $pattern ]] || { warn "${FUNCNAME[0]}: no integer value found for nopen limit"; return 0; }	# headers unrecognised e.g. not Bash
+
+	if (( nproc < nproc_min )) ; then
+		msg+=("Shell soft limit of 'max processes'$userm too low ($nproc). Should be at least $nproc_min.")
+	fi
+	if (( nopen < nopen_min )) ; then
+		msg+=("Shell soft limit of 'max open files'$userm too low ($nopen). Should be at least $nopen_min.")
+	fi
+	if (( ${#msg[*]} == 0 )) ; then
+		return 0
+	else
+		local tmp=$(IFS=$'\n'; echo "${msg[*]}" )
+		warn "$tmp"
+		return 1
+	fi
+}

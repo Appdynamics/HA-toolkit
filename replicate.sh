@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.60 2019-12-12 20:03:41 robnav $
+# $Id: replicate.sh 3.61 2020-02-11 23:20:42 robnav $
 #
 # install HA to a controller pair
 #
@@ -987,6 +987,9 @@ require "ex" "vim-minimal" "vim-tiny" || exit 1
 require "rsync" "rsync" "rsync" || exit 1
 type awk &> /dev/null || fatal 1 "awk or gawk must be installed"
 type shuf &> /dev/null || fatal 1 "GNU coreutils must be installed (for shuf)"
+
+# Emit warning, but do not stop script, if either "Max processes" or "Max open files" not large enough
+check_system_limits || warn "IMPORTANT: Controller may break in strange ways unless shell resource limits are large enough."
 
 #
 # kill a remote rsyncd if we have one

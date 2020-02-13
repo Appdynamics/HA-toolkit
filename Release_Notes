@@ -1021,3 +1021,9 @@ Release notes for version 3.60
 
 2) Fixed rare failure in replicate.sh if file to be rsync'd has been deleted by time rsync starts. 
    Just the return code, 24, for vanished input file has been added to rsync's ignore list.
+
+--------------------------------------
+Release notes for version 3.61
+
+1) Added warning message (that will not fail the replicate.sh) if either 'max processes' or 'max open files'
+   are below values required within the Controller's Linux installation pre-requisites. 
