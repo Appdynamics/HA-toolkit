@@ -232,10 +232,10 @@ function get_privilege_escalation(){
 	local errors=0
 	for s in ${appdynamics_service_list[@]}
 	do 
-		if $ssh $host test -f $APPD_ROOT/HA/NOROOT ; then
+		if $ssh $host test -f $APPD_ROOT/HA/NOROOT > /dev/null ; then
 			escalation_type="noroot"
-		elif $ssh $host test -x /sbin/appdservice ; then
-			if $ssh $host file /sbin/appdservice | grep -q setuid ; then
+		elif $ssh $host test -x /sbin/appdservice > /dev/null ; then
+			if $ssh $host file /sbin/appdservice | grep -q setuid > /dev/null ; then
 				escalation_type="setuid"
 			else
 				escalation_type="pbrun"
