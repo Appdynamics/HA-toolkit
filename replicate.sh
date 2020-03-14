@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.62 2020-02-13 11:43:37 cm68 $
+# $Id: replicate.sh 3.63 2020-03-14 15:27:43 robnav $
 #
 # install HA to a controller pair
 #
