@@ -1037,3 +1037,7 @@ Release notes for version 3.62
 2) replicate had a too-wide rm -f logs/*log*, intending to prune bin-logs and relay-logs.  this also hit a mds
    database directory.
 
+--------------------------------------
+Release notes for version 3.63
+
+1) Minor patch to prevent chatty ssh installations (e.g. boks_ssh) from breaking replicate.sh.
