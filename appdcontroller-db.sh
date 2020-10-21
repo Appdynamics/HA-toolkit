@@ -100,6 +100,11 @@ function do_numa_settings {
 			echo "never" > $dir/defrag
 		fi
 	done
+
+	# also add in here disabling of numa_balancing as memory/processes have been explicity set in numa.settings
+	# See: https://www.kernel.org/doc/Documentation/sysctl/kernel.txt and
+	# https://documentation.suse.com/sles/15-SP1/html/SLES-all/cha-tuning-numactl.html
+	echo 0 > /proc/sys/kernel/numa_balancing
 }
 
 #

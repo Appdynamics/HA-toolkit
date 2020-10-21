@@ -83,7 +83,7 @@ function start() {
     mkdir -p /var/lock/subsys
 	rm -f $pidfile
 
-	# place every machine agent in its own process session to simplify killing it later
+	# place every machine agent in its own process group to simplify killing it later
 	pid=`bg_runuser setsid $JAVA $JAVA_OPTS -jar $MACHINE_AGENT_HOME/machineagent.jar`
 	echo $pid > $pidfile
     touch $lockfile

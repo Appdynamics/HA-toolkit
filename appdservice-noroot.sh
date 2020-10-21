@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# $Id: appdservice-noroot.sh 3.47 2019-03-22 16:05:00 saradhip $
+# $Id: appdservice-noroot.sh 3.64 2020-06-05 15:00:58 robnav $
 #
 # no root shell wrapper for appdynamics service changes
 #
@@ -195,7 +195,7 @@ appdynamics-machine-agent:start)
 		echo "cannot find machine agent"
 		exit 0
 	fi
-	nohup $JAVA $JAVA_OPTS -jar $ma_dir/machineagent.jar >/dev/null 2>&1 &
+	nohup setsid $JAVA $JAVA_OPTS -jar $ma_dir/machineagent.jar >/dev/null 2>&1 &
 	;;
 
 appdynamics-machine-agent:stop)

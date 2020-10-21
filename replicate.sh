@@ -578,7 +578,7 @@ function prepare_checksum_work {
 	[[ -f "${allibds}" ]] || fatal 1 "unable to open ${allibds}"
 	if [[ -s "$tmpdir/secondary.ibds" ]] ; then
 		split_file ${allibds} ${split} CHECK_ACTUAL_SPLIT	# assigns CHECK_ACTUAL_SPLIT
-		$SCP -q $tmpdir/split*.txt $secondary:$tmpdir
+		$SCP -q $tmpdir/split*.txt $secondary:$tmpdir || fatal 1 "ERROR: unable to scp (path=$SCP) to $secondary"
 	fi
 
 	cat <<- 'EOT' > ${tmpdir}/$CHECKSUM_RUN
@@ -677,7 +677,7 @@ fi
 LC_ALL=C sort -u -k 1 ${tmpdir}/map.local > ${tmpdir}/map.local.sort
 	EOT
 
-	$SCP -q ${tmpdir}/$CHECKSUM_RUN $secondary:$tmpdir
+	$SCP -q ${tmpdir}/$CHECKSUM_RUN $secondary:$tmpdir || fatal 1 "ERROR: unable to scp (path=$SCP) to $secondary"
 	# now both primary and secondary should have all they need to run checksums over same filenames at same time
 }
 
