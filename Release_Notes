@@ -1041,3 +1041,14 @@ Release notes for version 3.62
 Release notes for version 3.63
 
 1) Minor patch to prevent chatty ssh installations (e.g. boks_ssh) from breaking replicate.sh.
+
+--------------------------------------
+Release notes for version 3.64
+
+1) disabled /proc/sys/kernel/numa_balancing and other small changes
+
+--------------------------------------
+Release notes for version 3.65
+
+1) Fix to prevent rsync of controller install dir also wrongly copying datadir if within $APPD_ROOT/data or some such sub-directory. Duplicate copying of datadir leads to replication failure with "master and slave have equal MySQL server UUIDs".
+

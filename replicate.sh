@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.63 2020-03-14 15:27:43 robnav $
+# $Id: replicate.sh 3.65 2020-12-07 19:55:44 robnav $
 #
 # install HA to a controller pair
 #
@@ -791,6 +791,43 @@ function prsync {
 	message "  rsync of $srcdir completed in $(( endsecs-startsecs )) seconds"
 }
 
+# return true if directory X *strictly* contains directory Y else false e.g. 
+# includes_dir / /tmp 	returns true
+# includes_dir / / 	returns false 		# must strictly contain
+function includes_dir {
+	(($# == 2 )) || fatal 10 "Usage: ${FUNCNAME[0]} <dir1> <dir2>"
+	local dir1=$(cd $1 &> /dev/null && pwd -P)	# normalise directory to ignore symbolic link
+	local dir2=$(cd $2 &> /dev/null && pwd -P)	# normalise directory to ignore symbolic link
+
+	if [[ -n "$dir1" && -n "$dir2" ]] && (( ${#dir1} < ${#dir2} )) && [[ "${dir2:0:${#dir1}}" == "$dir1" ]]; then
+		return 0
+	else
+		return 1
+	fi
+}
+#
+# *If* MySQL datadir is contained within $APPD_ROOT then we need to exclude it from controller-only copy.
+# rsync has odd exclude rules (See "Include/Exclude Pattern Rules" section within https://linux.die.net/man/1/rsync) 
+# and so need to catch this case and create a special rsync exclude path that works for rsync e.g.
+# datadir in $APPD_ROOT/data    requires EXCLUDE_DATADIR="--exclude=/data"
+# datadir in $APPD_ROOT/db/data requires EXCLUDE_DATADIR="--exclude=/db/data"
+# else
+# datadir outside $APPD_ROOT requires EXCLUDE_DATADIR=""
+#
+function make_rsync_exclude {
+	(($# == 2 )) || fatal 11 "Usage: ${FUNCNAME[0]} <APPD_ROOT> <datadir>"
+	local dir1=$(cd $1 &> /dev/null && pwd -P)	# normalise directory to ignore symbolic link
+	local dir2=$(cd $2 &> /dev/null && pwd -P)	# normalise directory to ignore symbolic link
+	local exclude_dir=""
+
+	if includes_dir "$dir1" "$dir2"; then
+		exclude_dir="${dir2:${#dir1}}"		# all of $dir2 minus $dir1
+		[[ ${exclude_dir:0:1} == '/' ]] || exclude_dir="/$exclude_dir"	# ensure leading '/'
+		exclude_dir="--exclude=$exclude_dir"
+	fi
+	echo "$exclude_dir"
+}
+
 while getopts :s:e:m:a:i:dfhjut:P:nwzEFHMWUS7X flag; do
 	case $flag in
 	7)
@@ -1464,6 +1501,9 @@ if ! echo $JAVA | grep -q $APPD_ROOT ; then
 		${JAVA%bin/java} $JAVADEST
 fi
 
+# build special rsync exclude path when datadir inside APPD_ROOT
+EXCLUDE_DATADIR=$(make_rsync_exclude $APPD_ROOT $datadir)
+
 message "Rsync'ing Controller: $APPD_ROOT"
 logcmd rsync $rsync_opts \
 	$rsync_throttle $rsync_compression \
@@ -1473,9 +1513,8 @@ logcmd rsync $rsync_opts \
 	--exclude=HA/\*.pid \
 	--exclude=db/\*.pid \
 	--exclude=logs/\* \
-	--exclude=$datadir \
+	"$EXCLUDE_DATADIR" \
 	--exclude=backup \
-	--exclude=db/data \
 	--exclude=db/bin/.status \
 	--exclude=app_agent_operation_logs \
 	--exclude=appserver/glassfish/domains/domain1/appagent/logs/\* \
