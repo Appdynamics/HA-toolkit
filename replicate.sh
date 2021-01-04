@@ -1764,8 +1764,8 @@ if $ssl_replication ; then
 	#
 	# make a CA
 	#
-	openssl genrsa 2048 > $CERTS/ca-key.pem 2>/dev/null
-	openssl req -new -x509 -nodes -days 3650 \
+	$OPENSSL genrsa 2048 > $CERTS/ca-key.pem 2>/dev/null
+	$OPENSSL req -new -x509 -nodes -days 3650 \
 		-key $CERTS/ca-key.pem -out $CERTS/ca-cert.pem -subj "/CN=ca" >/dev/null 2>&1
 
 	#
@@ -1774,11 +1774,11 @@ if $ssl_replication ; then
 	for cn in $primary $secondary ; do
 		base=$CERTS/$cn
 		echo "making host $cn keypair"
-		openssl req -newkey rsa:2048 \
+		$OPENSSL req -newkey rsa:2048 \
 			-subj "/CN=$cn" -nodes -days 3650 \
 			-keyout $base-private.pem -out $base-public.pem >/dev/null 2>&1
-		openssl rsa -in $base-private.pem -out $base-private.pem >/dev/null 2>&1
-		openssl x509 -req -days 3560 -set_serial 01 \
+		$OPENSSL rsa -in $base-private.pem -out $base-private.pem >/dev/null 2>&1
+		$OPENSSL x509 -req -days 3560 -set_serial 01 \
 			-in $base-public.pem -out $base-cert.pem \
 			-CA $CERTS/ca-cert.pem -CAkey $CERTS/ca-key.pem >/dev/null 2>&1
 	done
