@@ -29,6 +29,7 @@
 #
 SSH=ssh
 SCP=scp
+OPENSSL=openssl
 
 #
 # if this file exists, source it to set any local customizations to the execution environment
