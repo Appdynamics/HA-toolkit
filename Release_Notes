@@ -1050,5 +1050,10 @@ Release notes for version 3.64
 --------------------------------------
 Release notes for version 3.65
 
+
 1) Fix to prevent rsync of controller install dir also wrongly copying datadir if within $APPD_ROOT/data or some such sub-directory. Duplicate copying of datadir leads to replication failure with "master and slave have equal MySQL server UUIDs".
+
+--------------------------------------
+Release notes for version 3.66
+added symbolic reference to OPENSSL, so substitution can be easy
 
