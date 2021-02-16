@@ -1,5 +1,5 @@
 #!/bin/bash
-# $Id: replicate.sh 3.65 2020-12-07 19:55:44 robnav $
+# $Id: replicate.sh 3.67 2021-02-15 18:40:32 robnav $
 #
 # install HA to a controller pair
 #
@@ -773,9 +773,10 @@ function prsync {
 		for i in $(seq 1 $RSYNC_ACTUAL_SPLIT) ; do
 			# duplicate code here because want to log exact syntax but shell interpretation of <(...) 
 			# happens before "..." expansion AND need output to go to unbuffered sed pipe
-			logonly <<< "rsync --files-from=<(awk '{print \$2}' ${tmpdir}/split.$i.txt) $@ | sed -u 's/^/Thread'$i': /"
+			logonly <<< "rsync --files-from=<(awk '{print \$2}' ${tmpdir}/split.$i.txt) $@ 2> >(tee >(cat 1>&2)) | sed -u 's/^/Thread'$i': /"
 			# will lose rsync return code unless 'set -o pipefail' in sub-shell
-			( set -o pipefail; rsync --files-from=<(awk '{print $2}' ${tmpdir}/split.$i.txt) "$@" | sed -u 's/^/Thread'$i': /' >> >(logonly) ) &
+			# note extra logic here to copy STDERR text to STDOUT so that it appears on screen and within log file: 2> >(tee >(cat 1>&2))
+			( set -o pipefail; rsync --files-from=<(awk '{print $2}' ${tmpdir}/split.$i.txt) "$@" 2> >(tee >(cat 1>&2)) | sed -u 's/^/Thread'$i': /' >> >(logonly) ) &
 			pids+=($!)
 			status[$!]="rsync partition $i of $RSYNC_ACTUAL_SPLIT"  # help narrow down failing sub-task
 		done

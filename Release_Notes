@@ -1057,3 +1057,8 @@ Release notes for version 3.65
 Release notes for version 3.66
 added symbolic reference to OPENSSL, so substitution can be easy
 
+--------------------------------------
+Release notes for version 3.67
+
+1) parallel replicate rsync thread errors now copied to STDERR and saved to log file
+
