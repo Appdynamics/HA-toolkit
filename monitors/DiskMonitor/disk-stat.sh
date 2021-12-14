@@ -2,11 +2,11 @@
 # 
 # Monitors Disks on Linux 
 # 
-# $Id: disk-stat.sh 3.20 2017-06-02 15:05:40 cmayer $
+# $Id: disk-stat.sh 3.21 2021-01-02 cmayer $
 # 
 # using only: iostat, awk
 # 
-# Copyright 2016 AppDynamics, Inc 
+# Copyright 2021 AppDynamics, Inc 
 # 
 # Licensed under the Apache License, Version 2.0 (the "License"); 
 # you may not use this file except in compliance with the License. 
@@ -23,31 +23,44 @@
 
 PATH=$PATH:/bin:/usr/sbin:/sbin:/usr/bin:/usr/local/sbin:/usr/local/bin
 
-iostat -xk 1 | awk ' 
-/Device:/ { state ++; next }
-( NF == 12 && state >= 2) { 
-   state=2;
-   agg="AVERAGE"; 
-   dev = $1; 
-   printf("name=Hardware Resources|Disk|%s|avg req size (s),aggregator=%s,value=%d\n", dev, agg, $8); 
-   printf("name=Hardware Resources|Disk|%s|avg queue length,aggregator=%s,value=%d\n", dev, agg, $9); 
-   printf("name=Hardware Resources|Disk|%s|avg wait (ms),aggregator=%s,value=%d\n", dev, agg, $10); 
-   printf("name=Hardware Resources|Disk|%s|avg svctime (ms),aggregator=%s,value=%d\n", dev, agg, $11); 
-   printf("name=Hardware Resources|Disk|%s|utilization (ms),aggregator=%s,value=%d\n", dev, agg, $12); 
-   next
-} 
-( NF == 14 && state >= 2) { 
-   state=2;
-   agg="AVERAGE"; 
-   dev = $1; 
-   printf("name=Hardware Resources|Disk|%s|reads per sec,aggregator=%s,value=%d\n", dev, agg, $4); 
-   printf("name=Hardware Resources|Disk|%s|writes per sec,aggregator=%s,value=%d\n", dev, agg, $5); 
-   printf("name=Hardware Resources|Disk|%s|reads (kb/s),aggregator=%s,value=%d\n", dev, agg, $6); 
-   printf("name=Hardware Resources|Disk|%s|writes (kb/s),aggregator=%s,value=%d\n", dev, agg, $7); 
-   printf("name=Hardware Resources|Disk|%s|avg req size (s),aggregator=%s,value=%d\n", dev, agg, $8); 
-   printf("name=Hardware Resources|Disk|%s|avg queue length,aggregator=%s,value=%d\n", dev, agg, $9); 
-   printf("name=Hardware Resources|Disk|%s|avg wait (ms),aggregator=%s,value=%d\n", dev, agg, $10); 
-   printf("name=Hardware Resources|Disk|%s|avg read await (ms),aggregator=%s,value=%d\n", dev, agg, $11); 
-   printf("name=Hardware Resources|Disk|%s|avg write await (ms),aggregator=%s,value=%d\n", dev, agg, $12); 
-   next
-} '
+#
+# this version is tolerant of varying iostat column order, presence and names
+#
+iostat -xdk 1 | awk ' 
+BEGIN {
+	# column translation array indexed by heading
+	trans["r/s"]="reads per sec"
+	trans["w/s"]="writes per sec"
+	trans["rkB/s"] = "reads (kb/s)"
+	trans["wkB/s"] = "writes (kb/s)"
+	trans["aqu-sz"] = "avg queue length"
+	trans["avgqu-sz"] = "avg queue length"
+	trans["await"] = "avg wait (ms)"
+	trans["rareq-sz"] = "avg read size (k)"
+	trans["r_await"] = "avg read await (ms)"
+	trans["wareq-sz"] = "avg write size (k)"
+	trans["w_await"] = "avg write await (ms)"
+	trans["svctm"] = "service time (ms)"
+}
+
+/Device/ { 
+	reports++
+	if (reports > 1) next
+	# process heading and link output fields to actual fields
+	for (col = 2; col <= NF; col++) {
+		if ($col in trans) {
+			colname[col] = trans[$col];
+		}
+	}
+	next
+}
+
+# ignore the first cumulative report
+(reports > 1) {
+	# scan through columns with names
+	for (col = 2; col <= NF; col++) {
+		if (!colname[col]) continue;
+		printf("name=Hardware Resources|Disk|%s|%s,aggregator=AVERAGE,value=%d\n", 
+			$1, colname[col], $col);
+	}
+}'

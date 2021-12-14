@@ -1062,3 +1062,17 @@ Release notes for version 3.67
 
 1) parallel replicate rsync thread errors now copied to STDERR and saved to log file
 
+--------------------------------------
+Release notes for version 3.68
+
+1) when crashing, mysql sometimes leaves behind truncate files.  these mess up restarts
+   after replication, since they will contain stale table state.  they are now removed.
+
+2) the disk monitor had an unfortunate sensitivity to version, where the columns displayed
+   varied between OS releases.   now, it is much smarter, parsing the heading and associating
+   the headings with metric names, and then binding the corresponding columns to metrics
+   at run time.   this no longer requires modification based on column count; it does the
+   right thing when columns are added or deleted, or even renamed.  if a new version decides
+   to rename a column, then it can be added to the translation table and things will just
+   work.
+

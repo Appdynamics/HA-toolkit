@@ -1247,7 +1247,7 @@ if ! $appserver_only_sync ; then
 	#
 	message "inhibit running of secondary and delete mysql/innodb logfiles"
 	$SSH $secondary rm -f $APPD_ROOT/bin/controller.sh \
-		"$innodb_logdir/ib_logfile*" \
+		"$innodb_logdir/ib_logfile*" "$innodb_logdir/ib*_trunc.log" \
 		"$datadir/relay-log*" \
 		"$datadir/bin-log*" \
 		$datadir/ibdata1 2>&1 | logonly
